@@ -38,15 +38,26 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.logging.Logger
 
-@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateRunnable: Runnable
+    private lateinit var settingsManager: SettingsManager
+    private val logger = Logger.getLogger("MainActivity")
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        settingsManager = SettingsManager(this)
+
+        if (!settingsManager.areSettingsComplete()) {
+            startActivity(Intent(this, InitialSetupActivity::class.java))
+//            finish()
+//            return
+        }
+
         if (!isUsageStatsPermissionGranted()) {
             navigateToUsageStatsPermissionSettings()
         }
