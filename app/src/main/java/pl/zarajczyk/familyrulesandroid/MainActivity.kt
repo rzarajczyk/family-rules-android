@@ -1,6 +1,7 @@
 package pl.zarajczyk.familyrulesandroid
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -12,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,7 +31,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import org.json.JSONArray
 import org.json.JSONObject
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.io.OutputStream
@@ -79,11 +80,21 @@ class MainActivity : ComponentActivity() {
     private fun setupPeriodicUpdate() {
         updateRunnable = Runnable {
             val usageStatsList = fetchUsageStats()
-            sendUsageStatsToServer(usageStatsList)
+            val totalScreenTime = getTotalScreenOnTimeSinceMidnight()
+            val result = sendUsageStatsToServer(usageStatsList, totalScreenTime)
+            if (result is Result.Error) {
+                showError(result.message)
+            }
             setupContent()
             handler.postDelayed(updateRunnable, 5000)
         }
         handler.post(updateRunnable)
+    }
+
+    private fun showError(message: String) {
+        runOnUiThread {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun isUsageStatsPermissionGranted(): Boolean {
@@ -129,36 +140,89 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sendUsageStatsToServer(usageStatsList: List<UsageStats>) {
-        val json = convertUsageStatsToJson(usageStatsList)
-        val url = URL("http://cloud.local:8080/api/v1/report")
-        try {
+    private fun getTotalScreenOnTimeSinceMidnight(): Long {
+        val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val endTime = System.currentTimeMillis()
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startTime = calendar.timeInMillis
+        val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
+        var totalScreenOnTime = 0L
+        var screenOnTime = 0L
+        var screenOffTime = 0L
+
+        while (usageEvents.hasNextEvent()) {
+            val event = UsageEvents.Event()
+            usageEvents.getNextEvent(event)
+            when (event.eventType) {
+                UsageEvents.Event.SCREEN_INTERACTIVE -> screenOnTime = event.timeStamp
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    screenOffTime = event.timeStamp
+                    if (screenOnTime != 0L) {
+                        totalScreenOnTime += screenOffTime - screenOnTime
+                        screenOnTime = 0L
+                    }
+                }
+            }
+        }
+        return totalScreenOnTime / 1000 // Convert to seconds
+    }
+
+    private fun sendUsageStatsToServer(usageStatsList: List<UsageStats>, totalScreenTime: Long): Result {
+        val serverUrl = settingsManager.getString("serverUrl", "")
+        val username = settingsManager.getString("username", "")
+        val instanceId = settingsManager.getString("instanceId", "")
+        val instanceToken = settingsManager.getString("instanceToken", "")
+
+        val applications = JSONObject().apply {
+            usageStatsList.forEach { stat ->
+                put(stat.packageName, stat.totalTimeInForeground / 1000)
+            }
+        }
+
+        val json = JSONObject().apply {
+            put("instanceId", instanceId)
+            put("screenTime", totalScreenTime)
+            put("applications", applications)
+        }.toString()
+
+        val url = URL("$serverUrl/api/v1/report")
+        return try {
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json; utf-8")
+            val auth = android.util.Base64.encodeToString("$username:$instanceToken".toByteArray(), android.util.Base64.NO_WRAP)
+            connection.setRequestProperty("Authorization", "Basic $auth")
             connection.doOutput = true
+
+            // Log the request details
+            logger.info("Sending request to: $url")
+            logger.info("Request headers: Authorization: Basic $auth, Content-Type: application/json; utf-8")
+            logger.info("Request body: $json")
+
             connection.outputStream.use { os: OutputStream ->
                 val input = json.toByteArray(Charsets.UTF_8)
                 os.write(input, 0, input.size)
             }
-            connection.responseCode // To trigger the request
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                Result.Success
+            } else {
+                Result.Error("Failed to send usage stats: HTTP $responseCode")
+            }
         } catch (e: Exception) {
-            // Ignore any errors
+            Result.Error("Failed to send usage stats: ${e.message}")
         }
     }
 
-    private fun convertUsageStatsToJson(usageStatsList: List<UsageStats>): String {
-        val jsonArray = JSONArray()
-        usageStatsList.forEach { stat ->
-            val jsonObject = JSONObject()
-            jsonObject.put("packageName", stat.packageName)
-            jsonObject.put("lastTimeUsed", stat.lastTimeUsed)
-            jsonObject.put("totalTimeInForeground", stat.totalTimeInForeground)
-            jsonArray.put(jsonObject)
-        }
-        return jsonArray.toString()
-    }
-}
+    sealed class Result {
+        object Success : Result()
+        data class Error(val message: String) : Result()
+    }}
 
 @Composable
 fun MainScreen(usageStatsList: List<UsageStats>, settingsManager: SettingsManager) {
