@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
 
         if (!settingsManager.areSettingsComplete()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
-//            finish()
+            finish()
 //            return
         }
 
