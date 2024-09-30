@@ -20,8 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -45,7 +44,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var updateRunnable: Runnable
     private lateinit var settingsManager: SettingsManager
     private val logger = Logger.getLogger("MainActivity")
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,7 +71,7 @@ class MainActivity : ComponentActivity() {
     private fun setupContent() {
         setContent {
             FamilyRulesAndroidTheme {
-                MainScreen(fetchUsageStats())
+                MainScreen(fetchUsageStats(), settingsManager)
             }
         }
     }
@@ -163,15 +161,24 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(usageStatsList: List<UsageStats>) {
+fun MainScreen(usageStatsList: List<UsageStats>, settingsManager: SettingsManager) {
+    val context = LocalContext.current
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { AppTopBar() }
     ) { innerPadding ->
-        UsageStatsDisplay(
-            usageStatsList = usageStatsList,
-            modifier = Modifier.padding(innerPadding)
-        )
+        Column(modifier = Modifier.padding(innerPadding)) {
+            UsageStatsDisplay(usageStatsList)
+            Button(
+                onClick = {
+                    settingsManager.clearSettings()
+                    context.startActivity(Intent(context, InitialSetupActivity::class.java))
+                },
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text("Clear Settings")
+            }
+        }
     }
 }
 

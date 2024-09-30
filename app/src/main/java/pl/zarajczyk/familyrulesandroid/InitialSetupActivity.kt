@@ -63,8 +63,8 @@ fun InitialSetupScreen(settingsManager: SettingsManager, onSetupComplete: () -> 
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
         )
         TextField(
-            value = instanceId,
-            onValueChange = { instanceId = it },
+            value = instanceToken,
+            onValueChange = { instanceToken = it },
             label = { Text("Instance Token") },
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
         )

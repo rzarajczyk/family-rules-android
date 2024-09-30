@@ -21,4 +21,8 @@ class SettingsManager(context: Context) {
                getString("instanceName", null) != null &&
                getString("instanceToken", null) != null
     }
+
+    fun clearSettings() {
+        preferences.edit().clear().apply()
+    }
 }
