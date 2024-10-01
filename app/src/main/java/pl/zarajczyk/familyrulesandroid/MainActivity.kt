@@ -1,12 +1,9 @@
 package pl.zarajczyk.familyrulesandroid
 
+import ReportWorker
 import android.app.AppOpsManager
-import android.app.usage.UsageEvents
-import android.app.usage.UsageStats
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -18,11 +15,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -31,26 +40,25 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import org.json.JSONObject
-import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
-import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.logging.Logger
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import kotlin.text.*
+import org.json.JSONObject
+import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateRunnable: Runnable
     private lateinit var settingsManager: SettingsManager
-    private val logger = Logger.getLogger("MainActivity")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +79,12 @@ class MainActivity : ComponentActivity() {
 
         setupContent()
         setupPeriodicUpdate()
+
+        val reportWorkRequest =
+            OneTimeWorkRequestBuilder<ReportWorker>()
+                .setInitialDelay(5, TimeUnit.SECONDS)
+                .build()
+        WorkManager.getInstance(this).enqueue(reportWorkRequest)
     }
 
     override fun onDestroy() {
@@ -81,12 +95,12 @@ class MainActivity : ComponentActivity() {
     private fun setupContent() {
         setContent {
             FamilyRulesAndroidTheme {
-                MainScreen(fetchUsageStats(), settingsManager)
+                MainScreen(fetchUsageStats(this.applicationContext), settingsManager)
             }
         }
     }
 
-    fun sendLaunchRequest(context: Context) {
+    private fun sendLaunchRequest(context: Context) {
         val settingsManager = SettingsManager(context)
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
@@ -100,7 +114,10 @@ class MainActivity : ComponentActivity() {
                 put(JSONObject().apply {
                     put("deviceState", "ACTIVE")
                     put("title", "Active")
-                    put("icon", "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/>")
+                    put(
+                        "icon",
+                        "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/>"
+                    )
                     put("description", JSONObject.NULL)
                 })
             })
@@ -112,7 +129,10 @@ class MainActivity : ComponentActivity() {
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                val auth = android.util.Base64.encodeToString("$username:$instanceToken".toByteArray(), android.util.Base64.NO_WRAP)
+                val auth = android.util.Base64.encodeToString(
+                    "$username:$instanceToken".toByteArray(),
+                    android.util.Base64.NO_WRAP
+                )
                 connection.setRequestProperty("Authorization", "Basic $auth")
                 connection.doOutput = true
 
@@ -134,19 +154,10 @@ class MainActivity : ComponentActivity() {
 
     private fun setupPeriodicUpdate() {
         updateRunnable = Runnable {
-            val usageStatsList = fetchUsageStats()
-            val totalScreenTime = getTotalScreenOnTimeSinceMidnight()
-            sendUsageStatsToServer(usageStatsList, totalScreenTime)
             setupContent()
             handler.postDelayed(updateRunnable, 5000)
         }
         handler.post(updateRunnable)
-    }
-
-    private fun showError(message: String) {
-        runOnUiThread {
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        }
     }
 
     private fun isUsageStatsPermissionGranted(): Boolean {
@@ -164,126 +175,14 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
-    private fun fetchUsageStats(): List<UsageStats> {
-        val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val startTime = calendar.timeInMillis
-        val usageStatsList = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            startTime,
-            endTime
-        )
-        return usageStatsList.filterNot { isSystemApp(it.packageName) || it.totalTimeInForeground == 0L }
-    }
-
-    private fun isSystemApp(packageName: String): Boolean {
-        return try {
-            val packageManager = applicationContext.packageManager
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        }
-    }
-
-    private fun getTotalScreenOnTimeSinceMidnight(): Long {
-        val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val startTime = calendar.timeInMillis
-        val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
-        var totalScreenOnTime = 0L
-        var screenOnTime = 0L
-        var screenOffTime = 0L
-
-        while (usageEvents.hasNextEvent()) {
-            val event = UsageEvents.Event()
-            usageEvents.getNextEvent(event)
-            when (event.eventType) {
-                UsageEvents.Event.SCREEN_INTERACTIVE -> screenOnTime = event.timeStamp
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                    screenOffTime = event.timeStamp
-                    if (screenOnTime != 0L) {
-                        totalScreenOnTime += screenOffTime - screenOnTime
-                        screenOnTime = 0L
-                    }
-                }
-            }
-        }
-        if (screenOnTime != 0L) {
-            totalScreenOnTime += endTime - screenOnTime
-        }
-        return totalScreenOnTime / 1000 // Convert to seconds
-    }
-
-    private fun sendUsageStatsToServer(usageStatsList: List<UsageStats>, totalScreenTime: Long) {
-        val serverUrl = settingsManager.getString("serverUrl", "")
-        val username = settingsManager.getString("username", "")
-        val instanceId = settingsManager.getString("instanceId", "")
-        val instanceToken = settingsManager.getString("instanceToken", "")
-
-        val applications = JSONObject().apply {
-            usageStatsList.forEach { stat ->
-                put(stat.packageName, stat.totalTimeInForeground / 1000)
-            }
-        }
-
-        val json = JSONObject().apply {
-            put("instanceId", instanceId)
-            put("screenTime", totalScreenTime)
-            put("applications", applications)
-        }.toString()
-
-        CoroutineScope(Dispatchers.IO).launch {
-            val result = try {
-                val url = URL("$serverUrl/api/v1/report")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                val auth = android.util.Base64.encodeToString("$username:$instanceToken".toByteArray(), android.util.Base64.NO_WRAP)
-                connection.setRequestProperty("Authorization", "Basic $auth")
-                connection.doOutput = true
-
-                connection.outputStream.use { os: OutputStream ->
-                    val input = json.toByteArray(Charsets.UTF_8)
-                    os.write(input, 0, input.size)
-                }
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    Result.Success
-                } else {
-                    Result.Error("Failed to send usage stats: HTTP $responseCode")
-                }
-            } catch (e: Exception) {
-                Result.Error("Failed to send usage stats: ${e.message}")
-            }
-
-            withContext(Dispatchers.Main) {
-                if (result is Result.Error) {
-                    showError(result.message)
-                }
-            }
-        }
-    }
-
     sealed class Result {
         object Success : Result()
         data class Error(val message: String) : Result()
-    }}
+    }
+}
 
 @Composable
-fun MainScreen(usageStatsList: List<UsageStats>, settingsManager: SettingsManager) {
+fun MainScreen(usageStatsList: List<UsageStatistics>, settingsManager: SettingsManager) {
     val context = LocalContext.current
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -317,7 +216,7 @@ fun AppTopBar() {
 }
 
 @Composable
-fun UsageStatsDisplay(usageStatsList: List<UsageStats>, modifier: Modifier = Modifier) {
+fun UsageStatsDisplay(usageStatsList: List<UsageStatistics>, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     // Sort the usageStatsList by totalTimeInForeground in descending order
@@ -330,7 +229,8 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStats>, modifier: Modifier = Mod
             val hours = totalTimeInSeconds / 3600
             val minutes = (totalTimeInSeconds % 3600) / 60
             val seconds = totalTimeInSeconds % 60
-            val totalTimeFormatted = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+            val totalTimeFormatted =
+                String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
 
             Row(modifier = Modifier.padding(vertical = 8.dp)) {
                 appIcon?.let {
@@ -363,7 +263,7 @@ private fun getAppNameAndIcon(packageName: String, context: Context): Pair<Strin
         val appInfo = packageManager.getApplicationInfo(packageName, 0)
         val appName = packageManager.getApplicationLabel(appInfo).toString()
         val appIcon = packageManager.getApplicationIcon(appInfo).toBitmap()
-        Pair(appName, appIcon)
+        Pair(packageName, appIcon)
     } catch (e: PackageManager.NameNotFoundException) {
         Pair(packageName, null)
     }
