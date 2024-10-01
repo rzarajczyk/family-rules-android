@@ -39,6 +39,11 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.logging.Logger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.text.*
 
 class MainActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
@@ -81,10 +86,7 @@ class MainActivity : ComponentActivity() {
         updateRunnable = Runnable {
             val usageStatsList = fetchUsageStats()
             val totalScreenTime = getTotalScreenOnTimeSinceMidnight()
-            val result = sendUsageStatsToServer(usageStatsList, totalScreenTime)
-            if (result is Result.Error) {
-                showError(result.message)
-            }
+            sendUsageStatsToServer(usageStatsList, totalScreenTime)
             setupContent()
             handler.postDelayed(updateRunnable, 5000)
         }
@@ -172,7 +174,7 @@ class MainActivity : ComponentActivity() {
         return totalScreenOnTime / 1000 // Convert to seconds
     }
 
-    private fun sendUsageStatsToServer(usageStatsList: List<UsageStats>, totalScreenTime: Long): Result {
+    private fun sendUsageStatsToServer(usageStatsList: List<UsageStats>, totalScreenTime: Long) {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val username = settingsManager.getString("username", "")
         val instanceId = settingsManager.getString("instanceId", "")
@@ -190,32 +192,35 @@ class MainActivity : ComponentActivity() {
             put("applications", applications)
         }.toString()
 
-        val url = URL("$serverUrl/api/v1/report")
-        return try {
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json; utf-8")
-            val auth = android.util.Base64.encodeToString("$username:$instanceToken".toByteArray(), android.util.Base64.NO_WRAP)
-            connection.setRequestProperty("Authorization", "Basic $auth")
-            connection.doOutput = true
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = try {
+                val url = URL("$serverUrl/api/v1/report")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json; utf-8")
+                val auth = android.util.Base64.encodeToString("$username:$instanceToken".toByteArray(), android.util.Base64.NO_WRAP)
+                connection.setRequestProperty("Authorization", "Basic $auth")
+                connection.doOutput = true
 
-            // Log the request details
-            logger.info("Sending request to: $url")
-            logger.info("Request headers: Authorization: Basic $auth, Content-Type: application/json; utf-8")
-            logger.info("Request body: $json")
+                connection.outputStream.use { os: OutputStream ->
+                    val input = json.toByteArray(Charsets.UTF_8)
+                    os.write(input, 0, input.size)
+                }
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    Result.Success
+                } else {
+                    Result.Error("Failed to send usage stats: HTTP $responseCode")
+                }
+            } catch (e: Exception) {
+                Result.Error("Failed to send usage stats: ${e.message}")
+            }
 
-            connection.outputStream.use { os: OutputStream ->
-                val input = json.toByteArray(Charsets.UTF_8)
-                os.write(input, 0, input.size)
+            withContext(Dispatchers.Main) {
+                if (result is Result.Error) {
+                    showError(result.message)
+                }
             }
-            val responseCode = connection.responseCode
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                Result.Success
-            } else {
-                Result.Error("Failed to send usage stats: HTTP $responseCode")
-            }
-        } catch (e: Exception) {
-            Result.Error("Failed to send usage stats: ${e.message}")
         }
     }
 
@@ -270,7 +275,13 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStats>, modifier: Modifier = Mod
             val totalTimeInSeconds = stat.totalTimeInForeground / 1000
             val hours = totalTimeInSeconds / 3600
             val minutes = (totalTimeInSeconds % 3600) / 60
-            val totalTimeFormatted = String.format("%02d:%02d", hours, minutes)
+            val seconds = totalTimeInSeconds % 60
+            val totalTimeFormatted = String.format(
+                "%02d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
 
             Row(modifier = Modifier.padding(vertical = 8.dp)) {
                 appIcon?.let {
