@@ -43,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import kotlin.text.*
 
 class MainActivity : ComponentActivity() {
@@ -65,6 +66,9 @@ class MainActivity : ComponentActivity() {
         if (!isUsageStatsPermissionGranted()) {
             navigateToUsageStatsPermissionSettings()
         }
+
+        sendLaunchRequest(this)
+
         setupContent()
         setupPeriodicUpdate()
     }
@@ -78,6 +82,52 @@ class MainActivity : ComponentActivity() {
         setContent {
             FamilyRulesAndroidTheme {
                 MainScreen(fetchUsageStats(), settingsManager)
+            }
+        }
+    }
+
+    fun sendLaunchRequest(context: Context) {
+        val settingsManager = SettingsManager(context)
+        val serverUrl = settingsManager.getString("serverUrl", "")
+        val instanceId = settingsManager.getString("instanceId", "")
+        val username = settingsManager.getString("username", "")
+        val instanceToken = settingsManager.getString("instanceToken", "")
+
+        val json = JSONObject().apply {
+            put("instanceId", instanceId)
+            put("version", "v1")
+            put("availableStates", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("deviceState", "ACTIVE")
+                    put("title", "Active")
+                    put("icon", "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/>")
+                    put("description", JSONObject.NULL)
+                })
+            })
+        }.toString()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val url = URL("$serverUrl/api/v1/launch")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json; utf-8")
+                val auth = android.util.Base64.encodeToString("$username:$instanceToken".toByteArray(), android.util.Base64.NO_WRAP)
+                connection.setRequestProperty("Authorization", "Basic $auth")
+                connection.doOutput = true
+
+                connection.outputStream.use { os: OutputStream ->
+                    val input = json.toByteArray(Charsets.UTF_8)
+                    os.write(input, 0, input.size)
+                }
+
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    throw Exception("Failed to send launch request: HTTP ${connection.responseCode}")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -269,17 +319,18 @@ fun AppTopBar() {
 @Composable
 fun UsageStatsDisplay(usageStatsList: List<UsageStats>, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+
+    // Sort the usageStatsList by totalTimeInForeground in descending order
+    val sortedUsageStatsList = usageStatsList.sortedByDescending { it.totalTimeInForeground }
 
     LazyColumn(modifier = modifier.padding(16.dp)) {
-        items(usageStatsList) { stat ->
+        items(sortedUsageStatsList) { stat ->
             val (appName, appIcon) = getAppNameAndIcon(stat.packageName, context)
-            val lastUsed = dateFormat.format(Date(stat.lastTimeUsed))
             val totalTimeInSeconds = stat.totalTimeInForeground / 1000
             val hours = totalTimeInSeconds / 3600
             val minutes = (totalTimeInSeconds % 3600) / 60
             val seconds = totalTimeInSeconds % 60
-            val totalTimeFormatted = String.format("%02d:%02d:%02d", hours, minutes, seconds)
+            val totalTimeFormatted = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
 
             Row(modifier = Modifier.padding(vertical = 8.dp)) {
                 appIcon?.let {
@@ -296,7 +347,6 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStats>, modifier: Modifier = Mod
                         style = MaterialTheme.typography.bodyLarge,
                         fontSize = 18.sp
                     )
-                    Text(text = "Last Used: $lastUsed", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         text = "Total Time: $totalTimeFormatted",
                         style = MaterialTheme.typography.bodyMedium
