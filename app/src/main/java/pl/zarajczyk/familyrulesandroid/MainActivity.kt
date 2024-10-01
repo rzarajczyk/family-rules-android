@@ -171,6 +171,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (screenOnTime != 0L) {
+            totalScreenOnTime += endTime - screenOnTime
+        }
         return totalScreenOnTime / 1000 // Convert to seconds
     }
 
@@ -276,12 +279,7 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStats>, modifier: Modifier = Mod
             val hours = totalTimeInSeconds / 3600
             val minutes = (totalTimeInSeconds % 3600) / 60
             val seconds = totalTimeInSeconds % 60
-            val totalTimeFormatted = String.format(
-                "%02d:%02d:%02d",
-                hours,
-                minutes,
-                seconds
-            )
+            val totalTimeFormatted = String.format("%02d:%02d:%02d", hours, minutes, seconds)
 
             Row(modifier = Modifier.padding(vertical = 8.dp)) {
                 appIcon?.let {
