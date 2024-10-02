@@ -22,11 +22,13 @@ jobs:
 
       - run: ./gradlew clean assembleRelease
 
+      - run: cp app/build/outputs/apk/release/app-release-unsigned.apk app-release-unsigned.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: app-release-unsigned.apk
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          path: app-release-unsigned.apk
           if-no-files-found: error
 
   create-release:
@@ -34,6 +36,8 @@ jobs:
     needs: [ build ]
     steps:
       - uses: actions/download-artifact@v4
+        with:
+          name: app-release-unsigned.apk
 
       - run: ls
 
