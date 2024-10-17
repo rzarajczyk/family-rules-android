@@ -15,17 +15,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +67,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+//        enableEdgeToEdge()
         settingsManager = SettingsManager(this)
 
         if (!settingsManager.areSettingsComplete()) {
@@ -95,7 +100,11 @@ class MainActivity : ComponentActivity() {
     private fun setupContent() {
         setContent {
             FamilyRulesAndroidTheme {
-                MainScreen(fetchUsageStats(this.applicationContext), settingsManager)
+                MainScreen(
+                    usageStatsList = fetchUsageStats(this.applicationContext),
+                    screenTime = getTotalScreenOnTimeSinceMidnight(this.applicationContext),
+                    settingsManager = settingsManager
+                )
             }
         }
     }
@@ -182,23 +191,41 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(usageStatsList: List<UsageStatistics>, settingsManager: SettingsManager) {
+fun MainScreen(usageStatsList: List<UsageStatistics>, screenTime: Long, settingsManager: SettingsManager) {
     val context = LocalContext.current
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { AppTopBar() }
+        topBar = { AppTopBar() },
+        bottomBar = { BottomToolbar(screenTime, settingsManager, context) }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             UsageStatsDisplay(usageStatsList)
-            Button(
-                onClick = {
-                    settingsManager.clearSettings()
-                    context.startActivity(Intent(context, InitialSetupActivity::class.java))
-                },
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text("Clear Settings")
-            }
+        }
+    }
+}
+
+@Composable
+fun BottomToolbar(screenTime: Long, settingsManager: SettingsManager, context: Context) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "Screen time: ${String.format("%02d:%02d:%02d", screenTime / 3600, (screenTime % 3600) / 60, screenTime % 60)}",
+            modifier = Modifier.padding(start = 16.dp)
+        )
+        Button(
+            onClick = {
+                settingsManager.clearSettings()
+                context.startActivity(Intent(context, InitialSetupActivity::class.java))
+            },
+            modifier = Modifier.padding(end = 16.dp).size(width = 60.dp, height = 40.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = Color.Black
+            )
+        ) {
+            Text("🗑️")
         }
     }
 }
@@ -224,7 +251,7 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStatistics>, modifier: Modifier 
 
     LazyColumn(modifier = modifier.padding(16.dp)) {
         items(sortedUsageStatsList) { stat ->
-            val (appName, appIcon) = getAppNameAndIcon(stat.packageName, context)
+            val app = getAppNameAndIcon(stat.packageName, context)
             val totalTimeInSeconds = stat.totalTimeInForeground / 1000
             val hours = totalTimeInSeconds / 3600
             val minutes = (totalTimeInSeconds % 3600) / 60
@@ -233,7 +260,7 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStatistics>, modifier: Modifier 
                 String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
 
             Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                appIcon?.let {
+                app.icon?.let {
                     Image(
                         bitmap = it.asImageBitmap(),
                         contentDescription = null,
@@ -243,12 +270,12 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStatistics>, modifier: Modifier 
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = appName,
+                        text = app.name,
                         style = MaterialTheme.typography.bodyLarge,
                         fontSize = 18.sp
                     )
                     Text(
-                        text = "Total Time: $totalTimeFormatted",
+                        text = "Total time: $totalTimeFormatted",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -257,17 +284,23 @@ fun UsageStatsDisplay(usageStatsList: List<UsageStatistics>, modifier: Modifier 
     }
 }
 
-private fun getAppNameAndIcon(packageName: String, context: Context): Pair<String, Bitmap?> {
+private fun getAppNameAndIcon(packageName: String, context: Context): App {
     return try {
         val packageManager = context.packageManager
-        val appInfo = packageManager.getApplicationInfo(packageName, 0)
+        val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
         val appName = packageManager.getApplicationLabel(appInfo).toString()
         val appIcon = packageManager.getApplicationIcon(appInfo).toBitmap()
-        Pair(packageName, appIcon)
+        App(appName, packageName, appIcon)
     } catch (e: PackageManager.NameNotFoundException) {
-        Pair(packageName, null)
+        App(packageName, packageName, null)
     }
 }
+
+private data class App(
+    val name: String,
+    val packageName: String,
+    val icon: Bitmap?,
+)
 
 @Preview(showBackground = true)
 @Composable
