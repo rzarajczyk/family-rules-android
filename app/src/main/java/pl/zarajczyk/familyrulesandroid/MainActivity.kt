@@ -13,7 +13,6 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,7 +28,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -40,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,6 +87,9 @@ class MainActivity : ComponentActivity() {
                 .setInitialDelay(5, TimeUnit.SECONDS)
                 .build()
         WorkManager.getInstance(this).enqueue(reportWorkRequest)
+
+        val serviceIntent = Intent(this, KeepAliveService::class.java)
+        startService(serviceIntent)
     }
 
     override fun onDestroy() {
@@ -183,15 +183,14 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
         startActivity(intent)
     }
-
-    sealed class Result {
-        object Success : Result()
-        data class Error(val message: String) : Result()
-    }
 }
 
 @Composable
-fun MainScreen(usageStatsList: List<UsageStatistics>, screenTime: Long, settingsManager: SettingsManager) {
+fun MainScreen(
+    usageStatsList: List<UsageStatistics>,
+    screenTime: Long,
+    settingsManager: SettingsManager
+) {
     val context = LocalContext.current
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -211,7 +210,14 @@ fun BottomToolbar(screenTime: Long, settingsManager: SettingsManager, context: C
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            text = "Screen time: ${String.format("%02d:%02d:%02d", screenTime / 3600, (screenTime % 3600) / 60, screenTime % 60)}",
+            text = "Screen time: ${
+                String.format(
+                    "%02d:%02d:%02d",
+                    screenTime / 3600,
+                    (screenTime % 3600) / 60,
+                    screenTime % 60
+                )
+            }",
             modifier = Modifier.padding(start = 16.dp)
         )
         Button(
@@ -219,7 +225,9 @@ fun BottomToolbar(screenTime: Long, settingsManager: SettingsManager, context: C
                 settingsManager.clearSettings()
                 context.startActivity(Intent(context, InitialSetupActivity::class.java))
             },
-            modifier = Modifier.padding(end = 16.dp).size(width = 60.dp, height = 40.dp),
+            modifier = Modifier
+                .padding(end = 16.dp)
+                .size(width = 60.dp, height = 40.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
                 contentColor = Color.Black
