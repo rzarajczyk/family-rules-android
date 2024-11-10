@@ -1,9 +1,14 @@
 package pl.zarajczyk.familyrulesandroid
 
+import pl.zarajczyk.familyrulesandroid.MainActivity
+import pl.zarajczyk.familyrulesandroid.R
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -12,29 +17,54 @@ import androidx.core.content.ContextCompat
 
 class KeepAliveService : Service() {
 
+    companion object {
+        const val CHANNEL_ID = "FamilyRulesChannel"
+        const val NOTIFICATION_ID = 1001
+    }
+
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "ForegroundServiceChannel",
-                "Foreground Service Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            val manager = ContextCompat.getSystemService(this, NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+                CHANNEL_ID,
+                "Family Rules Service",
+                NotificationManager.IMPORTANCE_HIGH // Changed to HIGH for better visibility
+            ).apply {
+                description = "Keeps Family Rules running in background"
+                enableLights(true)
+                setShowBadge(true)
+            }
+
+            val notificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification: Notification = NotificationCompat.Builder(this, "ForegroundServiceChannel")
-            .setContentTitle("Foreground Service")
-            .setContentText("Service is running")
+        val pendingIntent: PendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Family Rules")
+            .setContentText("Monitoring active")
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
             .build()
 
-        startForeground(1, notification)
-
-        // Perform your background tasks here
+        startForeground(NOTIFICATION_ID, notification)
 
         return START_STICKY
     }

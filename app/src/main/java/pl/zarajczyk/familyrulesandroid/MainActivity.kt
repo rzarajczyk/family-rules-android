@@ -1,11 +1,15 @@
 package pl.zarajczyk.familyrulesandroid
 
 import ReportWorker
+import android.R
 import android.app.AppOpsManager
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -57,6 +61,7 @@ import java.net.URL
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+
 class MainActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateRunnable: Runnable
@@ -70,7 +75,6 @@ class MainActivity : ComponentActivity() {
         if (!settingsManager.areSettingsComplete()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
-//            return
         }
 
         if (!isUsageStatsPermissionGranted()) {
@@ -88,8 +92,30 @@ class MainActivity : ComponentActivity() {
                 .build()
         WorkManager.getInstance(this).enqueue(reportWorkRequest)
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
+        }
+
         val serviceIntent = Intent(this, KeepAliveService::class.java)
-        startService(serviceIntent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+
+//        val nMN = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+//        val n: Notification = Notification.Builder(this)
+//            .setContentTitle("Whip And Weep")
+//            .setContentText("Whip is On!")
+//            .setSmallIcon(R.drawable.ic_menu_search)
+//            .build()
+//        nMN.notify(2, n)
     }
 
     override fun onDestroy() {
