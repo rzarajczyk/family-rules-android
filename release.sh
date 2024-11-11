@@ -13,8 +13,8 @@ NEXT_VERSION=$(echo "$LATEST_VERSION" | awk -F. -v OFS=. '{$NF += 1 ; print}')
 
 echo "The current version is $LATEST_VERSION, preparing $NEXT_VERSION..."
 
-echo "$NEXT_VERSION" > ./src/resources/version.txt
-git add ./src/resources/version.txt
+echo "$NEXT_VERSION" > ./version.txt
+git add ./version.txt
 git commit -m "Version bump: $NEXT_VERSION"
 git tag "$NEXT_VERSION"
 
