@@ -65,11 +65,11 @@ jobs:
         id: releaseApk
         run: echo "apkfile=$(find app/build/outputs/apk/release/*.apk)" >> $GITHUB_OUTPUT
 
-      - name: Zip Files
-        uses: papeloto/action-zip@v1
-        with:
-          files: ${{ steps.releaseAab.outputs.aabfile }} ${{ steps.releaseApk.outputs.apkfile }}
-          dest: ${{ steps.releaseApk.outputs.apkfile }}.zip
+#      - name: Zip Files
+#        uses: papeloto/action-zip@v1
+#        with:
+#          files: ${{ steps.releaseAab.outputs.aabfile }} ${{ steps.releaseApk.outputs.apkfile }}
+#          dest: ${{ steps.releaseApk.outputs.apkfile }}.zip
 
       #      - name: Sending release build to Slack
       #        uses: MeilCli/slack-upload-file@v3
