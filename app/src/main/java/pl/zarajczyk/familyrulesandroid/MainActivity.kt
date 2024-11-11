@@ -1,10 +1,7 @@
 package pl.zarajczyk.familyrulesandroid
 
 import ReportWorker
-import android.R
 import android.app.AppOpsManager
-import android.app.Notification
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -66,6 +63,11 @@ class MainActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateRunnable: Runnable
     private lateinit var settingsManager: SettingsManager
+    val version = javaClass.getResourceAsStream("/version.txt")
+        ?.bufferedReader()
+        ?.readText()
+        ?.trim()
+        ?: "v?.?"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -108,14 +110,6 @@ class MainActivity : ComponentActivity() {
         } else {
             startService(serviceIntent)
         }
-
-//        val nMN = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-//        val n: Notification = Notification.Builder(this)
-//            .setContentTitle("Whip And Weep")
-//            .setContentText("Whip is On!")
-//            .setSmallIcon(R.drawable.ic_menu_search)
-//            .build()
-//        nMN.notify(2, n)
     }
 
     override fun onDestroy() {
@@ -129,6 +123,7 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     usageStatsList = fetchUsageStats(this.applicationContext),
                     screenTime = getTotalScreenOnTimeSinceMidnight(this.applicationContext),
+                    version = version,
                     settingsManager = settingsManager
                 )
             }
@@ -144,7 +139,7 @@ class MainActivity : ComponentActivity() {
 
         val json = JSONObject().apply {
             put("instanceId", instanceId)
-            put("version", "v1")
+            put("version", version)
             put("availableStates", JSONArray().apply {
                 put(JSONObject().apply {
                     put("deviceState", "ACTIVE")
@@ -215,13 +210,14 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     usageStatsList: List<UsageStatistics>,
     screenTime: Long,
+    version: String,
     settingsManager: SettingsManager
 ) {
     val context = LocalContext.current
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { AppTopBar() },
-        bottomBar = { BottomToolbar(screenTime, settingsManager, context) }
+        bottomBar = { BottomToolbar(screenTime, version, settingsManager, context) }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             UsageStatsDisplay(usageStatsList)
@@ -230,7 +226,7 @@ fun MainScreen(
 }
 
 @Composable
-fun BottomToolbar(screenTime: Long, settingsManager: SettingsManager, context: Context) {
+fun BottomToolbar(screenTime: Long, version: String, settingsManager: SettingsManager, context: Context) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -243,7 +239,7 @@ fun BottomToolbar(screenTime: Long, settingsManager: SettingsManager, context: C
                     (screenTime % 3600) / 60,
                     screenTime % 60
                 )
-            }",
+            }\n($version)",
             modifier = Modifier.padding(start = 16.dp)
         )
         Button(
