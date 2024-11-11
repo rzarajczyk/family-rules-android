@@ -59,7 +59,7 @@ jobs:
       - name: Upload Release Build to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: family-rules-release.apk
+          name: family-rules-release
           path: ${{ steps.releaseApk.outputs.apkfile }}
 
   create-release:
@@ -68,9 +68,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: family-rules-release.apk
+          name: family-rules-release
 
       - run: ls
+
+      - run: mv app-release.apk family-rules-android.apk
 
       - uses: actions/create-release@v1
         id: create_release
@@ -87,6 +89,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: "family-rules-release.apk"
-          asset_name: "family-rules-release.apk"
+          asset_path: "family-rules-android.apk"
+          asset_name: "family-rules-android.apk"
           asset_content_type: application/vnd.android.package-archive
