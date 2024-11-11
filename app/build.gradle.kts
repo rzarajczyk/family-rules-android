@@ -7,6 +7,15 @@ android {
     namespace = "pl.zarajczyk.familyrulesandroid"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../keystore.jks")
+            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEYSTORE_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+
     defaultConfig {
         applicationId = "pl.zarajczyk.familyrulesandroid"
         minSdk = 22
