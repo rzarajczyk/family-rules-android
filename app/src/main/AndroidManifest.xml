@@ -33,7 +33,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".gui.KeepAliveService"
+            android:name=".gui.PermanentNotification"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync"

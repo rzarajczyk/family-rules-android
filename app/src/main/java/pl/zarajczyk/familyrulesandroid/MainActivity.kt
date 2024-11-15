@@ -36,10 +36,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.domain.ReportService
 import pl.zarajczyk.familyrulesandroid.domain.UptimeService
 import pl.zarajczyk.familyrulesandroid.domain.UsageStatistics
+import pl.zarajczyk.familyrulesandroid.gui.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
 import pl.zarajczyk.familyrulesandroid.gui.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
@@ -69,14 +69,20 @@ class MainActivity : ComponentActivity() {
             reportService = ReportService(this, settingsManager, uptimeService, delayMillis = 5_000)
             reportService.start()
 
-            val notification = PermanentNotification(this)
-            notification.install()
+            PermanentNotification.install(this)
+            KeepAliveWorker.install(this)
 
             setupContent()
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        setupContent()
+    }
+
     fun setupContent() {
+        PermanentNotification.install(this)
         val uptime = uptimeService.getUptime()
         setContent {
             FamilyRulesAndroidTheme {
