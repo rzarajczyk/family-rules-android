@@ -1,11 +1,9 @@
 package pl.zarajczyk.familyrulesandroid
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,10 +30,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Base64
 
 class InitialSetupActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager

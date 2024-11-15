@@ -1,11 +1,55 @@
-package pl.zarajczyk.familyrulesandroid
+package pl.zarajczyk.familyrulesandroid.domain
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.util.Calendar
+
+class UptimeService(private val context: Context, private val delayMillis: Long = 5000) {
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    @Volatile
+    private var uptime: Uptime = Uptime(emptyList(), 0)
+
+    fun start(onFirstFetch: () -> Unit = {}) {
+        scope.launch {
+            while (isActive) {
+                uptime = performTask()
+                onFirstFetch()
+                delay(delayMillis)
+            }
+        }
+    }
+
+    fun getUptime(): Uptime {
+        return uptime
+    }
+
+    private fun performTask(): Uptime {
+        val uptime = fetchUptime(context)
+        Log.i("UptimeService", "Uptime: ${uptime.screenTimeSec}")
+        return uptime
+    }
+}
+
+data class Uptime(
+    val usageStatistics: List<UsageStatistics>,
+    val screenTimeSec: Long
+)
+
+fun fetchUptime(applicationContext: Context): Uptime {
+    val usageStatsList = fetchUsageStats(applicationContext)
+    val screenTime = getTotalScreenOnTimeSinceMidnight(applicationContext)
+    return Uptime(usageStatsList, screenTime)
+}
 
 data class UsageStatistics(
     var packageName: String = "",

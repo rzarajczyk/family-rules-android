@@ -1,17 +1,10 @@
 package pl.zarajczyk.familyrulesandroid
 
-import ReportWorker
-import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -43,166 +36,58 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
+import pl.zarajczyk.familyrulesandroid.domain.ReportService
+import pl.zarajczyk.familyrulesandroid.domain.UptimeService
+import pl.zarajczyk.familyrulesandroid.domain.UsageStatistics
+import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
+import pl.zarajczyk.familyrulesandroid.gui.PermissionsChecker
+import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
-import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 
 class MainActivity : ComponentActivity() {
-    private val handler = Handler(Looper.getMainLooper())
-    private lateinit var updateRunnable: Runnable
     private lateinit var settingsManager: SettingsManager
-    val version = javaClass.getResourceAsStream("/version.txt")
-        ?.bufferedReader()
-        ?.readText()
-        ?.trim()
-        ?: "v?.?"
+    private lateinit var uptimeService: UptimeService
+    private lateinit var reportService: ReportService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        enableEdgeToEdge()
+
         settingsManager = SettingsManager(this)
 
         if (!settingsManager.areSettingsComplete()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
-        }
-
-        if (!isUsageStatsPermissionGranted()) {
-            navigateToUsageStatsPermissionSettings()
-        }
-
-        sendLaunchRequest(this)
-
-        setupContent()
-        setupPeriodicUpdate()
-
-        val reportWorkRequest =
-            OneTimeWorkRequestBuilder<ReportWorker>()
-                .setInitialDelay(5, TimeUnit.SECONDS)
-                .build()
-        WorkManager.getInstance(this).enqueue(reportWorkRequest)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                    1001
-                )
-            }
-        }
-
-        val serviceIntent = Intent(this, KeepAliveService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
         } else {
-            startService(serviceIntent)
+            PermissionsChecker(this).checkPermissions()
+
+            uptimeService = UptimeService(this, delayMillis = 5_000)
+            uptimeService.start { setupContent() }
+
+            reportService = ReportService(this, settingsManager, uptimeService, delayMillis = 5_000)
+            reportService.start()
+
+            val notification = PermanentNotification(this)
+            notification.install()
+
+            setupContent()
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacks(updateRunnable)
-    }
-
-    private fun setupContent() {
+    fun setupContent() {
+        val uptime = uptimeService.getUptime()
         setContent {
             FamilyRulesAndroidTheme {
                 MainScreen(
-                    usageStatsList = fetchUsageStats(this.applicationContext),
-                    screenTime = getTotalScreenOnTimeSinceMidnight(this.applicationContext),
-                    version = version,
-                    settingsManager = settingsManager
+                    usageStatsList = uptime.usageStatistics,
+                    screenTime = uptime.screenTimeSec,
+                    settingsManager = settingsManager,
+                    mainActivity = this
                 )
             }
         }
-    }
-
-    private fun sendLaunchRequest(context: Context) {
-        val settingsManager = SettingsManager(context)
-        val serverUrl = settingsManager.getString("serverUrl", "")
-        val instanceId = settingsManager.getString("instanceId", "")
-        val username = settingsManager.getString("username", "")
-        val instanceToken = settingsManager.getString("instanceToken", "")
-
-        val json = JSONObject().apply {
-            put("instanceId", instanceId)
-            put("version", version)
-            put("availableStates", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("deviceState", "ACTIVE")
-                    put("title", "Active")
-                    put(
-                        "icon",
-                        "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/>"
-                    )
-                    put("description", JSONObject.NULL)
-                })
-            })
-        }.toString()
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val url = URL("$serverUrl/api/v1/launch")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                val auth = android.util.Base64.encodeToString(
-                    "$username:$instanceToken".toByteArray(),
-                    android.util.Base64.NO_WRAP
-                )
-                connection.setRequestProperty("Authorization", "Basic $auth")
-                connection.doOutput = true
-
-                connection.outputStream.use { os: OutputStream ->
-                    val input = json.toByteArray(Charsets.UTF_8)
-                    os.write(input, 0, input.size)
-                }
-
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw Exception("Failed to send launch request: HTTP ${connection.responseCode}")
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
-    private fun setupPeriodicUpdate() {
-        updateRunnable = Runnable {
-            setupContent()
-            handler.postDelayed(updateRunnable, 5000)
-        }
-        handler.post(updateRunnable)
-    }
-
-    private fun isUsageStatsPermissionGranted(): Boolean {
-        val appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOpsManager.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            android.os.Process.myUid(),
-            packageName
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
-
-    private fun navigateToUsageStatsPermissionSettings() {
-        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-        startActivity(intent)
     }
 }
 
@@ -210,14 +95,14 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     usageStatsList: List<UsageStatistics>,
     screenTime: Long,
-    version: String,
-    settingsManager: SettingsManager
+    settingsManager: SettingsManager,
+    mainActivity: MainActivity
 ) {
     val context = LocalContext.current
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { AppTopBar() },
-        bottomBar = { BottomToolbar(screenTime, version, settingsManager, context) }
+        bottomBar = { BottomToolbar(screenTime, settingsManager, context, mainActivity) }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             UsageStatsDisplay(usageStatsList)
@@ -226,7 +111,12 @@ fun MainScreen(
 }
 
 @Composable
-fun BottomToolbar(screenTime: Long, version: String, settingsManager: SettingsManager, context: Context) {
+fun BottomToolbar(
+    screenTime: Long,
+    settingsManager: SettingsManager,
+    context: Context,
+    mainActivity: MainActivity
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -234,18 +124,32 @@ fun BottomToolbar(screenTime: Long, version: String, settingsManager: SettingsMa
         Text(
             text = "Screen time: ${
                 String.format(
+                    Locale.getDefault(),
                     "%02d:%02d:%02d",
                     screenTime / 3600,
                     (screenTime % 3600) / 60,
                     screenTime % 60
                 )
-            }\n($version)",
+            }\n(${settingsManager.getVersion()})",
             modifier = Modifier.padding(start = 16.dp)
         )
         Button(
             onClick = {
                 settingsManager.clearSettings()
                 context.startActivity(Intent(context, InitialSetupActivity::class.java))
+            },
+            modifier = Modifier
+                .size(width = 60.dp, height = 40.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = Color.Black
+            )
+        ) {
+            Text("🗑️")
+        }
+        Button(
+            onClick = {
+                mainActivity.setupContent()
             },
             modifier = Modifier
                 .padding(end = 16.dp)
@@ -255,7 +159,7 @@ fun BottomToolbar(screenTime: Long, version: String, settingsManager: SettingsMa
                 contentColor = Color.Black
             )
         ) {
-            Text("🗑️")
+            Text("🔄")
         }
     }
 }

@@ -1,10 +1,15 @@
-package pl.zarajczyk.familyrulesandroid
+package pl.zarajczyk.familyrulesandroid.gui
 
 import android.content.Context
 import android.content.SharedPreferences
 
 class SettingsManager(context: Context) {
     private val preferences: SharedPreferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    private val version = javaClass.getResourceAsStream("/version.txt")
+        ?.bufferedReader()
+        ?.readText()
+        ?.trim()
+        ?: "v?.?"
 
     fun getString(key: String, defaultValue: String?): String? {
         return preferences.getString(key, defaultValue)
@@ -25,4 +30,9 @@ class SettingsManager(context: Context) {
     fun clearSettings() {
         preferences.edit().clear().apply()
     }
+
+    fun getVersion(): String {
+        return version
+    }
+
 }
