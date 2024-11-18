@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import pl.zarajczyk.familyrulesandroid.domain.Uptime
+import pl.zarajczyk.familyrulesandroid.scheduled.Uptime
 import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
 import java.io.OutputStream
 import java.net.HttpURLConnection

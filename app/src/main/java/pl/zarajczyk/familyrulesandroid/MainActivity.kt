@@ -36,10 +36,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import pl.zarajczyk.familyrulesandroid.domain.ReportService
-import pl.zarajczyk.familyrulesandroid.domain.UptimeService
-import pl.zarajczyk.familyrulesandroid.domain.UsageStatistics
-import pl.zarajczyk.familyrulesandroid.gui.KeepAliveWorker
+import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveService
+import pl.zarajczyk.familyrulesandroid.scheduled.ReportService
+import pl.zarajczyk.familyrulesandroid.scheduled.UptimeService
+import pl.zarajczyk.familyrulesandroid.scheduled.UsageStatistics
+import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
 import pl.zarajczyk.familyrulesandroid.gui.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
@@ -50,7 +51,6 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private lateinit var uptimeService: UptimeService
-    private lateinit var reportService: ReportService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,10 +66,8 @@ class MainActivity : ComponentActivity() {
             uptimeService = UptimeService(this, delayMillis = 5_000)
             uptimeService.start { setupContent() }
 
-            reportService = ReportService(this, settingsManager, uptimeService, delayMillis = 5_000)
-            reportService.start()
-
-            PermanentNotification.install(this)
+            ReportService.install(this, settingsManager, uptimeService, delayMillis = 5_000)
+            KeepAliveService.install(this)
             KeepAliveWorker.install(this)
 
             setupContent()

@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid.domain
+package pl.zarajczyk.familyrulesandroid.scheduled
 
 import android.content.Context
 import android.util.Log
@@ -19,6 +19,17 @@ class ReportService(
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val familyRulesClient: FamilyRulesClient = FamilyRulesClient(context, settingsManager)
+
+    companion object {
+        fun install(
+            context: Context,
+            settingsManager: SettingsManager,
+            uptimeService: UptimeService,
+            delayMillis: Long = 5000
+        ) {
+            ReportService(context, settingsManager, uptimeService, delayMillis).start()
+        }
+    }
 
     fun start() {
         familyRulesClient.sendLaunchRequest()

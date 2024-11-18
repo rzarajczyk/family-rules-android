@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid.domain
+package pl.zarajczyk.familyrulesandroid.scheduled
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.concurrent.atomic.AtomicBoolean
 
 class UptimeService(private val context: Context, private val delayMillis: Long = 5000) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -20,10 +21,13 @@ class UptimeService(private val context: Context, private val delayMillis: Long 
     private var uptime: Uptime = Uptime(emptyList(), 0)
 
     fun start(onFirstFetch: () -> Unit = {}) {
+        val isFirst = AtomicBoolean(true)
         scope.launch {
             while (isActive) {
                 uptime = performTask()
-                onFirstFetch()
+                if (isFirst.getAndSet(false)) {
+                    onFirstFetch()
+                }
                 delay(delayMillis)
             }
         }

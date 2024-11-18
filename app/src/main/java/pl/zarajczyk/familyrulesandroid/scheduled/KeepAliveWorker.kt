@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid.gui
+package pl.zarajczyk.familyrulesandroid.scheduled
 
 import android.content.Context
 import android.util.Log

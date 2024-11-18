@@ -27,6 +27,12 @@ class PermanentNotification : Service() {
                 context.startService(serviceIntent)
             }
         }
+
+        fun isNotificationAlive(context: Context): Boolean {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            return notificationManager.activeNotifications.any { it.id == NOTIFICATION_ID }
+        }
     }
 
     override fun onCreate() {
@@ -69,6 +75,7 @@ class PermanentNotification : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
+            .setSilent(true)
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
