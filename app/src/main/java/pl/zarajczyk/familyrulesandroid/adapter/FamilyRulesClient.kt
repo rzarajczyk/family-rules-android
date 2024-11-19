@@ -19,6 +19,7 @@ class FamilyRulesClient(
     private val context: Context,
     private val settingsManager: SettingsManager
 ) {
+    private val isDevMode = System.getenv("DEV") == "true"
 
 
     fun sendLaunchRequest() {
@@ -63,16 +64,11 @@ class FamilyRulesClient(
                 }
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    Log.e(
-                        "FamilyRulesClient",
-                        "Failed to send launch request: HTTP ${connection.responseCode}"
-                    )
+                    throw RuntimeException("Failed to send launch request: HTTP ${connection.responseCode}")
                 }
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send launch request: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                showToast(e)
             }
         }
     }
@@ -84,14 +80,14 @@ class FamilyRulesClient(
         val instanceToken = settingsManager.getString("instanceToken", "")
 
         val applications = JSONObject().apply {
-            uptime.usageStatistics.forEach { stat ->
-                put(stat.packageName, stat.totalTimeInForeground / 1000)
+            uptime.packageUsages.forEach { stat ->
+                put(stat.packageName, stat.totalTimeInForegroundMillis / 1000)
             }
         }
 
         val json = JSONObject().apply {
             put("instanceId", instanceId)
-            put("screenTime", uptime.screenTimeSec)
+            put("screenTime", uptime.screenTimeMillis / 1000)
             put("applications", applications)
         }.toString()
 
@@ -114,16 +110,19 @@ class FamilyRulesClient(
                 }
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    Log.e(
-                        "FamilyRulesClient",
-                        "Failed to send launch request: HTTP ${connection.responseCode}"
-                    )
+                    throw RuntimeException("Failed to send report request: HTTP ${connection.responseCode}")
                 }
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send launch request: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                showToast(e)
+            }
+        }
+    }
+
+    private suspend fun showToast(e: Exception) {
+        if (isDevMode) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

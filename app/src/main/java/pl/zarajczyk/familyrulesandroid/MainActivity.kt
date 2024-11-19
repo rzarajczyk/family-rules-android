@@ -39,7 +39,7 @@ import androidx.core.graphics.drawable.toBitmap
 import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveService
 import pl.zarajczyk.familyrulesandroid.scheduled.ReportService
 import pl.zarajczyk.familyrulesandroid.scheduled.UptimeService
-import pl.zarajczyk.familyrulesandroid.scheduled.UsageStatistics
+import pl.zarajczyk.familyrulesandroid.scheduled.PackageUsage
 import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
 import pl.zarajczyk.familyrulesandroid.gui.PermissionsChecker
@@ -85,8 +85,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             FamilyRulesAndroidTheme {
                 MainScreen(
-                    usageStatsList = uptime.usageStatistics,
-                    screenTime = uptime.screenTimeSec,
+                    usageStatsList = uptime.packageUsages,
+                    screenTime = uptime.screenTimeMillis,
                     settingsManager = settingsManager,
                     mainActivity = this
                 )
@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(
-    usageStatsList: List<UsageStatistics>,
+    usageStatsList: List<PackageUsage>,
     screenTime: Long,
     settingsManager: SettingsManager,
     mainActivity: MainActivity
@@ -130,7 +130,7 @@ fun BottomToolbar(
                 String.format(
                     Locale.getDefault(),
                     "%02d:%02d:%02d",
-                    screenTime / 3600,
+                    screenTime / (1000 * 3600),
                     (screenTime % 3600) / 60,
                     screenTime % 60
                 )
@@ -181,16 +181,16 @@ fun AppTopBar() {
 }
 
 @Composable
-fun UsageStatsDisplay(usageStatsList: List<UsageStatistics>, modifier: Modifier = Modifier) {
+fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     // Sort the usageStatsList by totalTimeInForeground in descending order
-    val sortedUsageStatsList = usageStatsList.sortedByDescending { it.totalTimeInForeground }
+    val sortedUsageStatsList = usageStatsList.sortedByDescending { it.totalTimeInForegroundMillis }
 
     LazyColumn(modifier = modifier.padding(16.dp)) {
         items(sortedUsageStatsList) { stat ->
             val app = getAppNameAndIcon(stat.packageName, context)
-            val totalTimeInSeconds = stat.totalTimeInForeground / 1000
+            val totalTimeInSeconds = stat.totalTimeInForegroundMillis / 1000
             val hours = totalTimeInSeconds / 3600
             val minutes = (totalTimeInSeconds % 3600) / 60
             val seconds = totalTimeInSeconds % 60

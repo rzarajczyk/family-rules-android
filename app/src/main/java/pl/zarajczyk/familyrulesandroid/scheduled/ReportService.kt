@@ -43,7 +43,7 @@ class ReportService(
 
     private fun performTask() {
         val uptime = uptimeService.getUptime()
-        Log.i("ReportService", "Reporting: ${uptime.screenTimeSec}")
+        Log.i("ReportService", "Reporting: ${uptime.screenTimeMillis}")
         familyRulesClient.reportUptime(uptime)
     }
 
