@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import pl.zarajczyk.familyrulesandroid.gui.ScreenStatus
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -26,9 +27,11 @@ class UptimeService(private val context: Context, private val delayMillis: Long 
         val isFirst = AtomicBoolean(true)
         scope.launch {
             while (isActive) {
-                uptime = performTask()
-                if (isFirst.getAndSet(false)) {
-                    onFirstFetch()
+                if (ScreenStatus.isScreenOn(context)) {
+                    uptime = performTask()
+                    if (isFirst.getAndSet(false)) {
+                        onFirstFetch()
+                    }
                 }
                 delay(delayMillis)
             }
@@ -79,8 +82,11 @@ private object UptimeFetcher {
 
         val usageStatsMap = mutableMapOf<String, Long>()
 
-        usageStatsList.forEach { stat ->
-            if (!isSystemApp(context, stat.packageName) && stat.totalTimeInForeground > 0) {
+        usageStatsList
+            .asSequence()
+            .filter { stat -> stat.totalTimeInForeground > 60 * 1000 }
+            .filter { stat -> !isSystemApp(context, stat.packageName) }
+            .forEach { stat ->
                 if (usageStatsMap.containsKey(stat.packageName)) {
                     usageStatsMap[stat.packageName] =
                         usageStatsMap[stat.packageName]!! + stat.totalTimeInForeground
@@ -88,12 +94,11 @@ private object UptimeFetcher {
                     usageStatsMap[stat.packageName] = stat.totalTimeInForeground
                 }
             }
-        }
 
         return usageStatsMap.map { (packageName, totalTime) ->
             PackageUsage(
                 packageName = packageName,
-                totalTimeInForegroundMillis =  totalTime
+                totalTimeInForegroundMillis = totalTime
             )
         }
     }
@@ -122,7 +127,7 @@ private object UptimeFetcher {
         val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
         var totalScreenOnTime = 0L
         var screenOnTime = 0L
-        var screenOffTime = 0L
+        var screenOffTime: Long
 
         while (usageEvents.hasNextEvent()) {
             val event = UsageEvents.Event()
