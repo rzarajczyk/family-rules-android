@@ -60,7 +60,7 @@ class InitialSetupActivity : ComponentActivity() {
     ): Result {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL("$serverUrl/api/v1/register-instance")
+                val url = URL("$serverUrl/api/v2/register-instance")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")

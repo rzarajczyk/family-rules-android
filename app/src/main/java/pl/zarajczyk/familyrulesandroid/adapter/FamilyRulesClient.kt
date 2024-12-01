@@ -47,13 +47,13 @@ class FamilyRulesClient(
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("$serverUrl/api/v1/launch")
+                val url = URL("$serverUrl/api/v2/launch")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.instanceFollowRedirects = true
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
                 val auth = android.util.Base64.encodeToString(
-                    "$username:$instanceToken".toByteArray(),
+                    "$instanceId:$instanceToken".toByteArray(),
                     android.util.Base64.NO_WRAP
                 )
                 connection.setRequestProperty("Authorization", "Basic $auth")
@@ -94,13 +94,13 @@ class FamilyRulesClient(
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("$serverUrl/api/v1/report")
+                val url = URL("$serverUrl/api/v2/report")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.instanceFollowRedirects = true
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
                 val auth = android.util.Base64.encodeToString(
-                    "$username:$instanceToken".toByteArray(),
+                    "$instanceId:$instanceToken".toByteArray(),
                     android.util.Base64.NO_WRAP
                 )
                 connection.setRequestProperty("Authorization", "Basic $auth")
