@@ -36,21 +36,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import pl.zarajczyk.familyrulesandroid.scheduled.PermanentNotificationPeriodicJob
-import pl.zarajczyk.familyrulesandroid.scheduled.ReportPeriodicJob
-import pl.zarajczyk.familyrulesandroid.scheduled.UptimePeriodicJob
-import pl.zarajczyk.familyrulesandroid.scheduled.PackageUsage
-import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveWorker
-import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
-import pl.zarajczyk.familyrulesandroid.gui.PermissionsChecker
-import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
+import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
+import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
+import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.util.Locale
 
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
-    private lateinit var uptimePeriodicJob: UptimePeriodicJob
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,12 +58,7 @@ class MainActivity : ComponentActivity() {
         } else {
             PermissionsChecker(this).checkPermissions()
 
-            uptimePeriodicJob = UptimePeriodicJob(this, delayMillis = 5_000)
-            uptimePeriodicJob.start { setupContent() }
-
-            ReportPeriodicJob.install(this, settingsManager, uptimePeriodicJob, delayMillis = 5_000)
-            PermanentNotificationPeriodicJob.install(this)
-            KeepAliveWorker.install(this)
+            FamilyRulesCoreService.install(this)
 
             setupContent()
         }
@@ -80,16 +70,17 @@ class MainActivity : ComponentActivity() {
     }
 
     fun setupContent() {
-        PermanentNotification.install(this)
-        val uptime = uptimePeriodicJob.getUptime()
-        setContent {
-            FamilyRulesAndroidTheme {
-                MainScreen(
-                    usageStatsList = uptime.packageUsages,
-                    screenTime = uptime.screenTimeMillis,
-                    settingsManager = settingsManager,
-                    mainActivity = this
-                )
+        FamilyRulesCoreService.bind(this) {
+            val uptime = it.getUptime()
+            setContent {
+                FamilyRulesAndroidTheme {
+                    MainScreen(
+                        usageStatsList = uptime.packageUsages,
+                        screenTime = uptime.screenTimeMillis,
+                        settingsManager = settingsManager,
+                        mainActivity = this
+                    )
+                }
             }
         }
     }

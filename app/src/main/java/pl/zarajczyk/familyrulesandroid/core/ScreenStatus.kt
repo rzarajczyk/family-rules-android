@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid.gui
+package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.Context
 import android.os.PowerManager

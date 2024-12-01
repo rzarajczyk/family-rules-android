@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid.scheduled
+package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.Context
 import android.util.Log
@@ -9,10 +9,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
-import pl.zarajczyk.familyrulesandroid.gui.ScreenStatus
-import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
 
-class ReportPeriodicJob(
+class PeriodicReportSender(
     private val context: Context,
     settingsManager: SettingsManager,
     private val uptimePeriodicJob: UptimePeriodicJob,
@@ -28,7 +26,7 @@ class ReportPeriodicJob(
             uptimePeriodicJob: UptimePeriodicJob,
             delayMillis: Long = 5000
         ) {
-            ReportPeriodicJob(context, settingsManager, uptimePeriodicJob, delayMillis).start()
+            PeriodicReportSender(context, settingsManager, uptimePeriodicJob, delayMillis).start()
         }
     }
 

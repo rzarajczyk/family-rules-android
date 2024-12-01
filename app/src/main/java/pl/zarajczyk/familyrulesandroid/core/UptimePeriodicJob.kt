@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid.scheduled
+package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -13,9 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import pl.zarajczyk.familyrulesandroid.gui.ScreenStatus
 import java.util.Calendar
-import java.util.concurrent.atomic.AtomicBoolean
 
 class UptimePeriodicJob(private val context: Context, private val delayMillis: Long = 5000) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -23,15 +21,12 @@ class UptimePeriodicJob(private val context: Context, private val delayMillis: L
     @Volatile
     private var uptime: Uptime = Uptime(emptyList(), 0)
 
-    fun start(onFirstFetch: () -> Unit = {}) {
-        val isFirst = AtomicBoolean(true)
+    fun start() {
+        uptime = performTask()
         scope.launch {
             while (isActive) {
                 if (ScreenStatus.isScreenOn(context)) {
                     uptime = performTask()
-                    if (isFirst.getAndSet(false)) {
-                        onFirstFetch()
-                    }
                 }
                 delay(delayMillis)
             }

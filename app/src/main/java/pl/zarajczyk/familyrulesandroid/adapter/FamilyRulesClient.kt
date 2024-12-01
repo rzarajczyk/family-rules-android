@@ -10,8 +10,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import pl.zarajczyk.familyrulesandroid.scheduled.Uptime
-import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
+import pl.zarajczyk.familyrulesandroid.core.Uptime
+import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,7 +33,6 @@ class FamilyRulesClient(
     fun sendLaunchRequest() {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
-        val username = settingsManager.getString("username", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
         val version = settingsManager.getVersion()
 
@@ -84,7 +83,6 @@ class FamilyRulesClient(
 
     fun reportUptime(uptime: Uptime) {
         val serverUrl = settingsManager.getString("serverUrl", "")
-        val username = settingsManager.getString("username", "")
         val instanceId = settingsManager.getString("instanceId", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
 

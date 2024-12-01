@@ -1,16 +1,14 @@
-package pl.zarajczyk.familyrulesandroid.scheduled
+package pl.zarajczyk.familyrulesandroid
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Start your service here
-            Intent(context, KeepAliveService::class.java).also {
-                context.startService(it)
-            }
+            FamilyRulesCoreService.install(context)
         }
     }
 }

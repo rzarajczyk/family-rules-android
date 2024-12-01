@@ -35,14 +35,14 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".gui.PermanentNotification"
+            android:name=".core.FamilyRulesCoreService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync"
 
             />
         <receiver
-            android:name=".scheduled.BootReceiver"
+            android:name=".BootReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>

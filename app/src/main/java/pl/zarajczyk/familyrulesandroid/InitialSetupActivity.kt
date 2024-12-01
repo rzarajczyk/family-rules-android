@@ -30,7 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
+import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.net.HttpURLConnection
 import java.net.URL
@@ -52,7 +52,7 @@ class InitialSetupActivity : ComponentActivity() {
         }
     }
 
-    public suspend fun registerInstance(
+    suspend fun registerInstance(
         serverUrl: String,
         username: String,
         password: String,
