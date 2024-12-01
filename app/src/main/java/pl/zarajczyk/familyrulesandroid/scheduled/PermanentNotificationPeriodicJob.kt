@@ -9,7 +9,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
 
-class KeepAliveService {
+class PermanentNotificationPeriodicJob {
     companion object {
         private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 

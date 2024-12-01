@@ -17,7 +17,7 @@ import pl.zarajczyk.familyrulesandroid.gui.ScreenStatus
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
 
-class UptimeService(private val context: Context, private val delayMillis: Long = 5000) {
+class UptimePeriodicJob(private val context: Context, private val delayMillis: Long = 5000) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @Volatile

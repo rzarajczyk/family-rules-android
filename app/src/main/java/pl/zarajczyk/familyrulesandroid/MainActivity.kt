@@ -36,9 +36,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveService
-import pl.zarajczyk.familyrulesandroid.scheduled.ReportService
-import pl.zarajczyk.familyrulesandroid.scheduled.UptimeService
+import pl.zarajczyk.familyrulesandroid.scheduled.PermanentNotificationPeriodicJob
+import pl.zarajczyk.familyrulesandroid.scheduled.ReportPeriodicJob
+import pl.zarajczyk.familyrulesandroid.scheduled.UptimePeriodicJob
 import pl.zarajczyk.familyrulesandroid.scheduled.PackageUsage
 import pl.zarajczyk.familyrulesandroid.scheduled.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.gui.PermanentNotification
@@ -50,7 +50,7 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
-    private lateinit var uptimeService: UptimeService
+    private lateinit var uptimePeriodicJob: UptimePeriodicJob
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,11 +63,11 @@ class MainActivity : ComponentActivity() {
         } else {
             PermissionsChecker(this).checkPermissions()
 
-            uptimeService = UptimeService(this, delayMillis = 5_000)
-            uptimeService.start { setupContent() }
+            uptimePeriodicJob = UptimePeriodicJob(this, delayMillis = 5_000)
+            uptimePeriodicJob.start { setupContent() }
 
-            ReportService.install(this, settingsManager, uptimeService, delayMillis = 5_000)
-            KeepAliveService.install(this)
+            ReportPeriodicJob.install(this, settingsManager, uptimePeriodicJob, delayMillis = 5_000)
+            PermanentNotificationPeriodicJob.install(this)
             KeepAliveWorker.install(this)
 
             setupContent()
@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
 
     fun setupContent() {
         PermanentNotification.install(this)
-        val uptime = uptimeService.getUptime()
+        val uptime = uptimePeriodicJob.getUptime()
         setContent {
             FamilyRulesAndroidTheme {
                 MainScreen(

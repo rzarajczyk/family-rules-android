@@ -12,10 +12,10 @@ import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.gui.ScreenStatus
 import pl.zarajczyk.familyrulesandroid.gui.SettingsManager
 
-class ReportService(
+class ReportPeriodicJob(
     private val context: Context,
     settingsManager: SettingsManager,
-    private val uptimeService: UptimeService,
+    private val uptimePeriodicJob: UptimePeriodicJob,
     private val delayMillis: Long = 5000
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -25,10 +25,10 @@ class ReportService(
         fun install(
             context: Context,
             settingsManager: SettingsManager,
-            uptimeService: UptimeService,
+            uptimePeriodicJob: UptimePeriodicJob,
             delayMillis: Long = 5000
         ) {
-            ReportService(context, settingsManager, uptimeService, delayMillis).start()
+            ReportPeriodicJob(context, settingsManager, uptimePeriodicJob, delayMillis).start()
         }
     }
 
@@ -45,7 +45,7 @@ class ReportService(
     }
 
     private fun performTask() {
-        val uptime = uptimeService.getUptime()
+        val uptime = uptimePeriodicJob.getUptime()
         Log.i("ReportService", "Reporting: ${uptime.screenTimeMillis}")
         familyRulesClient.reportUptime(uptime)
     }

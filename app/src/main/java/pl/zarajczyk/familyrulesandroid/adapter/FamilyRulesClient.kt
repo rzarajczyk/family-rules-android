@@ -19,7 +19,7 @@ class FamilyRulesClient(
     private val context: Context,
     private val settingsManager: SettingsManager
 ) {
-    private val isDevMode = System.getenv("DEV") == "true"
+    private val isDevMode = true
 
 
     fun sendLaunchRequest() {
@@ -50,6 +50,7 @@ class FamilyRulesClient(
                 val url = URL("$serverUrl/api/v1/launch")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
+                connection.instanceFollowRedirects = true
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
                 val auth = android.util.Base64.encodeToString(
                     "$username:$instanceToken".toByteArray(),
@@ -96,6 +97,7 @@ class FamilyRulesClient(
                 val url = URL("$serverUrl/api/v1/report")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
+                connection.instanceFollowRedirects = true
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
                 val auth = android.util.Base64.encodeToString(
                     "$username:$instanceToken".toByteArray(),
