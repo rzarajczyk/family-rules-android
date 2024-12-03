@@ -7,16 +7,17 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 class FamilyRulesCoreServicePeriodicInstaller {
     companion object {
         private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-        fun install(context: Context, delayMillis: Long = 5000) {
+        fun install(context: Context, delayDuration: Duration) {
             scope.launch {
                 while (isActive) {
                     FamilyRulesCoreService.install(context)
-                    delay(delayMillis)
+                    delay(delayDuration)
                 }
             }
         }

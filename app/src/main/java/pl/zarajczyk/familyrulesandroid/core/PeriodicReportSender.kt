@@ -9,12 +9,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
+import kotlin.time.Duration
 
 class PeriodicReportSender(
     private val context: Context,
     settingsManager: SettingsManager,
-    private val uptimePeriodicJob: UptimePeriodicJob,
-    private val delayMillis: Long = 5000
+    private val periodicUptimeChecker: PeriodicUptimeChecker,
+    private val delayDuration: Duration
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val familyRulesClient: FamilyRulesClient = FamilyRulesClient(context, settingsManager)
@@ -23,10 +24,10 @@ class PeriodicReportSender(
         fun install(
             context: Context,
             settingsManager: SettingsManager,
-            uptimePeriodicJob: UptimePeriodicJob,
-            delayMillis: Long = 5000
+            periodicUptimeChecker: PeriodicUptimeChecker,
+            delayMillis: Duration
         ) {
-            PeriodicReportSender(context, settingsManager, uptimePeriodicJob, delayMillis).start()
+            PeriodicReportSender(context, settingsManager, periodicUptimeChecker, delayMillis).start()
         }
     }
 
@@ -37,13 +38,13 @@ class PeriodicReportSender(
                 if (ScreenStatus.isScreenOn(context)) {
                     performTask()
                 }
-                delay(delayMillis)
+                delay(delayDuration)
             }
         }
     }
 
     private fun performTask() {
-        val uptime = uptimePeriodicJob.getUptime()
+        val uptime = periodicUptimeChecker.getUptime()
         Log.i("ReportService", "Reporting: ${uptime.screenTimeMillis}")
         familyRulesClient.reportUptime(uptime)
     }

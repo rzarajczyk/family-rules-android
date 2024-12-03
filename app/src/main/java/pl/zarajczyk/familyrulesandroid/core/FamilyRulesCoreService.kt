@@ -14,11 +14,14 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 
 class FamilyRulesCoreService : Service() {
     private val binder = LocalBinder()
-    private lateinit var uptimePeriodicJob: UptimePeriodicJob
+    private lateinit var periodicUptimeChecker: PeriodicUptimeChecker
 
     companion object {
         const val CHANNEL_ID = "FamilyRulesChannel"
@@ -63,15 +66,20 @@ class FamilyRulesCoreService : Service() {
         }
     }
 
-    fun getUptime() = uptimePeriodicJob.getUptime()
+    fun getUptime() = periodicUptimeChecker.getUptime()
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        FamilyRulesCoreServicePeriodicInstaller.install(this)
-        uptimePeriodicJob = UptimePeriodicJob(this, delayMillis = 5_000)
+        KeepAliveWorker.install(this, delayDuration = 30.minutes)
+        FamilyRulesCoreServicePeriodicInstaller.install(this, delayDuration = 30.seconds)
+        periodicUptimeChecker = PeriodicUptimeChecker(this, delayDuration = 10.seconds)
             .also { it.start() }
-        PeriodicReportSender.install(this, settingsManager = SettingsManager(this), uptimePeriodicJob)
+        PeriodicReportSender.install(this,
+            settingsManager = SettingsManager(this),
+            periodicUptimeChecker,
+            delayMillis = 10.seconds
+            )
     }
 
     private fun createNotificationChannel() {

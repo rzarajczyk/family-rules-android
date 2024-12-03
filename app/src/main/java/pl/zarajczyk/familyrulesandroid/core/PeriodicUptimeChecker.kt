@@ -14,8 +14,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import kotlin.time.Duration
 
-class UptimePeriodicJob(private val context: Context, private val delayMillis: Long = 5000) {
+class PeriodicUptimeChecker(private val context: Context, private val delayDuration: Duration) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @Volatile
@@ -28,7 +29,7 @@ class UptimePeriodicJob(private val context: Context, private val delayMillis: L
                 if (ScreenStatus.isScreenOn(context)) {
                     uptime = performTask()
                 }
-                delay(delayMillis)
+                delay(delayDuration)
             }
         }
     }

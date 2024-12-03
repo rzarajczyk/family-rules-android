@@ -1,4 +1,4 @@
-package pl.zarajczyk.familyrulesandroid
+package pl.zarajczyk.familyrulesandroid.entrypoints
 
 import android.content.BroadcastReceiver
 import android.content.Context

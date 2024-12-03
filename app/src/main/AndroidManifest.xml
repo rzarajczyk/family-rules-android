@@ -42,7 +42,7 @@
 
             />
         <receiver
-            android:name=".BootReceiver"
+            android:name=".entrypoints.BootReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
