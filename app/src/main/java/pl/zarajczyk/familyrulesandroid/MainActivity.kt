@@ -5,9 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +30,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -36,10 +43,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
+import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
-import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.util.Locale
 
@@ -112,6 +121,11 @@ fun BottomToolbar(
     context: Context,
     mainActivity: MainActivity
 ) {
+    // State to count clicks on the text field
+    var clickCount by remember { mutableStateOf(0) }
+    val clickTimeoutMillis = 500L // Time window to count clicks
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -126,21 +140,40 @@ fun BottomToolbar(
                     screenTime % 60
                 )
             }\n(${settingsManager.getVersion()})",
-            modifier = Modifier.padding(start = 16.dp)
-        )
-        Button(
-            onClick = {
-                settingsManager.clearSettings()
-                context.startActivity(Intent(context, InitialSetupActivity::class.java))
-            },
             modifier = Modifier
-                .size(width = 60.dp, height = 40.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                contentColor = Color.Black
-            )
-        ) {
-            Text("🗑️")
+                .padding(start = 16.dp)
+                .clickable {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastClickTime > clickTimeoutMillis) {
+                        clickCount = 1 // Reset the count if timeout exceeded
+                    } else {
+                        clickCount++
+                    }
+                    lastClickTime = currentTime
+
+                    if (clickCount >= 5) {
+                        // Toggle dev mode
+                        settingsManager.toggleDevMode()
+                        Toast.makeText(context, "Dev mode: ${settingsManager.isDevMode()}", Toast.LENGTH_LONG).show()
+                        clickCount = 0 // Reset the click count
+                    }
+                }
+        )
+        if (settingsManager.isDevMode()) {
+            Button(
+                onClick = {
+                    settingsManager.clearSettings()
+                    context.startActivity(Intent(context, InitialSetupActivity::class.java))
+                },
+                modifier = Modifier
+                    .size(width = 60.dp, height = 40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Color.Black
+                )
+            ) {
+                Text("🗑️")
+            }
         }
         Button(
             onClick = {

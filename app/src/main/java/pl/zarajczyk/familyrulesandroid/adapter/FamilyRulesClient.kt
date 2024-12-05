@@ -20,15 +20,6 @@ class FamilyRulesClient(
     private val context: Context,
     private val settingsManager: SettingsManager
 ) {
-    private val isDevMode = (Build.FINGERPRINT.startsWith("generic")
-            || Build.FINGERPRINT.startsWith("unknown")
-            || Build.MODEL.contains("google_sdk")
-            || Build.MODEL.contains("Emulator")
-            || Build.MODEL.contains("Android SDK built for x86")
-            || Build.MANUFACTURER.contains("Genymotion")
-            || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
-            || "google_sdk" == Build.PRODUCT)
-
 
     fun sendLaunchRequest() {
         val serverUrl = settingsManager.getString("serverUrl", "")
@@ -128,7 +119,7 @@ class FamilyRulesClient(
     }
 
     private suspend fun showToast(e: Exception) {
-        if (isDevMode) {
+        if (settingsManager.isDevMode()) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }

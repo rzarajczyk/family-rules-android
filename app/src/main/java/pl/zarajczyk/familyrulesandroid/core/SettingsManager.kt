@@ -4,12 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 
 class SettingsManager(context: Context) {
-    private val preferences: SharedPreferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    private val preferences: SharedPreferences =
+        context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
     private val version = javaClass.getResourceAsStream("/version.txt")
         ?.bufferedReader()
         ?.readText()
         ?.trim()
         ?: "v?.?"
+    private var devMode = false
 
     fun getString(key: String, defaultValue: String?): String? {
         return preferences.getString(key, defaultValue)
@@ -21,10 +23,10 @@ class SettingsManager(context: Context) {
 
     fun areSettingsComplete(): Boolean {
         return getString("serverUrl", null) != null &&
-               getString("username", null) != null &&
-               getString("instanceId", null) != null &&
-               getString("instanceName", null) != null &&
-               getString("instanceToken", null) != null
+                getString("username", null) != null &&
+                getString("instanceId", null) != null &&
+                getString("instanceName", null) != null &&
+                getString("instanceToken", null) != null
     }
 
     fun clearSettings() {
@@ -33,6 +35,12 @@ class SettingsManager(context: Context) {
 
     fun getVersion(): String {
         return version
+    }
+
+    fun isDevMode(): Boolean = devMode
+
+    fun toggleDevMode() {
+        devMode = !devMode
     }
 
 }
