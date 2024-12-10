@@ -126,6 +126,12 @@ fun BottomToolbar(
     val clickTimeoutMillis = 500L // Time window to count clicks
     var lastClickTime by remember { mutableLongStateOf(0L) }
 
+    val screenTimeInSeconds = screenTime / 1000
+    val seconds = screenTimeInSeconds % 60
+    val screenTimeInMinutes = screenTimeInSeconds / 60
+    val minutes = screenTimeInMinutes % 60
+    val hours = screenTimeInMinutes / 60
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -135,9 +141,9 @@ fun BottomToolbar(
                 String.format(
                     Locale.getDefault(),
                     "%02d:%02d:%02d",
-                    screenTime / (1000 * 3600),
-                    (screenTime % 3600) / 60,
-                    screenTime % 60
+                    hours,
+                    minutes,
+                    seconds
                 )
             }\n(${settingsManager.getVersion()})",
             modifier = Modifier

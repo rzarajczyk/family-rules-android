@@ -73,7 +73,7 @@ class FamilyRulesCoreService : Service() {
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
         FamilyRulesCoreServicePeriodicInstaller.install(this, delayDuration = 30.seconds)
-        periodicUptimeChecker = PeriodicUptimeChecker(this, delayDuration = 10.seconds)
+        periodicUptimeChecker = PeriodicUptimeChecker(this, delayDuration = 5.seconds)
             .also { it.start() }
         PeriodicReportSender.install(this,
             settingsManager = SettingsManager(this),
