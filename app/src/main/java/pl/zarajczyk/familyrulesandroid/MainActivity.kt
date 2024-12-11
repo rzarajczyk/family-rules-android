@@ -43,13 +43,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
+import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import java.util.Locale
 
 
@@ -126,26 +125,12 @@ fun BottomToolbar(
     val clickTimeoutMillis = 500L // Time window to count clicks
     var lastClickTime by remember { mutableLongStateOf(0L) }
 
-    val screenTimeInSeconds = screenTime / 1000
-    val seconds = screenTimeInSeconds % 60
-    val screenTimeInMinutes = screenTimeInSeconds / 60
-    val minutes = screenTimeInMinutes % 60
-    val hours = screenTimeInMinutes / 60
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            text = "Screen time: ${
-                String.format(
-                    Locale.getDefault(),
-                    "%02d:%02d:%02d",
-                    hours,
-                    minutes,
-                    seconds
-                )
-            }\n(${settingsManager.getVersion()})",
+            text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
             modifier = Modifier
                 .padding(start = 16.dp)
                 .clickable {
@@ -220,12 +205,7 @@ fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, modifier: Modifier = M
     LazyColumn(modifier = modifier.padding(16.dp)) {
         items(sortedUsageStatsList) { stat ->
             val app = getAppNameAndIcon(stat.packageName, context)
-            val totalTimeInSeconds = stat.totalTimeInForegroundMillis / 1000
-            val hours = totalTimeInSeconds / 3600
-            val minutes = (totalTimeInSeconds % 3600) / 60
-            val seconds = totalTimeInSeconds % 60
-            val totalTimeFormatted =
-                String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+            val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
 
             Row(modifier = Modifier.padding(vertical = 8.dp)) {
                 app.icon?.let {

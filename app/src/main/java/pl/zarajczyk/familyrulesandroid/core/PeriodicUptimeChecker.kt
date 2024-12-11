@@ -3,8 +3,6 @@ package pl.zarajczyk.familyrulesandroid.core
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.SharedPreferences
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -119,8 +117,8 @@ private object UptimeFetcher {
 
         val packageUsageToday = uptimePreferences.all
             .filter { it.key.startsWith("package_usage_${today}_") }
-            .mapKeys { (k,_) -> k.removePrefix("package_usage_${today}_") }
-            .mapValues { (_,v) -> v as Long }
+            .mapKeys { (k, _) -> k.removePrefix("package_usage_${today}_") }
+            .mapValues { (_, v) -> v as Long }
             .toMutableMap()
 
         val currentTime = System.currentTimeMillis()

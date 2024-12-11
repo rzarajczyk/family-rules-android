@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
+import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -48,14 +49,14 @@ class FamilyRulesCoreService : Service() {
             context: Context,
             callback: (FamilyRulesCoreService) -> Unit
         ) {
-
             context.bindService(
                 Intent(context, FamilyRulesCoreService::class.java),
                 object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName, service: IBinder) {
                         val binder = service as LocalBinder
-                        val permanentNotification = binder.getService()
-                        callback(permanentNotification)
+                        val familyRulesCoreService = binder.getService()
+                        familyRulesCoreService.updateNotification()
+                        callback(familyRulesCoreService)
                     }
 
                     override fun onServiceDisconnected(name: ComponentName) {
@@ -75,11 +76,12 @@ class FamilyRulesCoreService : Service() {
         FamilyRulesCoreServicePeriodicInstaller.install(this, delayDuration = 30.seconds)
         periodicUptimeChecker = PeriodicUptimeChecker(this, delayDuration = 5.seconds)
             .also { it.start() }
-        PeriodicReportSender.install(this,
+        PeriodicReportSender.install(
+            this,
             settingsManager = SettingsManager(this),
             periodicUptimeChecker,
             delayMillis = 10.seconds
-            )
+        )
     }
 
     private fun createNotificationChannel() {
@@ -101,6 +103,12 @@ class FamilyRulesCoreService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        updateNotification()
+
+        return START_STICKY
+    }
+
+    fun updateNotification() {
         val pendingIntent: PendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -110,7 +118,7 @@ class FamilyRulesCoreService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Family Rules")
-            .setContentText("Monitoring active")
+            .setContentText("Screen time: ${getUptime().screenTimeMillis.toHMS()}")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -121,8 +129,6 @@ class FamilyRulesCoreService : Service() {
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
-
-        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder {
