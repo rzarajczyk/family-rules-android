@@ -55,7 +55,6 @@ class FamilyRulesCoreService : Service() {
                     override fun onServiceConnected(name: ComponentName, service: IBinder) {
                         val binder = service as LocalBinder
                         val familyRulesCoreService = binder.getService()
-                        familyRulesCoreService.updateNotification()
                         callback(familyRulesCoreService)
                     }
 
@@ -108,7 +107,7 @@ class FamilyRulesCoreService : Service() {
         return START_STICKY
     }
 
-    fun updateNotification() {
+    private fun updateNotification() {
         val pendingIntent: PendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -118,7 +117,7 @@ class FamilyRulesCoreService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Family Rules")
-            .setContentText("Screen time: ${getUptime().screenTimeMillis.toHMS()}")
+            .setContentText("Monitoring active")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
