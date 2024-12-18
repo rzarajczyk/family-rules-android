@@ -15,7 +15,6 @@ import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
-import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
