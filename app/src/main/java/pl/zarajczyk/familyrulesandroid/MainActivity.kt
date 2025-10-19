@@ -45,6 +45,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import android.util.Base64
+import android.graphics.BitmapFactory
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
@@ -221,12 +223,15 @@ fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, appDb: AppDb, modifier
 
             app?.let { appInfo ->
                 Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                    appInfo.icon?.let {
-                        Image(
-                            bitmap = it.asImageBitmap(),
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp)
-                        )
+                    appInfo.icon?.let { base64Icon ->
+                        val bitmap = base64ToBitmap(base64Icon)
+                        bitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
@@ -246,6 +251,14 @@ fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, appDb: AppDb, modifier
     }
 }
 
+private fun base64ToBitmap(base64: String): android.graphics.Bitmap? {
+    return try {
+        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @Preview(showBackground = true)
 @Composable

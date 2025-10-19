@@ -22,7 +22,7 @@ class AppDb(private val context: Context) {
                 return@withContext App(
                     name = cachedAppInfo.appName,
                     packageName = packageName,
-                    icon = cachedAppInfo.iconBase64?.let { base64ToBitmap(it) }
+                    icon = cachedAppInfo.iconBase64
                 )
             }
 
@@ -43,22 +43,19 @@ class AppDb(private val context: Context) {
             val appName = packageManager.getApplicationLabel(appInfo).toString()
             val appIcon = packageManager.getApplicationIcon(appInfo)
             val bitmap = appIcon.toBitmap(64, 64)
+            val iconBase64 = bitmapToBase64(bitmap)
             
-            App(appName, packageName, bitmap)
+            App(appName, packageName, iconBase64)
         } catch (e: PackageManager.NameNotFoundException) {
             App(packageName, packageName, null)
         }
     }
 
     private suspend fun cacheAppInfo(app: App) {
-        val iconBase64 = if (app.icon != null) {
-            bitmapToBase64(app.icon)
-        } else null
-
         val appInfo = AppInfo(
             packageName = app.packageName,
             appName = app.name,
-            iconBase64 = iconBase64
+            iconBase64 = app.icon
         )
 
         appInfoDao.insertAppInfo(appInfo)
@@ -71,14 +68,6 @@ class AppDb(private val context: Context) {
         return Base64.encodeToString(byteArray, Base64.DEFAULT)
     }
 
-    private fun base64ToBitmap(base64: String): Bitmap? {
-        return try {
-            val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
-            android.graphics.BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
-            null
-        }
-    }
 
     private fun Drawable.toBitmap(width: Int, height: Int): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -101,5 +90,5 @@ class AppDb(private val context: Context) {
 data class App(
     val name: String,
     val packageName: String,
-    val icon: Bitmap?
+    val icon: String? // base64 encoded icon
 )

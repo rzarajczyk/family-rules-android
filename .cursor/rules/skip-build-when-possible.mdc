@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+The full android build takes a long time, so avoid building the app to verify the code.
+Instead, run only the minimal amount gradle tasks to verify the syntax.
