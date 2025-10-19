@@ -30,11 +30,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -47,6 +49,8 @@ import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.database.AppDb
+import pl.zarajczyk.familyrulesandroid.database.App
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import java.util.Locale
@@ -54,11 +58,13 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
+    private lateinit var appDb: AppDb
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         settingsManager = SettingsManager(this)
+        appDb = AppDb(this)
 
         if (!settingsManager.areSettingsComplete()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
@@ -86,7 +92,8 @@ class MainActivity : ComponentActivity() {
                         usageStatsList = uptime.packageUsages,
                         screenTime = uptime.screenTimeMillis,
                         settingsManager = settingsManager,
-                        mainActivity = this
+                        mainActivity = this,
+                        appDb = appDb
                     )
                 }
             }
@@ -99,7 +106,8 @@ fun MainScreen(
     usageStatsList: List<PackageUsage>,
     screenTime: Long,
     settingsManager: SettingsManager,
-    mainActivity: MainActivity
+    mainActivity: MainActivity,
+    appDb: AppDb
 ) {
     val context = LocalContext.current
     Scaffold(
@@ -108,7 +116,7 @@ fun MainScreen(
         bottomBar = { BottomToolbar(screenTime, settingsManager, context, mainActivity) }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            UsageStatsDisplay(usageStatsList)
+            UsageStatsDisplay(usageStatsList, appDb = appDb)
         }
     }
 }
@@ -196,7 +204,7 @@ fun AppTopBar() {
 }
 
 @Composable
-fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, modifier: Modifier = Modifier) {
+fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, appDb: AppDb, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     // Sort the usageStatsList by totalTimeInForeground in descending order
@@ -204,56 +212,46 @@ fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, modifier: Modifier = M
 
     LazyColumn(modifier = modifier.padding(16.dp)) {
         items(sortedUsageStatsList) { stat ->
-            val app = getAppNameAndIcon(stat.packageName, context)
+            var app by remember { mutableStateOf<App?>(null) }
             val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
 
-            Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                app.icon?.let {
-                    Image(
-                        bitmap = it.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = app.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontSize = 18.sp
-                    )
-                    Text(
-                        text = "Total time: $totalTimeFormatted",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+            LaunchedEffect(stat.packageName) {
+                app = appDb.getAppNameAndIcon(stat.packageName)
+            }
+
+            app?.let { appInfo ->
+                Row(modifier = Modifier.padding(vertical = 8.dp)) {
+                    appInfo.icon?.let {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = appInfo.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            text = "Total time: $totalTimeFormatted",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-private fun getAppNameAndIcon(packageName: String, context: Context): App {
-    return try {
-        val packageManager = context.packageManager
-        val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
-        val appName = packageManager.getApplicationLabel(appInfo).toString()
-        val appIcon = packageManager.getApplicationIcon(appInfo).toBitmap()
-        App(appName, packageName, appIcon)
-    } catch (e: PackageManager.NameNotFoundException) {
-        App(packageName, packageName, null)
-    }
-}
-
-private data class App(
-    val name: String,
-    val packageName: String,
-    val icon: Bitmap?,
-)
 
 @Preview(showBackground = true)
 @Composable
 fun UsageStatsDisplayPreview() {
     FamilyRulesAndroidTheme {
-        UsageStatsDisplay(emptyList())
+        // Preview doesn't need real AppDb
+        UsageStatsDisplay(emptyList(), appDb = AppDb(androidx.compose.ui.platform.LocalContext.current))
     }
 }
