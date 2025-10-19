@@ -56,93 +56,132 @@ data class PackageUsage(
 )
 
 private object UptimeFetcher {
+    // Cache expensive objects to avoid repeated allocations
+    private var cachedUsageStatsManager: UsageStatsManager? = null
+    private var cachedTodayMidnight: Long = 0L
+    private var cachedSystemApps: MutableSet<String> = mutableSetOf()
+    private var lastCacheUpdate: Long = 0L
+    
+    // Reusable objects to avoid allocations in hot path
+    private val reusableEvent = UsageEvents.Event()
+    private val calendar = Calendar.getInstance()
 
     fun fetchUptime(applicationContext: Context): Uptime {
-        val usageStatsList = fetchPackageUsage(applicationContext)
-        val screenTime = getTotalScreenOnTimeSinceMidnight(applicationContext)
-        return Uptime(usageStatsList, screenTime)
+        val usageStatsManager = getUsageStatsManager(applicationContext)
+        val todayMidnight = getTodayMidnight()
+        
+        // Use single query for both screen time and app usage - much more efficient
+        val usageEvents = usageStatsManager.queryEvents(todayMidnight, System.currentTimeMillis())
+        val (packageUsages, screenTime) = processUsageEvents(usageEvents, applicationContext)
+        
+        return Uptime(packageUsages, screenTime)
     }
 
-    private fun fetchPackageUsage(context: Context): List<PackageUsage> {
-        val usageStatsManager =
-            context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val todayMidnight = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val startTime = todayMidnight.timeInMillis
-        val usageStatsList = usageStatsManager.queryUsageStats(INTERVAL_DAILY, startTime, endTime)
-
-        val usageStatsMap = mutableMapOf<String, Long>()
-
-        usageStatsList
-            .asSequence()
-            .filter { stat -> stat.totalTimeInForeground > 60 * 1000 }
-            .filter { stat -> !isSystemApp(context, stat.packageName) }
-            .forEach { stat ->
-                if (usageStatsMap.containsKey(stat.packageName)) {
-                    usageStatsMap[stat.packageName] =
-                        usageStatsMap[stat.packageName]!! + stat.totalTimeInForeground
-                } else {
-                    usageStatsMap[stat.packageName] = stat.totalTimeInForeground
-                }
-            }
-
-        return usageStatsMap.map { (packageName, totalTime) ->
-            PackageUsage(
-                packageName = packageName,
-                totalTimeInForegroundMillis = totalTime
-            )
+    private fun getUsageStatsManager(context: Context): UsageStatsManager {
+        return cachedUsageStatsManager ?: run {
+            val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            cachedUsageStatsManager = manager
+            manager
         }
     }
 
-    private fun isSystemApp(context: Context, packageName: String): Boolean {
-        return try {
-            val packageManager = context.packageManager
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
+    private fun getTodayMidnight(): Long {
+        val now = System.currentTimeMillis()
+        // Cache for 1 hour to avoid recalculation - midnight only changes once per day
+        if (now - lastCacheUpdate > 3600000) {
+            calendar.timeInMillis = now
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            cachedTodayMidnight = calendar.timeInMillis
+            lastCacheUpdate = now
         }
+        return cachedTodayMidnight
     }
 
-    private fun getTotalScreenOnTimeSinceMidnight(applicationContext: Context): Long {
-        val usageStatsManager =
-            applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val todayMidnight = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val startTime = todayMidnight.timeInMillis
-        val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
+    private fun processUsageEvents(
+        usageEvents: UsageEvents, 
+        context: Context
+    ): Pair<List<PackageUsage>, Long> {
+        val packageUsageMap = mutableMapOf<String, Long>()
         var totalScreenOnTime = 0L
         var screenOnTime = 0L
-        var screenOffTime: Long
+        val endTime = System.currentTimeMillis()
+        
+        // Track app foreground sessions for more accurate usage calculation
+        val appForegroundSessions = mutableMapOf<String, Long>()
 
         while (usageEvents.hasNextEvent()) {
-            val event = UsageEvents.Event()
-            usageEvents.getNextEvent(event)
-            when (event.eventType) {
-                UsageEvents.Event.SCREEN_INTERACTIVE -> screenOnTime = event.timeStamp
+            usageEvents.getNextEvent(reusableEvent)
+            
+            when (reusableEvent.eventType) {
+                UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                    screenOnTime = reusableEvent.timeStamp
+                }
                 UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                    screenOffTime = event.timeStamp
                     if (screenOnTime != 0L) {
-                        totalScreenOnTime += screenOffTime - screenOnTime
+                        totalScreenOnTime += reusableEvent.timeStamp - screenOnTime
                         screenOnTime = 0L
+                    }
+                }
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    val packageName = reusableEvent.packageName
+                    if (!isSystemAppCached(context, packageName)) {
+                        appForegroundSessions[packageName] = reusableEvent.timeStamp
+                    }
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    val packageName = reusableEvent.packageName
+                    if (!isSystemAppCached(context, packageName)) {
+                        val foregroundStart = appForegroundSessions[packageName]
+                        if (foregroundStart != null) {
+                            val sessionTime = reusableEvent.timeStamp - foregroundStart
+                            if (sessionTime > 60 * 1000) { // Only count sessions > 1 minute
+                                packageUsageMap[packageName] = 
+                                    (packageUsageMap[packageName] ?: 0L) + sessionTime
+                            }
+                            appForegroundSessions.remove(packageName)
+                        }
                     }
                 }
             }
         }
+
+        // Handle case where screen is still on
         if (screenOnTime != 0L) {
             totalScreenOnTime += endTime - screenOnTime
         }
-        return totalScreenOnTime
+        
+        // Handle any remaining foreground sessions (app still in foreground)
+        appForegroundSessions.forEach { (packageName, startTime) ->
+            val sessionTime = endTime - startTime
+            if (sessionTime > 60 * 1000) {
+                packageUsageMap[packageName] = 
+                    (packageUsageMap[packageName] ?: 0L) + sessionTime
+            }
+        }
+
+        val packageUsages = packageUsageMap.map { (packageName, totalTime) ->
+            PackageUsage(packageName, totalTime)
+        }
+
+        return Pair(packageUsages, totalScreenOnTime)
     }
 
+    private fun isSystemAppCached(context: Context, packageName: String): Boolean {
+        if (cachedSystemApps.contains(packageName)) return true
+        
+        return try {
+            val packageManager = context.packageManager
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            if (isSystem) {
+                cachedSystemApps.add(packageName)
+            }
+            isSystem
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
 }

@@ -196,7 +196,7 @@ fun InitialSetupScreen(settingsManager: SettingsManager, onSetupComplete: () -> 
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
             ) {
-                Text("Save Settings")
+                Text("Install!")
             }
         }
     }

@@ -2,6 +2,7 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
 class SettingsManager(context: Context) {
     private val preferences: SharedPreferences =
@@ -30,7 +31,7 @@ class SettingsManager(context: Context) {
     }
 
     fun clearSettings() {
-        preferences.edit().clear().apply()
+        preferences.edit { clear() }
     }
 
     fun getVersion(): String {
