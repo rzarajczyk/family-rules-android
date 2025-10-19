@@ -2,7 +2,6 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
-import android.app.usage.UsageStatsManager.INTERVAL_DAILY
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -59,7 +58,6 @@ private object UptimeFetcher {
     // Cache expensive objects to avoid repeated allocations
     private var cachedUsageStatsManager: UsageStatsManager? = null
     private var cachedTodayMidnight: Long = 0L
-    private var cachedSystemApps: MutableSet<String> = mutableSetOf()
     private var lastCacheUpdate: Long = 0L
     
     // Reusable calendar to avoid allocations
@@ -71,7 +69,7 @@ private object UptimeFetcher {
         val endTime = System.currentTimeMillis()
         
         // Get app usage data using the simpler and more reliable queryUsageStats
-        val packageUsages = fetchPackageUsage(usageStatsManager, todayMidnight, endTime, applicationContext)
+        val packageUsages = fetchPackageUsage(usageStatsManager, todayMidnight, endTime)
         
         // Get screen time using queryEvents for accuracy
         val screenTime = getScreenTime(usageStatsManager, todayMidnight, endTime)
@@ -80,11 +78,11 @@ private object UptimeFetcher {
     }
 
     private fun getUsageStatsManager(context: Context): UsageStatsManager {
-        return cachedUsageStatsManager ?: run {
+        if (cachedUsageStatsManager == null) {
             val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             cachedUsageStatsManager = manager
-            manager
         }
+        return cachedUsageStatsManager ?: throw IllegalStateException("UsageStatsManager is null")
     }
 
     private fun getTodayMidnight(): Long {
@@ -105,8 +103,7 @@ private object UptimeFetcher {
     private fun fetchPackageUsage(
         usageStatsManager: UsageStatsManager,
         startTime: Long,
-        endTime: Long,
-        context: Context
+        endTime: Long
     ): List<PackageUsage> {
         val usageStatsList = usageStatsManager.queryUsageStats(
             UsageStatsManager.INTERVAL_DAILY, 
@@ -117,7 +114,6 @@ private object UptimeFetcher {
         return usageStatsList
             .asSequence()
             .filter { stat -> stat.totalTimeInForeground > 60 * 1000 } // Only apps used > 1 minute
-            .filter { stat -> !isSystemAppCached(context, stat.packageName) }
             .map { stat ->
                 PackageUsage(
                     packageName = stat.packageName,
@@ -159,25 +155,5 @@ private object UptimeFetcher {
         }
 
         return totalScreenOnTime
-    }
-
-    private fun isSystemAppCached(context: Context, packageName: String): Boolean {
-        // Check if we already know this is a system app
-        if (cachedSystemApps.contains(packageName)) return true
-        
-        return try {
-            val packageManager = context.packageManager
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-            
-            // Cache the result for future use
-            if (isSystem) {
-                cachedSystemApps.add(packageName)
-            }
-            
-            isSystem
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        }
     }
 }
