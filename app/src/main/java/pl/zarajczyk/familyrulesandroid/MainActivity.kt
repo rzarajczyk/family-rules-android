@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -47,7 +48,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.runBlocking
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
@@ -228,7 +228,26 @@ fun UsageStatsDisplay(
 @Composable
 private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
     val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
-    val appInfo: App = runBlocking { appDb.getAppNameAndIcon(stat.packageName) }
+    
+    // State to hold the app info
+    var appInfo by remember(stat.packageName) { 
+        mutableStateOf<App?>(null) 
+    }
+    var isLoading by remember(stat.packageName) { 
+        mutableStateOf(true) 
+    }
+    
+    // Launch coroutine to fetch app info
+    LaunchedEffect(stat.packageName) {
+        try {
+            appInfo = appDb.getAppNameAndIcon(stat.packageName)
+        } catch (e: Exception) {
+            // Handle error - create a fallback app info
+            appInfo = App(stat.packageName, stat.packageName, null)
+        } finally {
+            isLoading = false
+        }
+    }
 
     Row(
         modifier = Modifier
@@ -236,11 +255,30 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AppIcon(appInfo.icon)
+        if (isLoading) {
+            // Show loading indicator
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        Color.Gray.copy(alpha = 0.3f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        } else {
+            AppIcon(appInfo?.icon)
+        }
+        
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = appInfo.name,
+                text = appInfo?.name ?: stat.packageName,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 18.sp
             )
@@ -249,7 +287,6 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-
     }
 }
 
