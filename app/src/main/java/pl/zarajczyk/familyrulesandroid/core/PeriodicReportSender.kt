@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 class PeriodicReportSender(
     private val context: Context,
@@ -21,6 +22,7 @@ class PeriodicReportSender(
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val familyRulesClient: FamilyRulesClient = FamilyRulesClient(context, settingsManager, appDb)
+    private val appListChangeDetector = AppListChangeDetector(appDb)
 
     companion object {
         fun install(
@@ -35,9 +37,33 @@ class PeriodicReportSender(
     }
 
     fun start() {
+        // Send initial client info request
         scope.launch {
-            familyRulesClient.sendClientInfoRequest()
+            try {
+                familyRulesClient.sendClientInfoRequest()
+                appListChangeDetector.updateLastSentApps()
+            } catch (e: Exception) {
+                Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
+            }
         }
+        
+        // Start the 15-minute app list change checker
+        scope.launch {
+            while (isActive) {
+                delay(15.minutes)
+                try {
+                    if (appListChangeDetector.hasAppListChanged()) {
+                        Log.i("PeriodicReportSender", "App list changed, sending client info request")
+                        familyRulesClient.sendClientInfoRequest()
+                        appListChangeDetector.updateLastSentApps()
+                    }
+                } catch (e: Exception) {
+                    Log.e("PeriodicReportSender", "Failed to check/send app list changes: ${e.message}", e)
+                }
+            }
+        }
+        
+        // Start the regular uptime reporting
         scope.launch {
             while (isActive) {
                 if (ScreenStatus.isScreenOn(context)) {
