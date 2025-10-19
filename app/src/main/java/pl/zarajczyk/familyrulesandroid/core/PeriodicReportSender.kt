@@ -32,7 +32,7 @@ class PeriodicReportSender(
     }
 
     fun start() {
-        familyRulesClient.sendLaunchRequest()
+        familyRulesClient.sendClientInfoRequest()
         scope.launch {
             while (isActive) {
                 if (ScreenStatus.isScreenOn(context)) {

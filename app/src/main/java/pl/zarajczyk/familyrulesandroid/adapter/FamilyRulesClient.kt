@@ -1,7 +1,6 @@
 package pl.zarajczyk.familyrulesandroid.adapter
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +20,7 @@ class FamilyRulesClient(
     private val settingsManager: SettingsManager
 ) {
 
-    fun sendLaunchRequest() {
+    fun sendClientInfoRequest() {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
@@ -45,7 +44,7 @@ class FamilyRulesClient(
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val url = URL("$serverUrl/api/v2/launch")
+                val url = URL("$serverUrl/api/v2/client-info")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.instanceFollowRedirects = true
