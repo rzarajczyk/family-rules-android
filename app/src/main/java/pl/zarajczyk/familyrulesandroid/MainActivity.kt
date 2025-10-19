@@ -2,15 +2,17 @@ package pl.zarajczyk.familyrulesandroid
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Base64
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,7 +39,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.launch
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -44,18 +47,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.drawable.toBitmap
-import android.util.Base64
-import android.graphics.BitmapFactory
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
-import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.database.App
+import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.utils.toHMS
-import java.util.Locale
 
 
 class MainActivity : ComponentActivity() {
@@ -155,7 +154,11 @@ fun BottomToolbar(
                     if (clickCount >= 5) {
                         // Toggle dev mode
                         settingsManager.toggleDevMode()
-                        Toast.makeText(context, "Dev mode: ${settingsManager.isDevMode()}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            "Dev mode: ${settingsManager.isDevMode()}",
+                            Toast.LENGTH_LONG
+                        ).show()
                         clickCount = 0 // Reset the click count
                     }
                 }
@@ -206,47 +209,78 @@ fun AppTopBar() {
 }
 
 @Composable
-fun UsageStatsDisplay(usageStatsList: List<PackageUsage>, appDb: AppDb, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-
+fun UsageStatsDisplay(
+    usageStatsList: List<PackageUsage>,
+    appDb: AppDb,
+    modifier: Modifier = Modifier
+) {
     // Sort the usageStatsList by totalTimeInForeground in descending order
     val sortedUsageStatsList = usageStatsList.sortedByDescending { it.totalTimeInForegroundMillis }
 
     LazyColumn(modifier = modifier.padding(16.dp)) {
         items(sortedUsageStatsList) { stat ->
-            var app by remember { mutableStateOf<App?>(null) }
-            val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
+            AppUsageItem(stat, appDb)
+        }
+    }
+}
 
-            LaunchedEffect(stat.packageName) {
-                app = appDb.getAppNameAndIcon(stat.packageName)
-            }
+@Composable
+private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
+    var app by remember { mutableStateOf<App?>(null) }
+    val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
 
-            app?.let { appInfo ->
-                Row(modifier = Modifier.padding(vertical = 8.dp)) {
-                    appInfo.icon?.let { base64Icon ->
-                        val bitmap = base64ToBitmap(base64Icon)
-                        bitmap?.let {
-                            Image(
-                                bitmap = it.asImageBitmap(),
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = appInfo.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontSize = 18.sp
-                        )
-                        Text(
-                            text = "Total time: $totalTimeFormatted",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
+    LaunchedEffect(stat.packageName) {
+        app = appDb.getAppNameAndIcon(stat.packageName)
+    }
+
+    app?.let { appInfo ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppIcon(appInfo.icon)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = appInfo.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = "Total time: $totalTimeFormatted",
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun AppIcon(iconBase64: String?) {
+    val bitmap = remember(iconBase64) {
+        iconBase64?.let { base64ToBitmap(it) }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.size(48.dp)
+        )
+    } else {
+        // Placeholder for apps without icons
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(
+                    Color.Gray.copy(alpha = 0.3f),
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("📱", fontSize = 24.sp)
         }
     }
 }
@@ -265,6 +299,9 @@ private fun base64ToBitmap(base64: String): android.graphics.Bitmap? {
 fun UsageStatsDisplayPreview() {
     FamilyRulesAndroidTheme {
         // Preview doesn't need real AppDb
-        UsageStatsDisplay(emptyList(), appDb = AppDb(androidx.compose.ui.platform.LocalContext.current))
+        UsageStatsDisplay(
+            emptyList(),
+            appDb = AppDb(androidx.compose.ui.platform.LocalContext.current)
+        )
     }
 }
