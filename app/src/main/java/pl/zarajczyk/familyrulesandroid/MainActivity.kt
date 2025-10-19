@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.runBlocking
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
@@ -226,34 +227,29 @@ fun UsageStatsDisplay(
 
 @Composable
 private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
-    var app by remember { mutableStateOf<App?>(null) }
     val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
+    val appInfo: App = runBlocking { appDb.getAppNameAndIcon(stat.packageName) }
 
-    LaunchedEffect(stat.packageName) {
-        app = appDb.getAppNameAndIcon(stat.packageName)
-    }
-
-    app?.let { appInfo ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AppIcon(appInfo.icon)
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = appInfo.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontSize = 18.sp
-                )
-                Text(
-                    text = "Total time: $totalTimeFormatted",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppIcon(appInfo.icon)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = appInfo.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = 18.sp
+            )
+            Text(
+                text = "Total time: $totalTimeFormatted",
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
+
     }
 }
 
