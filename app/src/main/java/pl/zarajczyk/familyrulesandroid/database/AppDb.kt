@@ -77,6 +77,12 @@ class AppDb(private val context: Context) {
         return bitmap
     }
 
+    suspend fun getAllAppInfo(): List<AppInfo> {
+        return withContext(Dispatchers.IO) {
+            appInfoDao.getAllAppInfo()
+        }
+    }
+
     suspend fun clearCache() {
         withContext(Dispatchers.IO) {
             // Clear all app info from database

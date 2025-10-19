@@ -14,6 +14,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -78,7 +79,8 @@ class FamilyRulesCoreService : Service() {
             this,
             settingsManager = SettingsManager(this),
             periodicUptimeChecker,
-            delayMillis = 10.seconds
+            delayMillis = 10.seconds,
+            appDb = AppDb(this)
         )
     }
 

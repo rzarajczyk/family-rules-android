@@ -11,24 +11,42 @@ import org.json.JSONArray
 import org.json.JSONObject
 import pl.zarajczyk.familyrulesandroid.core.Uptime
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.database.AppDb
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
 class FamilyRulesClient(
     private val context: Context,
-    private val settingsManager: SettingsManager
+    private val settingsManager: SettingsManager,
+    private val appDb: AppDb
 ) {
 
-    fun sendClientInfoRequest() {
+    suspend fun sendClientInfoRequest() {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
         val version = settingsManager.getVersion()
 
+        // Get known apps from AppDb
+        val knownApps = JSONObject()
+        try {
+            val allAppInfo = appDb.getAllAppInfo()
+            allAppInfo.forEach { appInfo ->
+                val appData = JSONObject().apply {
+                    put("appName", appInfo.appName)
+                    put("iconBase64Png", appInfo.iconBase64 ?: JSONObject.NULL)
+                }
+                knownApps.put(appInfo.packageName, appData)
+            }
+        } catch (e: Exception) {
+            Log.e("FamilyRulesClient", "Failed to get known apps: ${e.message}", e)
+        }
+
         val json = JSONObject().apply {
             put("instanceId", instanceId)
             put("version", version)
+            put("knownApps", knownApps)
             put("availableStates", JSONArray().apply {
                 put(JSONObject().apply {
                     put("deviceState", "ACTIVE")
@@ -42,7 +60,7 @@ class FamilyRulesClient(
             })
         }.toString()
 
-        CoroutineScope(Dispatchers.IO).launch {
+        withContext(Dispatchers.IO) {
             try {
                 val url = URL("$serverUrl/api/v2/client-info")
                 val connection = url.openConnection() as HttpURLConnection
