@@ -1,3 +1,17 @@
+import java.io.ByteArrayOutputStream
+
+fun checkGitTag(): String {
+    val stdout = ByteArrayOutputStream()
+    exec {
+        workingDir = rootDir
+        commandLine("git", "describe", "--tags", "--abbrev=0")
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+
+val gitTag = checkGitTag()
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -21,8 +35,8 @@ android {
         applicationId = "pl.zarajczyk.familyrulesandroid"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (System.currentTimeMillis() / 1000).toInt()
+        versionName = "$gitTag"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
