@@ -46,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
@@ -109,72 +110,130 @@ fun MainScreen(
     mainActivity: MainActivity,
     appDb: AppDb
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding(),
-        bottomBar = { BottomToolbar(screenTime, settingsManager, mainActivity) }
+            .systemBarsPadding()
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF3F3F3))
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+        val bgColor = Color(0xFFD3E8FF)
+        if (isLandscape) {
+            // Horizontal layout for landscape orientation
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(bgColor)
+                    .padding(innerPadding)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.icon),
-                    contentDescription = "Family Rules Icon",
+                // Left side - Icon and label
+                Column(
                     modifier = Modifier
-                        .size(128.dp)
-                        .padding(top = 32.dp)
-                )
-                Text(
-                    text = "FamilyRules",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Color.Black,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-                Spacer(modifier = Modifier.size(32.dp))
-                UsageStatsDisplay(usageStatsList, appDb = appDb)
+                        .weight(1f)
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.icon),
+                        contentDescription = "Family Rules Icon",
+                        modifier = Modifier.size(128.dp)
+                    )
+                    Text(
+                        text = "FamilyRules",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.Black,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+                
+                // Right side - App list and screen time card
+                Column(
+                    modifier = Modifier
+                        .weight(2f)
+                        .fillMaxSize()
+                ) {
+                    ScreenTimeCard(screenTime, settingsManager, mainActivity)
+                    Spacer(modifier = Modifier.weight(1f))
+                    UsageStatsDisplay(usageStatsList, appDb = appDb)
+                }
+            }
+        } else {
+            // Vertical layout for portrait orientation
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(bgColor)
+                    .padding(innerPadding)
+            ) {
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.icon),
+                            contentDescription = "Family Rules Icon",
+                            modifier = Modifier
+                                .size(128.dp)
+                                .padding(top = 32.dp)
+                        )
+                        Text(
+                            text = "FamilyRules",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.Black,
+                            modifier = Modifier.padding(top = 16.dp)
+                        )
+                        ScreenTimeCard(screenTime, settingsManager, mainActivity)
+                        Spacer(modifier = Modifier.weight(1f))
+                        UsageStatsDisplay(usageStatsList, appDb = appDb)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun BottomToolbar(
+fun ScreenTimeCard(
     screenTime: Long,
     settingsManager: SettingsManager,
     mainActivity: MainActivity
 ) {
-
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
-            modifier = Modifier.padding(start = 16.dp)
-        )
-        Button(
-            onClick = {
-                mainActivity.setupContent()
-            },
-            modifier = Modifier
-                .padding(end = 16.dp)
-                .size(width = 60.dp, height = 40.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                contentColor = Color.Black
+            .padding(start = 16.dp, end=16.dp, bottom = 0.dp, top = 16.dp)
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(16.dp)
             )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("🔄")
+            Text(
+                text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Black
+            )
+            Button(
+                onClick = {
+                    mainActivity.setupContent()
+                },
+                modifier = Modifier.size(width = 60.dp, height = 40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Color.Black
+                )
+            ) {
+                Text("🔄")
+            }
         }
     }
 }
@@ -195,7 +254,6 @@ fun UsageStatsDisplay(
                 color = Color.White,
                 shape = RoundedCornerShape(16.dp)
             )
-            .padding(16.dp)
     ) {
         items(sortedUsageStatsList) { stat ->
             AppUsageItem(stat, appDb)
@@ -230,7 +288,7 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(all = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isLoading) {
