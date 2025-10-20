@@ -109,12 +109,11 @@ fun MainScreen(
     mainActivity: MainActivity,
     appDb: AppDb
 ) {
-    val context = LocalContext.current
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding(),
-        bottomBar = { BottomToolbar(screenTime, settingsManager, context, mainActivity) }
+        bottomBar = { BottomToolbar(screenTime, settingsManager, mainActivity) }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -133,6 +132,12 @@ fun MainScreen(
                         .size(128.dp)
                         .padding(top = 32.dp)
                 )
+                Text(
+                    text = "FamilyRules",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.Black,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
                 Spacer(modifier = Modifier.size(32.dp))
                 UsageStatsDisplay(usageStatsList, appDb = appDb)
             }
@@ -144,7 +149,6 @@ fun MainScreen(
 fun BottomToolbar(
     screenTime: Long,
     settingsManager: SettingsManager,
-    context: Context,
     mainActivity: MainActivity
 ) {
 
