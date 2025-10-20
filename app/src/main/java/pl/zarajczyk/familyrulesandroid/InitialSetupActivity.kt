@@ -1,29 +1,43 @@
 package pl.zarajczyk.familyrulesandroid
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -109,95 +123,237 @@ class InitialSetupActivity : ComponentActivity() {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun InitialSetupScreen(settingsManager: SettingsManager, onSetupComplete: () -> Unit) {
-    var serverUrl by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf("https://familyrules.org") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var instanceName by remember { mutableStateOf("") }
+    var instanceName by remember { 
+        mutableStateOf(
+            "${Build.MANUFACTURER} ${Build.MODEL}".replace(" ", "_")
+                .replace("[^a-zA-Z0-9_]".toRegex(), "")
+        )
+    }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(text = "FamilyRules Initial Setup") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF000080),
-                    titleContentColor = Color.White
-                )
-            )
-        }
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
-            TextField(
-                value = serverUrl,
-                onValueChange = { serverUrl = it },
-                label = { Text("Server URL") },
+        val bgColor = Color(0xFFD3E8FF)
+        if (isLandscape) {
+            // Horizontal layout for landscape orientation
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
-            TextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                visualTransformation = PasswordVisualTransformation()
-            )
-            TextField(
-                value = instanceName,
-                onValueChange = { instanceName = it },
-                label = { Text("Instance Name") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
-            errorMessage?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            Button(
-                onClick = {
-                    scope.launch {
-                        val result = (context as InitialSetupActivity).registerInstance(
-                            serverUrl, username, password, instanceName
-                        )
-                        when (result) {
-                            is InitialSetupActivity.Result.Success -> {
-                                settingsManager.setString("serverUrl", serverUrl)
-                                settingsManager.setString("username", username)
-                                settingsManager.setString("instanceId", result.instanceId)
-                                settingsManager.setString("instanceName", instanceName)
-                                settingsManager.setString("instanceToken", result.instanceToken)
-                                onSetupComplete()
-                            }
-                            is InitialSetupActivity.Result.Error -> {
-                                errorMessage = result.message
+                    .fillMaxSize()
+                    .background(bgColor)
+                    .padding(innerPadding)
+            ) {
+                // Left side - Icon and label
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.icon),
+                        contentDescription = "Family Rules Icon",
+                        modifier = Modifier.size(128.dp)
+                    )
+                    Text(
+                        text = "FamilyRules",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.Black,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+                
+                // Right side - Setup form
+                Column(
+                    modifier = Modifier
+                        .weight(2f)
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    SetupForm(
+                        serverUrl = serverUrl,
+                        onServerUrlChange = { serverUrl = it },
+                        username = username,
+                        onUsernameChange = { username = it },
+                        password = password,
+                        onPasswordChange = { password = it },
+                        instanceName = instanceName,
+                        onInstanceNameChange = { instanceName = it },
+                        errorMessage = errorMessage,
+                        onInstallClick = {
+                            scope.launch {
+                                val result = (context as InitialSetupActivity).registerInstance(
+                                    serverUrl, username, password, instanceName
+                                )
+                                when (result) {
+                                    is InitialSetupActivity.Result.Success -> {
+                                        settingsManager.setString("serverUrl", serverUrl)
+                                        settingsManager.setString("username", username)
+                                        settingsManager.setString("instanceId", result.instanceId)
+                                        settingsManager.setString("instanceName", instanceName)
+                                        settingsManager.setString("instanceToken", result.instanceToken)
+                                        onSetupComplete()
+                                    }
+                                    is InitialSetupActivity.Result.Error -> {
+                                        errorMessage = result.message
+                                    }
+                                }
                             }
                         }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-            ) {
-                Text("Install!")
+                    )
+                }
             }
+        } else {
+            // Vertical layout for portrait orientation
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(bgColor)
+                    .padding(innerPadding)
+            ) {
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.icon),
+                            contentDescription = "Family Rules Icon",
+                            modifier = Modifier
+                                .size(128.dp)
+                                .padding(top = 32.dp)
+                        )
+                        Text(
+                            text = "FamilyRules",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.Black,
+                            modifier = Modifier.padding(top = 16.dp)
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        SetupForm(
+                            serverUrl = serverUrl,
+                            onServerUrlChange = { serverUrl = it },
+                            username = username,
+                            onUsernameChange = { username = it },
+                            password = password,
+                            onPasswordChange = { password = it },
+                            instanceName = instanceName,
+                            onInstanceNameChange = { instanceName = it },
+                            errorMessage = errorMessage,
+                            onInstallClick = {
+                                scope.launch {
+                                    val result = (context as InitialSetupActivity).registerInstance(
+                                        serverUrl, username, password, instanceName
+                                    )
+                                    when (result) {
+                                        is InitialSetupActivity.Result.Success -> {
+                                            settingsManager.setString("serverUrl", serverUrl)
+                                            settingsManager.setString("username", username)
+                                            settingsManager.setString("instanceId", result.instanceId)
+                                            settingsManager.setString("instanceName", instanceName)
+                                            settingsManager.setString("instanceToken", result.instanceToken)
+                                            onSetupComplete()
+                                        }
+                                        is InitialSetupActivity.Result.Error -> {
+                                            errorMessage = result.message
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SetupForm(
+    serverUrl: String,
+    onServerUrlChange: (String) -> Unit,
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    instanceName: String,
+    onInstanceNameChange: (String) -> Unit,
+    errorMessage: String?,
+    onInstallClick: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+    ) {
+        TextField(
+            value = serverUrl,
+            onValueChange = onServerUrlChange,
+            label = { Text("Server URL") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+        TextField(
+            value = username,
+            onValueChange = onUsernameChange,
+            label = { Text("Username") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+        TextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            label = { Text("Password") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            visualTransformation = PasswordVisualTransformation()
+        )
+        TextField(
+            value = instanceName,
+            onValueChange = onInstanceNameChange,
+            label = { Text("Instance Name") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+        errorMessage?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+        Button(
+            onClick = onInstallClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Text("Install!")
         }
     }
 }
