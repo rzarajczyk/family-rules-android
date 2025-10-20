@@ -2,10 +2,13 @@ package pl.zarajczyk.familyrulesandroid
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.view.WindowManager
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -80,11 +83,23 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
         } else {
-            PermissionsChecker(this).checkPermissions()
-
-            FamilyRulesCoreService.install(this)
-
-            setupContent()
+            // Check if all required permissions are granted
+            val permissionsChecker = PermissionsChecker(this)
+            val hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+            val hasUsageStatsPermission = permissionsChecker.isUsageStatsPermissionGranted()
+            
+            if (!hasNotificationPermission || !hasUsageStatsPermission) {
+                // Redirect to InitialSetupActivity for permission flow
+                startActivity(Intent(this, InitialSetupActivity::class.java))
+                finish()
+            } else {
+                FamilyRulesCoreService.install(this)
+                setupContent()
+            }
         }
     }
 

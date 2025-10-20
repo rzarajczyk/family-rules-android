@@ -26,7 +26,7 @@ class PermissionsChecker(private val activity: Activity) {
         }
     }
 
-    private fun isUsageStatsPermissionGranted(): Boolean {
+    fun isUsageStatsPermissionGranted(): Boolean {
         val appOpsManager = activity.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val mode = appOpsManager.checkOpNoThrow(
             AppOpsManager.OPSTR_GET_USAGE_STATS,
