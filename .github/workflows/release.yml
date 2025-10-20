@@ -66,7 +66,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: family-rules-release-aab
-          path: ${{ steps.releaseApk.outputs.aabfile }}
+          path: ${{ steps.releaseAab.outputs.aabfile }}
 
   create-release:
     runs-on: ubuntu-latest
