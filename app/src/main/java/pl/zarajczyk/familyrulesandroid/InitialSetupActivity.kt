@@ -1,16 +1,12 @@
 package pl.zarajczyk.familyrulesandroid
 
-import android.app.AppOpsManager
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -60,21 +55,17 @@ import java.net.URL
 class InitialSetupActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private lateinit var permissionChecker: PermissionsChecker
-    
+
     // Permission request launcher
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            // Notification permission granted, check usage stats permission
-            checkPermissionsAndUpdateUI()
-        }
+    ) {
+        checkPermissionsAndUpdateUI()
     }
-    
+
     private val usageStatsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        // Check permissions again after returning from settings
         checkPermissionsAndUpdateUI()
     }
 
@@ -88,10 +79,6 @@ class InitialSetupActivity : ComponentActivity() {
                 InitialSetupScreen(
                     settingsManager = settingsManager,
                     permissionChecker = permissionChecker,
-                    onSetupComplete = {
-                        // Don't finish here, stay for permission flow
-                        checkPermissionsAndUpdateUI()
-                    },
                     onNotificationPermissionRequest = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -104,15 +91,18 @@ class InitialSetupActivity : ComponentActivity() {
                     onAllPermissionsGranted = {
                         finish()
                         startActivity(Intent(this, MainActivity::class.java))
+                    },
+                    onRegistrationCompleted = {
+                        checkPermissionsAndUpdateUI()
                     }
                 )
             }
         }
     }
-    
+
     private fun checkPermissionsAndUpdateUI() {
-        // This will trigger a recomposition with updated permission states
-        // The UI will automatically update based on the permission states
+        finish()
+        startActivity(Intent(this, InitialSetupActivity::class.java))
     }
 
     suspend fun registerInstance(
@@ -175,20 +165,20 @@ class InitialSetupActivity : ComponentActivity() {
 fun InitialSetupScreen(
     settingsManager: SettingsManager,
     permissionChecker: PermissionsChecker,
-    onSetupComplete: () -> Unit,
     onNotificationPermissionRequest: () -> Unit,
     onUsageStatsPermissionRequest: () -> Unit,
-    onAllPermissionsGranted: () -> Unit
+    onAllPermissionsGranted: () -> Unit,
+    onRegistrationCompleted: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    
+
     // Determine current screen state using the specified conditional flow
     when {
         !settingsManager.areSettingsComplete() -> showSetupForm(
             settingsManager = settingsManager,
-            onSetupComplete = onSetupComplete,
-            isLandscape = isLandscape
+            isLandscape = isLandscape,
+            onRegistrationCompleted = onRegistrationCompleted
         )
         !permissionChecker.isNotificationPermissionGranted() -> showGrantNotificationPermissionForm(
             onNotificationPermissionRequest = onNotificationPermissionRequest,
@@ -294,8 +284,8 @@ fun GenericSetupLayout(
 @Composable
 fun showSetupForm(
     settingsManager: SettingsManager,
-    onSetupComplete: () -> Unit,
-    isLandscape: Boolean
+    isLandscape: Boolean,
+    onRegistrationCompleted: () -> Unit
 ) {
     var serverUrl by remember { mutableStateOf("https://familyrules.org") }
     var username by remember { mutableStateOf("") }
@@ -333,7 +323,8 @@ fun showSetupForm(
                             settingsManager.setString("instanceId", result.instanceId)
                             settingsManager.setString("instanceName", instanceName)
                             settingsManager.setString("instanceToken", result.instanceToken)
-                            onSetupComplete()
+                            // Trigger recomposition to restart the flow
+                            onRegistrationCompleted()
                         }
                         is InitialSetupActivity.Result.Error -> {
                             errorMessage = result.message
