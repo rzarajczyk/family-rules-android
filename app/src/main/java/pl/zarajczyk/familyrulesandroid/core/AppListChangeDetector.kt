@@ -41,3 +41,4 @@ class AppListChangeDetector(private val appDb: AppDb) {
         }
     }
 }
+

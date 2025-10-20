@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -113,7 +115,9 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding(),
         topBar = { AppTopBar() },
         bottomBar = { BottomToolbar(screenTime, settingsManager, context, mainActivity) }
     ) { innerPadding ->
@@ -136,7 +140,9 @@ fun BottomToolbar(
     var lastClickTime by remember { mutableLongStateOf(0L) }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
