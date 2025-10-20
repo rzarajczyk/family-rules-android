@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,12 +52,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.net.HttpURLConnection
 import java.net.URL
 
 class InitialSetupActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
+    private lateinit var permissionChecker: PermissionsChecker
     
     // Permission request launcher
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -78,11 +81,13 @@ class InitialSetupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settingsManager = SettingsManager(this)
+        permissionChecker = PermissionsChecker(this)
 
         setContent {
             FamilyRulesAndroidTheme {
                 InitialSetupScreen(
                     settingsManager = settingsManager,
+                    permissionChecker = permissionChecker,
                     onSetupComplete = {
                         // Don't finish here, stay for permission flow
                         checkPermissionsAndUpdateUI()
@@ -108,27 +113,6 @@ class InitialSetupActivity : ComponentActivity() {
     private fun checkPermissionsAndUpdateUI() {
         // This will trigger a recomposition with updated permission states
         // The UI will automatically update based on the permission states
-    }
-    
-    fun isNotificationPermissionGranted(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                this,
-                android.Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true // Notification permission not required for older versions
-        }
-    }
-    
-    fun isUsageStatsPermissionGranted(): Boolean {
-        val appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOpsManager.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            android.os.Process.myUid(),
-            packageName
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
     }
 
     suspend fun registerInstance(
@@ -189,49 +173,42 @@ class InitialSetupActivity : ComponentActivity() {
 
 @Composable
 fun InitialSetupScreen(
-    settingsManager: SettingsManager, 
+    settingsManager: SettingsManager,
+    permissionChecker: PermissionsChecker,
     onSetupComplete: () -> Unit,
     onNotificationPermissionRequest: () -> Unit,
     onUsageStatsPermissionRequest: () -> Unit,
     onAllPermissionsGranted: () -> Unit
 ) {
-    var serverUrl by remember { mutableStateOf("https://familyrules.org") }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var instanceName by remember { 
-        mutableStateOf(
-            "${Build.MANUFACTURER} ${Build.MODEL}".replace(" ", "_")
-                .replace("[^a-zA-Z0-9_]".toRegex(), "")
-        )
-    }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSetupComplete by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
-    // Check permissions
-    val isNotificationPermissionGranted = remember {
-        (context as InitialSetupActivity).isNotificationPermissionGranted()
-    }
-    val isUsageStatsPermissionGranted = remember {
-        (context as InitialSetupActivity).isUsageStatsPermissionGranted()
-    }
-    
-    // Determine current screen state
-    val currentScreen = when {
-        !isSetupComplete -> "setup"
-        !isNotificationPermissionGranted -> "notification_permission"
-        !isUsageStatsPermissionGranted -> "usage_stats_permission"
-        else -> "complete"
-    }
-    
-    // Navigate to MainActivity when all permissions are granted
-    if (currentScreen == "complete") {
-        onAllPermissionsGranted()
+    // Determine current screen state using the specified conditional flow
+    when {
+        !settingsManager.areSettingsComplete() -> showSetupForm(
+            settingsManager = settingsManager,
+            onSetupComplete = onSetupComplete,
+            isLandscape = isLandscape
+        )
+        !permissionChecker.isNotificationPermissionGranted() -> showGrantNotificationPermissionForm(
+            onNotificationPermissionRequest = onNotificationPermissionRequest,
+            isLandscape = isLandscape
+        )
+        !permissionChecker.isUsageStatsPermissionGranted() -> showGrantAppUsagePermissionForm(
+            onUsageStatsPermissionRequest = onUsageStatsPermissionRequest,
+            isLandscape = isLandscape
+        )
+        else -> setupCompleted(onAllPermissionsGranted = onAllPermissionsGranted)
     }
 
+}
+
+// Generic layout component that can be reused for all screens
+@Composable
+fun GenericSetupLayout(
+    isLandscape: Boolean,
+    content: @Composable () -> Unit
+) {
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -267,58 +244,13 @@ fun InitialSetupScreen(
                     )
                 }
                 
-                // Right side - Content based on current screen
+                // Right side - Content
                 Column(
                     modifier = Modifier
                         .weight(2f)
                         .fillMaxSize()
                 ) {
-                    when (currentScreen) {
-                        "setup" -> SetupForm(
-                            serverUrl = serverUrl,
-                            onServerUrlChange = { serverUrl = it },
-                            username = username,
-                            onUsernameChange = { username = it },
-                            password = password,
-                            onPasswordChange = { password = it },
-                            instanceName = instanceName,
-                            onInstanceNameChange = { instanceName = it },
-                            errorMessage = errorMessage,
-                            onInstallClick = {
-                                scope.launch {
-                                    val result = (context as InitialSetupActivity).registerInstance(
-                                        serverUrl, username, password, instanceName
-                                    )
-                                    when (result) {
-                                        is InitialSetupActivity.Result.Success -> {
-                                            settingsManager.setString("serverUrl", serverUrl)
-                                            settingsManager.setString("username", username)
-                                            settingsManager.setString("instanceId", result.instanceId)
-                                            settingsManager.setString("instanceName", instanceName)
-                                            settingsManager.setString("instanceToken", result.instanceToken)
-                                            isSetupComplete = true
-                                            onSetupComplete()
-                                        }
-                                        is InitialSetupActivity.Result.Error -> {
-                                            errorMessage = result.message
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                        "notification_permission" -> PermissionScreen(
-                            title = "Notification Permission Required",
-                            description = "FamilyRules needs notification permission to send you important updates and alerts about your family's screen time usage.",
-                            buttonText = "Grant Permission",
-                            onButtonClick = onNotificationPermissionRequest
-                        )
-                        "usage_stats_permission" -> PermissionScreen(
-                            title = "App Usage Permission Required",
-                            description = "FamilyRules needs access to app usage statistics to track screen time and provide detailed usage reports for your family.",
-                            buttonText = "Grant Permission",
-                            onButtonClick = onUsageStatsPermissionRequest
-                        )
-                    }
+                    content()
                 }
             }
         } else {
@@ -350,56 +282,107 @@ fun InitialSetupScreen(
                             modifier = Modifier.padding(top = 16.dp)
                         )
                         Spacer(modifier = Modifier.weight(1f))
-                        when (currentScreen) {
-                            "setup" -> SetupForm(
-                                serverUrl = serverUrl,
-                                onServerUrlChange = { serverUrl = it },
-                                username = username,
-                                onUsernameChange = { username = it },
-                                password = password,
-                                onPasswordChange = { password = it },
-                                instanceName = instanceName,
-                                onInstanceNameChange = { instanceName = it },
-                                errorMessage = errorMessage,
-                                onInstallClick = {
-                                    scope.launch {
-                                        val result = (context as InitialSetupActivity).registerInstance(
-                                            serverUrl, username, password, instanceName
-                                        )
-                                        when (result) {
-                                            is InitialSetupActivity.Result.Success -> {
-                                                settingsManager.setString("serverUrl", serverUrl)
-                                                settingsManager.setString("username", username)
-                                                settingsManager.setString("instanceId", result.instanceId)
-                                                settingsManager.setString("instanceName", instanceName)
-                                                settingsManager.setString("instanceToken", result.instanceToken)
-                                                isSetupComplete = true
-                                                onSetupComplete()
-                                            }
-                                            is InitialSetupActivity.Result.Error -> {
-                                                errorMessage = result.message
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                            "notification_permission" -> PermissionScreen(
-                                title = "Notification Permission Required",
-                                description = "FamilyRules needs notification permission to send you important updates and alerts about your family's screen time usage.",
-                                buttonText = "Grant Permission",
-                                onButtonClick = onNotificationPermissionRequest
-                            )
-                            "usage_stats_permission" -> PermissionScreen(
-                                title = "App Usage Permission Required",
-                                description = "FamilyRules needs access to app usage statistics to track screen time and provide detailed usage reports for your family.",
-                                buttonText = "Grant Permission",
-                                onButtonClick = onUsageStatsPermissionRequest
-                            )
-                        }
+                        content()
                     }
                 }
             }
         }
+    }
+}
+
+// Setup form screen
+@Composable
+fun showSetupForm(
+    settingsManager: SettingsManager,
+    onSetupComplete: () -> Unit,
+    isLandscape: Boolean
+) {
+    var serverUrl by remember { mutableStateOf("https://familyrules.org") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var instanceName by remember { 
+        mutableStateOf(
+            "${Build.MANUFACTURER} ${Build.MODEL}".replace(" ", "_")
+                .replace("[^a-zA-Z0-9_]".toRegex(), "")
+        )
+    }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    
+    GenericSetupLayout(isLandscape = isLandscape) {
+        SetupForm(
+            serverUrl = serverUrl,
+            onServerUrlChange = { serverUrl = it },
+            username = username,
+            onUsernameChange = { username = it },
+            password = password,
+            onPasswordChange = { password = it },
+            instanceName = instanceName,
+            onInstanceNameChange = { instanceName = it },
+            errorMessage = errorMessage,
+            onInstallClick = {
+                scope.launch {
+                    val result = (context as InitialSetupActivity).registerInstance(
+                        serverUrl, username, password, instanceName
+                    )
+                    when (result) {
+                        is InitialSetupActivity.Result.Success -> {
+                            settingsManager.setString("serverUrl", serverUrl)
+                            settingsManager.setString("username", username)
+                            settingsManager.setString("instanceId", result.instanceId)
+                            settingsManager.setString("instanceName", instanceName)
+                            settingsManager.setString("instanceToken", result.instanceToken)
+                            onSetupComplete()
+                        }
+                        is InitialSetupActivity.Result.Error -> {
+                            errorMessage = result.message
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+// Notification permission screen
+@Composable
+fun showGrantNotificationPermissionForm(
+    onNotificationPermissionRequest: () -> Unit,
+    isLandscape: Boolean
+) {
+    GenericSetupLayout(isLandscape = isLandscape) {
+        PermissionScreen(
+            title = "Notification Permission Required",
+            description = "FamilyRules needs notification permission to send you important updates and alerts about your family's screen time usage.",
+            buttonText = "Grant Permission",
+            onButtonClick = onNotificationPermissionRequest
+        )
+    }
+}
+
+// App usage permission screen
+@Composable
+fun showGrantAppUsagePermissionForm(
+    onUsageStatsPermissionRequest: () -> Unit,
+    isLandscape: Boolean
+) {
+    GenericSetupLayout(isLandscape = isLandscape) {
+        PermissionScreen(
+            title = "App Usage Permission Required",
+            description = "FamilyRules needs access to app usage statistics to track screen time and provide detailed usage reports for your family.",
+            buttonText = "Grant Permission",
+            onButtonClick = onUsageStatsPermissionRequest
+        )
+    }
+}
+
+// Setup completed screen
+@Composable
+fun setupCompleted(onAllPermissionsGranted: () -> Unit) {
+    // Call the completion callback immediately
+    LaunchedEffect(Unit) {
+        onAllPermissionsGranted()
     }
 }
 

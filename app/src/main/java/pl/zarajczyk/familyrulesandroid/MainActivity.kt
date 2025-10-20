@@ -79,27 +79,13 @@ class MainActivity : ComponentActivity() {
         settingsManager = SettingsManager(this)
         appDb = AppDb(this)
 
-        if (!settingsManager.areSettingsComplete()) {
+        val permissionsChecker = PermissionsChecker(this)
+        if (!settingsManager.areSettingsComplete() || !permissionsChecker.isAllPermissionsGranted()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
         } else {
-            // Check if all required permissions are granted
-            val permissionsChecker = PermissionsChecker(this)
-            val hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
-            val hasUsageStatsPermission = permissionsChecker.isUsageStatsPermissionGranted()
-            
-            if (!hasNotificationPermission || !hasUsageStatsPermission) {
-                // Redirect to InitialSetupActivity for permission flow
-                startActivity(Intent(this, InitialSetupActivity::class.java))
-                finish()
-            } else {
-                FamilyRulesCoreService.install(this)
-                setupContent()
-            }
+            FamilyRulesCoreService.install(this)
+            setupContent()
         }
     }
 

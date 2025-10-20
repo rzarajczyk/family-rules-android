@@ -26,6 +26,18 @@ class PermissionsChecker(private val activity: Activity) {
         }
     }
 
+    fun isAllPermissionsGranted(): Boolean {
+        return isUsageStatsPermissionGranted() && isNotificationPermissionGranted()
+    }
+
+    fun isNotificationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            activity.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+        } else
+            true
+    }
+
     fun isUsageStatsPermissionGranted(): Boolean {
         val appOpsManager = activity.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val mode = appOpsManager.checkOpNoThrow(
