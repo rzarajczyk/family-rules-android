@@ -111,7 +111,13 @@ private object UptimeFetcher {
             endTime
         )
 
-        return usageStatsList
+        // Debug: Log all usage stats to understand duplicates
+        Log.d("UptimeFetcher", "Raw usage stats count: ${usageStatsList.size}")
+        usageStatsList.forEach { stat ->
+            Log.d("UptimeFetcher", "Package: ${stat.packageName}, Time: ${stat.totalTimeInForeground}, LastTimeUsed: ${stat.lastTimeUsed}")
+        }
+
+        val filteredStats = usageStatsList
             .asSequence()
             .filter { stat -> stat.totalTimeInForeground > 60 * 1000 } // Only apps used > 1 minute
             .map { stat ->
@@ -121,6 +127,32 @@ private object UptimeFetcher {
                 )
             }
             .toList()
+
+        // Debug: Log filtered results and check for duplicates
+        Log.d("UptimeFetcher", "Filtered package usage count: ${filteredStats.size}")
+        val packageNames = filteredStats.map { it.packageName }
+        val uniquePackageNames = packageNames.toSet()
+        if (packageNames.size != uniquePackageNames.size) {
+            Log.w("UptimeFetcher", "Found duplicate packages! Total: ${packageNames.size}, Unique: ${uniquePackageNames.size}")
+            val duplicates = packageNames.groupingBy { it }.eachCount().filter { it.value > 1 }
+            Log.w("UptimeFetcher", "Duplicate packages: $duplicates")
+        }
+
+        // Deduplicate packages by name and sum their usage times
+        val deduplicatedStats = filteredStats
+            .groupBy { it.packageName }
+            .map { (packageName, packageUsages) ->
+                val totalTime = packageUsages.maxOf { it.totalTimeInForegroundMillis }
+                PackageUsage(
+                    packageName = packageName,
+                    totalTimeInForegroundMillis = totalTime
+                )
+            }
+            .sortedByDescending { it.totalTimeInForegroundMillis }
+
+        Log.d("UptimeFetcher", "Deduplicated package usage count: ${deduplicatedStats.size}")
+
+        return deduplicatedStats
     }
 
     private fun getScreenTime(

@@ -8,5 +8,5 @@ fun Long.toHMS(): String {
     val timeInMinutes = timeInSeconds / 60
     val minPart = String.format(Locale.getDefault(), "%02d", timeInMinutes % 60)
     val hourPart = String.format(Locale.getDefault(), "%02d", timeInMinutes / 60)
-    return "${hourPart}h ${minPart}m ${secPart}s"
+    return if (hourPart == "00") "${minPart}m ${secPart}s" else "${hourPart}h ${minPart}m ${secPart}s"
 }
