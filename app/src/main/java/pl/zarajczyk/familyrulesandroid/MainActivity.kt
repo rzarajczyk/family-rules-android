@@ -5,40 +5,35 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Base64
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,11 +114,28 @@ fun MainScreen(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding(),
-        topBar = { AppTopBar() },
         bottomBar = { BottomToolbar(screenTime, settingsManager, context, mainActivity) }
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
-            UsageStatsDisplay(usageStatsList, appDb = appDb)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF3F3F3))
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.icon),
+                    contentDescription = "Family Rules Icon",
+                    modifier = Modifier
+                        .size(128.dp)
+                        .padding(top = 32.dp)
+                )
+                Spacer(modifier = Modifier.size(32.dp))
+                UsageStatsDisplay(usageStatsList, appDb = appDb)
+            }
         }
     }
 }
@@ -134,10 +147,6 @@ fun BottomToolbar(
     context: Context,
     mainActivity: MainActivity
 ) {
-    // State to count clicks on the text field
-    var clickCount by remember { mutableStateOf(0) }
-    val clickTimeoutMillis = 500L // Time window to count clicks
-    var lastClickTime by remember { mutableLongStateOf(0L) }
 
     Row(
         modifier = Modifier
@@ -147,45 +156,8 @@ fun BottomToolbar(
     ) {
         Text(
             text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .clickable {
-                    val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastClickTime > clickTimeoutMillis) {
-                        clickCount = 1 // Reset the count if timeout exceeded
-                    } else {
-                        clickCount++
-                    }
-                    lastClickTime = currentTime
-
-                    if (clickCount >= 5) {
-                        // Toggle dev mode
-                        settingsManager.toggleDevMode()
-                        Toast.makeText(
-                            context,
-                            "Dev mode: ${settingsManager.isDevMode()}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        clickCount = 0 // Reset the click count
-                    }
-                }
+            modifier = Modifier.padding(start = 16.dp)
         )
-        if (settingsManager.isDevMode()) {
-            Button(
-                onClick = {
-                    settingsManager.clearSettings()
-                    context.startActivity(Intent(context, InitialSetupActivity::class.java))
-                },
-                modifier = Modifier
-                    .size(width = 60.dp, height = 40.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Color.Black
-                )
-            ) {
-                Text("🗑️")
-            }
-        }
         Button(
             onClick = {
                 mainActivity.setupContent()
@@ -203,18 +175,6 @@ fun BottomToolbar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppTopBar() {
-    TopAppBar(
-        title = { Text(text = "Family Rules") },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color(0xFF000080),
-            titleContentColor = Color.White
-        )
-    )
-}
-
 @Composable
 fun UsageStatsDisplay(
     usageStatsList: List<PackageUsage>,
@@ -224,7 +184,15 @@ fun UsageStatsDisplay(
     // Sort the usageStatsList by totalTimeInForeground in descending order
     val sortedUsageStatsList = usageStatsList.sortedByDescending { it.totalTimeInForegroundMillis }
 
-    LazyColumn(modifier = modifier.padding(16.dp)) {
+    LazyColumn(
+        modifier = modifier
+            .padding(16.dp)
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(16.dp)
+    ) {
         items(sortedUsageStatsList) { stat ->
             AppUsageItem(stat, appDb)
         }
@@ -234,15 +202,15 @@ fun UsageStatsDisplay(
 @Composable
 private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
     val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
-    
+
     // State to hold the app info
-    var appInfo by remember(stat.packageName) { 
-        mutableStateOf<App?>(null) 
+    var appInfo by remember(stat.packageName) {
+        mutableStateOf<App?>(null)
     }
-    var isLoading by remember(stat.packageName) { 
-        mutableStateOf(true) 
+    var isLoading by remember(stat.packageName) {
+        mutableStateOf(true)
     }
-    
+
     // Launch coroutine to fetch app info
     LaunchedEffect(stat.packageName) {
         try {
@@ -280,7 +248,7 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
         } else {
             AppIcon(appInfo?.icon)
         }
-        
+
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

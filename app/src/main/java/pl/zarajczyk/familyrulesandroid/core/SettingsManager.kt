@@ -12,7 +12,6 @@ class SettingsManager(context: Context) {
         ?.readText()
         ?.trim()
         ?: "v?.?"
-    private var devMode = false
 
     fun getString(key: String, defaultValue: String?): String? {
         return preferences.getString(key, defaultValue)
@@ -38,10 +37,5 @@ class SettingsManager(context: Context) {
         return version
     }
 
-    fun isDevMode(): Boolean = devMode
-
-    fun toggleDevMode() {
-        devMode = !devMode
-    }
 
 }

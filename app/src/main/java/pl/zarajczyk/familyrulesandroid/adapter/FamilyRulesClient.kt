@@ -82,9 +82,9 @@ class FamilyRulesClient(
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                     throw RuntimeException("Failed to send launch request: HTTP ${connection.responseCode}")
                 }
+                "ok"
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send launch request: ${e.message}", e)
-                showToast(e)
             }
         }
     }
@@ -130,15 +130,6 @@ class FamilyRulesClient(
                 }
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send launch request: ${e.message}", e)
-                showToast(e)
-            }
-        }
-    }
-
-    private suspend fun showToast(e: Exception) {
-        if (settingsManager.isDevMode()) {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
