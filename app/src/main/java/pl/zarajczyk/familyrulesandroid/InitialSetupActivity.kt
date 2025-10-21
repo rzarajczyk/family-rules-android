@@ -1,6 +1,8 @@
 package pl.zarajczyk.familyrulesandroid
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -41,7 +43,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,7 +65,17 @@ class InitialSetupActivity : ComponentActivity() {
     // Permission request launcher
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) {
+    ) { isGranted ->
+        if (!isGranted) {
+            // Permission was denied, check if we should show rationale or direct to settings
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (!shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)) {
+                    // User selected "Don't ask again" or this is the first denial
+                    // Direct them to app settings
+                    openAppSettings()
+                }
+            }
+        }
         checkPermissionsAndUpdateUI()
     }
 
@@ -82,7 +97,16 @@ class InitialSetupActivity : ComponentActivity() {
                     permissionChecker = permissionChecker,
                     onNotificationPermissionRequest = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            // Check if permission was previously denied
+                            if (!shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS) &&
+                                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                // Permission was denied and "Don't ask again" was selected, or first denial
+                                // Direct user to app settings
+                                openAppSettings()
+                            } else {
+                                // Permission can be requested normally
+                                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
                         }
                     },
                     onUsageStatsPermissionRequest = {
@@ -104,6 +128,13 @@ class InitialSetupActivity : ComponentActivity() {
     private fun checkPermissionsAndUpdateUI() {
         finish()
         startActivity(Intent(this, InitialSetupActivity::class.java))
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        startActivity(intent)
     }
 
     suspend fun registerInstance(
@@ -177,10 +208,9 @@ fun InitialSetupScreen(
             settingsManager = settingsManager,
             onRegistrationCompleted = onRegistrationCompleted
         )
-        !permissionChecker.isNotificationPermissionGranted() -> showGrantNotificationPermissionForm(
-            onNotificationPermissionRequest = onNotificationPermissionRequest
-        )
-        !permissionChecker.isUsageStatsPermissionGranted() -> showGrantAppUsagePermissionForm(
+        !permissionChecker.isNotificationPermissionGranted() || !permissionChecker.isUsageStatsPermissionGranted() -> showGrantPermissionsForm(
+            permissionChecker = permissionChecker,
+            onNotificationPermissionRequest = onNotificationPermissionRequest,
             onUsageStatsPermissionRequest = onUsageStatsPermissionRequest
         )
         else -> setupCompleted(onAllPermissionsGranted = onAllPermissionsGranted)
@@ -251,32 +281,18 @@ fun showSetupForm(
     }
 }
 
-// Notification permission screen
+// Unified permission screen
 @Composable
-fun showGrantNotificationPermissionForm(
-    onNotificationPermissionRequest: () -> Unit
-) {
-    GenericSetupLayout {
-        PermissionScreen(
-            title = "Notification Permission Required",
-            description = "FamilyRules needs notification permission to send you important updates and alerts about your family's screen time usage.",
-            buttonText = "Grant Permission",
-            onButtonClick = onNotificationPermissionRequest
-        )
-    }
-}
-
-// App usage permission screen
-@Composable
-fun showGrantAppUsagePermissionForm(
+fun showGrantPermissionsForm(
+    permissionChecker: PermissionsChecker,
+    onNotificationPermissionRequest: () -> Unit,
     onUsageStatsPermissionRequest: () -> Unit
 ) {
     GenericSetupLayout {
-        PermissionScreen(
-            title = "App Usage Permission Required",
-            description = "FamilyRules needs access to app usage statistics to track screen time and provide detailed usage reports for your family.",
-            buttonText = "Grant Permission",
-            onButtonClick = onUsageStatsPermissionRequest
+        UnifiedPermissionScreen(
+            permissionChecker = permissionChecker,
+            onNotificationPermissionRequest = onNotificationPermissionRequest,
+            onUsageStatsPermissionRequest = onUsageStatsPermissionRequest
         )
     }
 }
@@ -332,6 +348,8 @@ fun SetupForm(
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
         )
+        var passwordVisible by remember { mutableStateOf(false) }
+        
         TextField(
             value = password,
             onValueChange = onPasswordChange,
@@ -339,7 +357,15 @@ fun SetupForm(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Text(
+                        text = if (passwordVisible) "👁️" else "🙈",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
         )
         TextField(
             value = instanceName,
@@ -410,6 +436,84 @@ fun PermissionScreen(
                 .padding(vertical = 16.dp)
         ) {
             Text(buttonText)
+        }
+    }
+}
+
+@Composable
+fun UnifiedPermissionScreen(
+    permissionChecker: PermissionsChecker,
+    onNotificationPermissionRequest: () -> Unit,
+    onUsageStatsPermissionRequest: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+    val isNotificationPermissionGranted = permissionChecker.isNotificationPermissionGranted()
+    val isUsageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(16.dp)
+            .verticalScroll(scrollState),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "FamilyRules needs the following permissions to function properly:",
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.Black,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        
+        if (!isNotificationPermissionGranted) {
+            Text(
+                text = "If you previously denied notification permission, you may need to grant it manually in app settings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF666666),
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+        
+        // Notification Permission Button
+        Button(
+            onClick = onNotificationPermissionRequest,
+            enabled = !isNotificationPermissionGranted,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                if (isNotificationPermissionGranted) "Notification Permission Granted ✓" 
+                else "Grant Notification Permission"
+            )
+        }
+        
+        // App Usage Permission Button
+        Button(
+            onClick = onUsageStatsPermissionRequest,
+            enabled = !isUsageStatsPermissionGranted,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                if (isUsageStatsPermissionGranted) "App Usage Permission Granted ✓" 
+                else "Grant App Usage Permission"
+            )
+        }
+        
+        if (isNotificationPermissionGranted && isUsageStatsPermissionGranted) {
+            Text(
+                text = "All permissions granted! You can now proceed.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF4CAF50),
+                modifier = Modifier.padding(top = 16.dp)
+            )
         }
     }
 }
