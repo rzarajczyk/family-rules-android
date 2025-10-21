@@ -61,84 +61,25 @@ import java.net.URL
 
 class InitialSetupActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
-    private lateinit var permissionChecker: PermissionsChecker
-
-    // Permission request launcher
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            // Permission was denied, check if we should show rationale or direct to settings
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (!shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)) {
-                    // User selected "Don't ask again" or this is the first denial
-                    // Direct them to app settings
-                    openAppSettings()
-                }
-            }
-        }
-        checkPermissionsAndUpdateUI()
-    }
-
-    private val usageStatsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        checkPermissionsAndUpdateUI()
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settingsManager = SettingsManager(this)
-        permissionChecker = PermissionsChecker(this)
 
         setContent {
             FamilyRulesAndroidTheme {
                 InitialSetupScreen(
                     settingsManager = settingsManager,
-                    permissionChecker = permissionChecker,
-                    onNotificationPermissionRequest = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            // Check if permission was previously denied
-                            if (!shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS) &&
-                                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                                // Permission was denied and "Don't ask again" was selected, or first denial
-                                // Direct user to app settings
-                                openAppSettings()
-                            } else {
-                                // Permission can be requested normally
-                                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                        }
-                    },
-                    onUsageStatsPermissionRequest = {
-                        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-                        usageStatsPermissionLauncher.launch(intent)
-                    },
-                    onAllPermissionsGranted = {
-                        // Start the core service early to begin uptime calculation
-                        FamilyRulesCoreService.install(this)
-                        finish()
-                        startActivity(Intent(this, MainActivity::class.java))
-                    },
                     onRegistrationCompleted = {
-                        checkPermissionsAndUpdateUI()
+                        // After registration, go to protection setup
+                        finish()
+                        startActivity(Intent(this, ProtectionSetupActivity::class.java))
                     }
                 )
             }
         }
     }
 
-    private fun checkPermissionsAndUpdateUI() {
-        finish()
-        startActivity(Intent(this, InitialSetupActivity::class.java))
-    }
-
-    private fun openAppSettings() {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", packageName, null)
-        }
-        startActivity(intent)
-    }
 
     suspend fun registerInstance(
         serverUrl: String,
@@ -199,26 +140,13 @@ class InitialSetupActivity : ComponentActivity() {
 @Composable
 fun InitialSetupScreen(
     settingsManager: SettingsManager,
-    permissionChecker: PermissionsChecker,
-    onNotificationPermissionRequest: () -> Unit,
-    onUsageStatsPermissionRequest: () -> Unit,
-    onAllPermissionsGranted: () -> Unit,
     onRegistrationCompleted: () -> Unit
 ) {
-    // Determine current screen state using the specified conditional flow
-    when {
-        !settingsManager.areSettingsComplete() -> showSetupForm(
-            settingsManager = settingsManager,
-            onRegistrationCompleted = onRegistrationCompleted
-        )
-        !permissionChecker.isNotificationPermissionGranted() || !permissionChecker.isUsageStatsPermissionGranted() -> showGrantPermissionsForm(
-            permissionChecker = permissionChecker,
-            onNotificationPermissionRequest = onNotificationPermissionRequest,
-            onUsageStatsPermissionRequest = onUsageStatsPermissionRequest
-        )
-        else -> setupCompleted(onAllPermissionsGranted = onAllPermissionsGranted)
-    }
-
+    // Only handle registration - permissions are handled in ProtectionSetupActivity
+    showSetupForm(
+        settingsManager = settingsManager,
+        onRegistrationCompleted = onRegistrationCompleted
+    )
 }
 
 // Generic layout wrapper that uses the shared layout component
@@ -284,30 +212,6 @@ fun showSetupForm(
     }
 }
 
-// Unified permission screen
-@Composable
-fun showGrantPermissionsForm(
-    permissionChecker: PermissionsChecker,
-    onNotificationPermissionRequest: () -> Unit,
-    onUsageStatsPermissionRequest: () -> Unit
-) {
-    GenericSetupLayout {
-        UnifiedPermissionScreen(
-            permissionChecker = permissionChecker,
-            onNotificationPermissionRequest = onNotificationPermissionRequest,
-            onUsageStatsPermissionRequest = onUsageStatsPermissionRequest
-        )
-    }
-}
-
-// Setup completed screen
-@Composable
-fun setupCompleted(onAllPermissionsGranted: () -> Unit) {
-    // Call the completion callback immediately
-    LaunchedEffect(Unit) {
-        onAllPermissionsGranted()
-    }
-}
 
 @Composable
 fun SetupForm(
@@ -439,84 +343,6 @@ fun PermissionScreen(
                 .padding(vertical = 16.dp)
         ) {
             Text(buttonText)
-        }
-    }
-}
-
-@Composable
-fun UnifiedPermissionScreen(
-    permissionChecker: PermissionsChecker,
-    onNotificationPermissionRequest: () -> Unit,
-    onUsageStatsPermissionRequest: () -> Unit
-) {
-    val scrollState = rememberScrollState()
-    val isNotificationPermissionGranted = permissionChecker.isNotificationPermissionGranted()
-    val isUsageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted()
-    
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .background(
-                color = Color.White,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .padding(16.dp)
-            .verticalScroll(scrollState),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "FamilyRules needs the following permissions to function properly:",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        if (!isNotificationPermissionGranted) {
-            Text(
-                text = "If you previously denied notification permission, you may need to grant it manually in app settings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF666666),
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-        }
-        
-        // Notification Permission Button
-        Button(
-            onClick = onNotificationPermissionRequest,
-            enabled = !isNotificationPermissionGranted,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        ) {
-            Text(
-                if (isNotificationPermissionGranted) "Notification Permission Granted ✓" 
-                else "Grant Notification Permission"
-            )
-        }
-        
-        // App Usage Permission Button
-        Button(
-            onClick = onUsageStatsPermissionRequest,
-            enabled = !isUsageStatsPermissionGranted,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        ) {
-            Text(
-                if (isUsageStatsPermissionGranted) "App Usage Permission Granted ✓" 
-                else "Grant App Usage Permission"
-            )
-        }
-        
-        if (isNotificationPermissionGranted && isUsageStatsPermissionGranted) {
-            Text(
-                text = "All permissions granted! You can now proceed.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF4CAF50),
-                modifier = Modifier.padding(top = 16.dp)
-            )
         }
     }
 }

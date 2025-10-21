@@ -48,12 +48,7 @@ class TamperDetector(private val context: Context) {
                 notifyTamperDetected("Device admin privileges removed")
             }
             
-            // Check if stealth mode is still active
-            val stealthModeManager = StealthModeManager(context)
-            if (!stealthModeManager.isStealthModeEnabled()) {
-                Log.w("TamperDetector", "Stealth mode disabled")
-                notifyTamperDetected("Stealth mode disabled")
-            }
+            // Note: Stealth mode removed - child should be aware of monitoring
             
         } catch (e: PackageManager.NameNotFoundException) {
             Log.w("TamperDetector", "App not found - possible uninstall attempt")

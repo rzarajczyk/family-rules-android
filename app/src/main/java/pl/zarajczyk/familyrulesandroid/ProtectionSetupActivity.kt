@@ -2,6 +2,7 @@ package pl.zarajczyk.familyrulesandroid
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -9,6 +10,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,33 +18,81 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import pl.zarajczyk.familyrulesandroid.core.*
+import pl.zarajczyk.familyrulesandroid.core.DeviceAdminManager
+import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
+import pl.zarajczyk.familyrulesandroid.core.TamperDetector
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 
 class ProtectionSetupActivity : ComponentActivity() {
     
     private lateinit var deviceAdminManager: DeviceAdminManager
-    private lateinit var stealthModeManager: StealthModeManager
     private lateinit var tamperDetector: TamperDetector
+    private lateinit var permissionChecker: PermissionsChecker
+    
+    // Permission request launchers
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            // Permission was denied, check if we should show rationale or direct to settings
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (!shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)) {
+                    // User selected "Don't ask again" or this is the first denial
+                    // Direct them to app settings
+                    openAppSettings()
+                }
+            }
+        }
+    }
+
+    private val usageStatsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Permission check will be handled in the UI
+    }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         deviceAdminManager = DeviceAdminManager(this)
-        stealthModeManager = StealthModeManager(this)
         tamperDetector = TamperDetector(this)
+        permissionChecker = PermissionsChecker(this)
         
         setContent {
             FamilyRulesAndroidTheme {
-                ProtectionSetupScreen(
-                    deviceAdminManager = deviceAdminManager,
-                    stealthModeManager = stealthModeManager,
-                    tamperDetector = tamperDetector,
-                    onSetupComplete = { finish() }
-                )
+                SharedAppLayout {
+                    ProtectionSetupContent(
+                        deviceAdminManager = deviceAdminManager,
+                        tamperDetector = tamperDetector,
+                        permissionChecker = permissionChecker,
+                        onNotificationPermissionRequest = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                // Check if permission was previously denied
+                                if (!shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS) &&
+                                    checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                    // Permission was denied and "Don't ask again" was selected, or first denial
+                                    // Direct user to app settings
+                                    openAppSettings()
+                                } else {
+                                    // Permission can be requested normally
+                                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            }
+                        },
+                        onUsageStatsPermissionRequest = {
+                            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                            usageStatsPermissionLauncher.launch(intent)
+                        },
+                        onSetupComplete = { 
+                            finish()
+                            startActivity(Intent(this@ProtectionSetupActivity, MainActivity::class.java))
+                        }
+                    )
+                }
             }
         }
     }
@@ -51,20 +101,30 @@ class ProtectionSetupActivity : ComponentActivity() {
         super.onResume()
         // Refresh the UI when returning from settings
     }
+    
+    private fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        startActivity(intent)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProtectionSetupScreen(
+fun ProtectionSetupContent(
     deviceAdminManager: DeviceAdminManager,
-    stealthModeManager: StealthModeManager,
     tamperDetector: TamperDetector,
+    permissionChecker: PermissionsChecker,
+    onNotificationPermissionRequest: () -> Unit,
+    onUsageStatsPermissionRequest: () -> Unit,
     onSetupComplete: () -> Unit
 ) {
     val context = LocalContext.current
     var deviceAdminEnabled by remember { mutableStateOf(deviceAdminManager.isDeviceAdminActive()) }
-    var stealthModeEnabled by remember { mutableStateOf(stealthModeManager.isStealthModeEnabled()) }
     var batteryOptimizationDisabled by remember { mutableStateOf(false) }
+    var notificationPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationPermissionGranted()) }
+    var usageStatsPermissionGranted by remember { mutableStateOf(permissionChecker.isUsageStatsPermissionGranted()) }
     
     LaunchedEffect(Unit) {
         batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
@@ -72,7 +132,7 @@ fun ProtectionSetupScreen(
     
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -84,8 +144,26 @@ fun ProtectionSetupScreen(
         )
         
         Text(
-            text = "To prevent your child from uninstalling this app, please enable the following protection features:",
+            text = "To complete the app setup, please grant the following permissions and enable protection features:",
             style = MaterialTheme.typography.bodyLarge
+        )
+        
+        // Notification Permission
+        ProtectionCard(
+            title = "Notification Permission",
+            description = "Required for app notifications and background operation",
+            isEnabled = notificationPermissionGranted,
+            onEnableClick = onNotificationPermissionRequest,
+            onRefresh = { notificationPermissionGranted = permissionChecker.isNotificationPermissionGranted() }
+        )
+        
+        // App Usage Permission
+        ProtectionCard(
+            title = "App Usage Permission",
+            description = "Required to monitor app usage and screen time",
+            isEnabled = usageStatsPermissionGranted,
+            onEnableClick = onUsageStatsPermissionRequest,
+            onRefresh = { usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted() }
         )
         
         // Device Admin Protection
@@ -98,18 +176,6 @@ fun ProtectionSetupScreen(
                 context.startActivity(intent)
             },
             onRefresh = { deviceAdminEnabled = deviceAdminManager.isDeviceAdminActive() }
-        )
-        
-        // Stealth Mode
-        ProtectionCard(
-            title = "Stealth Mode",
-            description = "Hides app icon from launcher to prevent discovery",
-            isEnabled = stealthModeEnabled,
-            onEnableClick = {
-                stealthModeManager.enableStealthMode()
-                stealthModeEnabled = stealthModeManager.isStealthModeEnabled()
-            },
-            onRefresh = { stealthModeEnabled = stealthModeManager.isStealthModeEnabled() }
         )
         
         // Battery Optimization
@@ -129,20 +195,27 @@ fun ProtectionSetupScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         // Setup Complete Button
+        val allPermissionsGranted = notificationPermissionGranted && usageStatsPermissionGranted && deviceAdminEnabled
+        
         Button(
             onClick = {
                 tamperDetector.startMonitoring()
                 onSetupComplete()
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = deviceAdminEnabled
+            enabled = allPermissionsGranted
         ) {
             Text("Complete Setup")
         }
         
-        if (!deviceAdminEnabled) {
+        if (!allPermissionsGranted) {
+            val missingPermissions = mutableListOf<String>()
+            if (!notificationPermissionGranted) missingPermissions.add("Notification Permission")
+            if (!usageStatsPermissionGranted) missingPermissions.add("App Usage Permission")
+            if (!deviceAdminEnabled) missingPermissions.add("Device Administrator Rights")
+            
             Text(
-                text = "Device Administrator rights are required to complete setup",
+                text = "Please grant all permissions to complete setup: ${missingPermissions.joinToString(", ")}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )

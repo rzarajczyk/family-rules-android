@@ -51,7 +51,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private lateinit var appDb: AppDb
     private lateinit var deviceAdminManager: DeviceAdminManager
-    private lateinit var stealthModeManager: StealthModeManager
     private lateinit var tamperDetector: TamperDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,15 +65,14 @@ class MainActivity : ComponentActivity() {
         settingsManager = SettingsManager(this)
         appDb = AppDb(this)
         deviceAdminManager = DeviceAdminManager(this)
-        stealthModeManager = StealthModeManager(this)
         tamperDetector = TamperDetector(this)
 
         val permissionsChecker = PermissionsChecker(this)
-        if (!settingsManager.areSettingsComplete() || !permissionsChecker.isAllPermissionsGranted()) {
+        if (!settingsManager.areSettingsComplete()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
-        } else if (!deviceAdminManager.isDeviceAdminActive()) {
-            // Redirect to protection setup if device admin is not enabled
+        } else if (!permissionsChecker.isAllPermissionsGranted() || !deviceAdminManager.isDeviceAdminActive()) {
+            // Redirect to protection setup if permissions or device admin are not enabled
             startActivity(Intent(this, ProtectionSetupActivity::class.java))
             finish()
         } else {

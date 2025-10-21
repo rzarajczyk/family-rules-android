@@ -23,23 +23,24 @@ This document explains the comprehensive protection mechanisms implemented to pr
 - App cannot be uninstalled through normal means
 - Parent receives notification if admin rights are removed
 
-### 2. Stealth Mode (Secondary Protection)
+### 2. Transparent Monitoring (Design Choice)
 
 **What it does:**
-- Hides app icon from launcher/home screen
-- Makes app less discoverable by children
-- App still runs in background with full functionality
+- App icon remains visible on home screen
+- Child is aware that monitoring is active
+- Promotes transparency and trust in family relationships
 
 **Implementation:**
-- `StealthModeManager.kt` - Controls app icon visibility
-- Uses `PackageManager.setComponentEnabledSetting()` to hide launcher activity
+- No stealth functionality - app remains visible
+- Child can see the monitoring app is present
+- Encourages open communication about device usage
 
 **User Experience:**
-- App icon disappears from home screen
-- App continues monitoring in background
-- Can be toggled on/off by parent through settings
+- App icon stays visible on home screen
+- Child knows monitoring is active
+- Promotes honest discussion about device usage
 
-### 3. Tamper Detection (Monitoring)
+### 2. Tamper Detection (Monitoring)
 
 **What it does:**
 - Continuously monitors for tampering attempts
@@ -57,7 +58,7 @@ This document explains the comprehensive protection mechanisms implemented to pr
 - Automatic device lock if tampering detected
 - Comprehensive logging of all protection events
 
-### 4. Battery Optimization Bypass
+### 3. Battery Optimization Bypass
 
 **What it does:**
 - Prevents Android from killing the app to save battery
@@ -69,7 +70,7 @@ This document explains the comprehensive protection mechanisms implemented to pr
 - Guides user through system settings to disable battery optimization
 - Monitors battery optimization status
 
-### 5. Enhanced Service Protection
+### 4. Enhanced Service Protection
 
 **What it does:**
 - Multiple layers of service protection
@@ -93,9 +94,10 @@ This document explains the comprehensive protection mechanisms implemented to pr
    - App will prompt for device admin permission
    - Enter device password when prompted
    - This is the most important step for protection
-4. **Enable Stealth Mode** (optional but recommended):
-   - Hides app icon from child
-   - App continues working in background
+4. **App Remains Visible** (transparency approach):
+   - App icon stays visible on home screen
+   - Child is aware of monitoring presence
+   - Promotes open communication about device usage
 5. **Disable Battery Optimization**:
    - Prevents system from killing the app
    - Ensures continuous protection
