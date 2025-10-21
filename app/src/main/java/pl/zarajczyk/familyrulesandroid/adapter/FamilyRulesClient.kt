@@ -2,10 +2,7 @@ package pl.zarajczyk.familyrulesandroid.adapter
 
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -48,15 +45,26 @@ class FamilyRulesClient(
             put("version", version)
             put("knownApps", knownApps)
             put("availableStates", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("deviceState", "ACTIVE")
-                    put("title", "Active")
-                    put(
-                        "icon",
-                        "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/>"
-                    )
-                    put("description", JSONObject.NULL)
-                })
+                DeviceState.entries.forEach { state ->
+                    val stateName = state.name
+                    val stateTitle = when (state) {
+                        DeviceState.ACTIVE -> "Active"
+                    }
+                    val stateIcon = when (state) {
+                        DeviceState.ACTIVE -> "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/>"
+                    }
+                    val stateDescription = when (state) {
+                        DeviceState.ACTIVE -> "Device is active"
+                    }
+
+                    put(JSONObject().apply {
+                        put("deviceState", stateName)
+                        put("title", stateTitle)
+                        put("icon", stateIcon)
+                        put("description", stateDescription)
+                    })
+
+                }
             })
         }.toString()
 
@@ -89,7 +97,7 @@ class FamilyRulesClient(
         }
     }
 
-    fun reportUptime(uptime: Uptime) {
+    suspend fun reportUptime(uptime: Uptime): DeviceState {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
@@ -106,7 +114,7 @@ class FamilyRulesClient(
             put("applications", applications)
         }.toString()
 
-        CoroutineScope(Dispatchers.IO).launch {
+        return withContext(Dispatchers.IO) {
             try {
                 val url = URL("$serverUrl/api/v2/report")
                 val connection = url.openConnection() as HttpURLConnection
@@ -128,9 +136,19 @@ class FamilyRulesClient(
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                     throw RuntimeException("Failed to send report request: HTTP ${connection.responseCode}")
                 }
+
+                // Read the response
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                Log.d("FamilyRulesClient", "Report response: $response")
+                response.let { DeviceState.valueOf(it) }
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to send launch request: ${e.message}", e)
+                Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
+                DeviceState.ACTIVE
             }
         }
     }
+}
+
+enum class DeviceState {
+    ACTIVE
 }

@@ -66,17 +66,22 @@ class PeriodicReportSender(
         scope.launch {
             while (isActive) {
                 if (ScreenStatus.isScreenOn(context)) {
-                    performTask()
+                    try {
+                        performTask()
+                    } catch (e: Exception) {
+                        Log.e("PeriodicReportSender", "Failed to perform uptime report: ${e.message}", e)
+                    }
                 }
                 delay(delayDuration)
             }
         }
     }
 
-    private fun performTask() {
+    private suspend fun performTask() {
         val uptime = periodicUptimeChecker.getUptime()
         Log.i("ReportService", "Reporting: ${uptime.screenTimeMillis}")
-        familyRulesClient.reportUptime(uptime)
+        val response = familyRulesClient.reportUptime(uptime)
+        Log.d("ReportService", "Received device state response: $response")
     }
 
 }
