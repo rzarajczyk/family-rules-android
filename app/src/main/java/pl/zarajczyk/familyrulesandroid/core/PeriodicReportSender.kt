@@ -47,10 +47,9 @@ class PeriodicReportSender(
             }
         }
         
-        // Start the 15-minute app list change checker
         scope.launch {
             while (isActive) {
-                delay(15.minutes)
+                delay(10.minutes)
                 try {
                     if (appListChangeDetector.hasAppListChanged()) {
                         Log.i("PeriodicReportSender", "App list changed, sending client info request")
