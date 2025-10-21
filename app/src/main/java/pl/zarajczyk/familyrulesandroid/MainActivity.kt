@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
         } else {
+            // Install service if not already running (might have been started in InitialSetupActivity)
             FamilyRulesCoreService.install(this)
             setupContent()
         }
@@ -83,7 +84,13 @@ class MainActivity : ComponentActivity() {
 
     fun setupContent() {
         FamilyRulesCoreService.bind(this) {
-            val uptime = it.getUptime()
+            var uptime = it.getUptime()
+            
+            // If uptime is zero, try to force an immediate update
+            if (uptime.screenTimeMillis == 0L && uptime.packageUsages.isEmpty()) {
+                uptime = it.forceUptimeUpdate()
+            }
+            
             setContent {
                 FamilyRulesAndroidTheme {
                     MainScreen(
@@ -110,7 +117,13 @@ fun MainScreen(
     SharedAppLayout {
         ScreenTimeCard(screenTime, settingsManager, mainActivity)
         Spacer(modifier = Modifier.weight(1f))
-        UsageStatsDisplay(usageStatsList, appDb = appDb)
+        
+        // Show fallback message if no app usage data is available yet
+        if (usageStatsList.isEmpty() && screenTime == 0L) {
+            AppUsageCalculationInProgress()
+        } else {
+            UsageStatsDisplay(usageStatsList, appDb = appDb)
+        }
     }
 }
 
@@ -151,6 +164,38 @@ fun ScreenTimeCard(
             ) {
                 Text("🔄")
             }
+        }
+    }
+}
+
+@Composable
+fun AppUsageCalculationInProgress() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 4.dp
+            )
+            Spacer(modifier = Modifier.padding(16.dp))
+            Text(
+                text = "App usage calculation in progress, it might take a while",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Black,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }

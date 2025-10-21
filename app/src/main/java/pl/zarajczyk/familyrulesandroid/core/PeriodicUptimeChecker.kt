@@ -22,6 +22,7 @@ class PeriodicUptimeChecker(private val context: Context, private val delayDurat
     private var uptime: Uptime = Uptime(emptyList(), 0)
 
     fun start() {
+        // Perform initial calculation immediately
         uptime = performTask()
         scope.launch {
             while (isActive) {
@@ -34,6 +35,11 @@ class PeriodicUptimeChecker(private val context: Context, private val delayDurat
     }
 
     fun getUptime(): Uptime {
+        return uptime
+    }
+    
+    fun forceUpdate(): Uptime {
+        uptime = performTask()
         return uptime
     }
 

@@ -67,6 +67,8 @@ class FamilyRulesCoreService : Service() {
     }
 
     fun getUptime() = periodicUptimeChecker.getUptime()
+    
+    fun forceUptimeUpdate() = periodicUptimeChecker.forceUpdate()
 
     override fun onCreate() {
         super.onCreate()

@@ -54,6 +54,7 @@ import org.json.JSONObject
 import pl.zarajczyk.familyrulesandroid.SharedAppLayout
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
+import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import java.net.HttpURLConnection
 import java.net.URL
@@ -114,6 +115,8 @@ class InitialSetupActivity : ComponentActivity() {
                         usageStatsPermissionLauncher.launch(intent)
                     },
                     onAllPermissionsGranted = {
+                        // Start the core service early to begin uptime calculation
+                        FamilyRulesCoreService.install(this)
                         finish()
                         startActivity(Intent(this, MainActivity::class.java))
                     },
