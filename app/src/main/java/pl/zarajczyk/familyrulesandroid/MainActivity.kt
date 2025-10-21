@@ -97,7 +97,6 @@ class MainActivity : ComponentActivity() {
                         usageStatsList = uptime.packageUsages,
                         screenTime = uptime.screenTimeMillis,
                         settingsManager = settingsManager,
-                        mainActivity = this,
                         appDb = appDb
                     )
                 }
@@ -111,11 +110,10 @@ fun MainScreen(
     usageStatsList: List<PackageUsage>,
     screenTime: Long,
     settingsManager: SettingsManager,
-    mainActivity: MainActivity,
     appDb: AppDb
 ) {
     SharedAppLayout {
-        ScreenTimeCard(screenTime, settingsManager, mainActivity)
+        ScreenTimeCard(screenTime, settingsManager)
         Spacer(modifier = Modifier.weight(1f))
         
         // Show fallback message if no app usage data is available yet
@@ -130,8 +128,7 @@ fun MainScreen(
 @Composable
 fun ScreenTimeCard(
     screenTime: Long,
-    settingsManager: SettingsManager,
-    mainActivity: MainActivity
+    settingsManager: SettingsManager
 ) {
     Box(
         modifier = Modifier
@@ -142,29 +139,12 @@ fun ScreenTimeCard(
                 shape = RoundedCornerShape(16.dp)
             )
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Black
-            )
-            Button(
-                onClick = {
-                    mainActivity.setupContent()
-                },
-                modifier = Modifier.size(width = 60.dp, height = 40.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Color.Black
-                )
-            ) {
-                Text("🔄")
-            }
-        }
+        Text(
+            text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Black,
+            modifier = Modifier.padding(8.dp)
+        )
     }
 }
 
