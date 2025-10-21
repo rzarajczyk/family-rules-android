@@ -46,6 +46,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import pl.zarajczyk.familyrulesandroid.SharedAppLayout
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
@@ -170,121 +171,35 @@ fun InitialSetupScreen(
     onAllPermissionsGranted: () -> Unit,
     onRegistrationCompleted: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
     // Determine current screen state using the specified conditional flow
     when {
         !settingsManager.areSettingsComplete() -> showSetupForm(
             settingsManager = settingsManager,
-            isLandscape = isLandscape,
             onRegistrationCompleted = onRegistrationCompleted
         )
         !permissionChecker.isNotificationPermissionGranted() -> showGrantNotificationPermissionForm(
-            onNotificationPermissionRequest = onNotificationPermissionRequest,
-            isLandscape = isLandscape
+            onNotificationPermissionRequest = onNotificationPermissionRequest
         )
         !permissionChecker.isUsageStatsPermissionGranted() -> showGrantAppUsagePermissionForm(
-            onUsageStatsPermissionRequest = onUsageStatsPermissionRequest,
-            isLandscape = isLandscape
+            onUsageStatsPermissionRequest = onUsageStatsPermissionRequest
         )
         else -> setupCompleted(onAllPermissionsGranted = onAllPermissionsGranted)
     }
 
 }
 
-// Generic layout component that can be reused for all screens
+// Generic layout wrapper that uses the shared layout component
 @Composable
 fun GenericSetupLayout(
-    isLandscape: Boolean,
-    content: @Composable () -> Unit
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-    ) { innerPadding ->
-        val bgColor = Color(0xFFD3E8FF)
-        if (isLandscape) {
-            // Horizontal layout for landscape orientation
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(bgColor)
-                    .padding(innerPadding)
-            ) {
-                // Left side - Icon and label
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.icon),
-                        contentDescription = "Family Rules Icon",
-                        modifier = Modifier.size(128.dp)
-                    )
-                    Text(
-                        text = "FamilyRules",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.Black,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-                
-                // Right side - Content
-                Column(
-                    modifier = Modifier
-                        .weight(2f)
-                        .fillMaxSize()
-                ) {
-                    content()
-                }
-            }
-        } else {
-            // Vertical layout for portrait orientation
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(bgColor)
-                    .padding(innerPadding)
-            ) {
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.icon),
-                            contentDescription = "Family Rules Icon",
-                            modifier = Modifier
-                                .size(128.dp)
-                                .padding(top = 32.dp)
-                        )
-                        Text(
-                            text = "FamilyRules",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = Color.Black,
-                            modifier = Modifier.padding(top = 16.dp)
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        content()
-                    }
-                }
-            }
-        }
-    }
+    SharedAppLayout(content = content)
 }
 
 // Setup form screen
 @Composable
 fun showSetupForm(
     settingsManager: SettingsManager,
-    isLandscape: Boolean,
     onRegistrationCompleted: () -> Unit
 ) {
     var serverUrl by remember { mutableStateOf("https://familyrules.org") }
@@ -300,7 +215,7 @@ fun showSetupForm(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     
-    GenericSetupLayout(isLandscape = isLandscape) {
+    GenericSetupLayout {
         SetupForm(
             serverUrl = serverUrl,
             onServerUrlChange = { serverUrl = it },
@@ -339,10 +254,9 @@ fun showSetupForm(
 // Notification permission screen
 @Composable
 fun showGrantNotificationPermissionForm(
-    onNotificationPermissionRequest: () -> Unit,
-    isLandscape: Boolean
+    onNotificationPermissionRequest: () -> Unit
 ) {
-    GenericSetupLayout(isLandscape = isLandscape) {
+    GenericSetupLayout {
         PermissionScreen(
             title = "Notification Permission Required",
             description = "FamilyRules needs notification permission to send you important updates and alerts about your family's screen time usage.",
@@ -355,10 +269,9 @@ fun showGrantNotificationPermissionForm(
 // App usage permission screen
 @Composable
 fun showGrantAppUsagePermissionForm(
-    onUsageStatsPermissionRequest: () -> Unit,
-    isLandscape: Boolean
+    onUsageStatsPermissionRequest: () -> Unit
 ) {
-    GenericSetupLayout(isLandscape = isLandscape) {
+    GenericSetupLayout {
         PermissionScreen(
             title = "App Usage Permission Required",
             description = "FamilyRules needs access to app usage statistics to track screen time and provide detailed usage reports for your family.",

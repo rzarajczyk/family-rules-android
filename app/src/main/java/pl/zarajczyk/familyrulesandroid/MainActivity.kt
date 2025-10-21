@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalConfiguration
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.SharedAppLayout
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.PackageUsage
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
@@ -120,90 +121,10 @@ fun MainScreen(
     mainActivity: MainActivity,
     appDb: AppDb
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-    ) { innerPadding ->
-        val bgColor = Color(0xFFD3E8FF)
-        if (isLandscape) {
-            // Horizontal layout for landscape orientation
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(bgColor)
-                    .padding(innerPadding)
-            ) {
-                // Left side - Icon and label
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.icon),
-                        contentDescription = "Family Rules Icon",
-                        modifier = Modifier.size(128.dp)
-                    )
-                    Text(
-                        text = "FamilyRules",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.Black,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-                
-                // Right side - App list and screen time card
-                Column(
-                    modifier = Modifier
-                        .weight(2f)
-                        .fillMaxSize()
-                ) {
-                    ScreenTimeCard(screenTime, settingsManager, mainActivity)
-                    Spacer(modifier = Modifier.weight(1f))
-                    UsageStatsDisplay(usageStatsList, appDb = appDb)
-                }
-            }
-        } else {
-            // Vertical layout for portrait orientation
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(bgColor)
-                    .padding(innerPadding)
-            ) {
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.icon),
-                            contentDescription = "Family Rules Icon",
-                            modifier = Modifier
-                                .size(128.dp)
-                                .padding(top = 32.dp)
-                        )
-                        Text(
-                            text = "FamilyRules",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = Color.Black,
-                            modifier = Modifier.padding(top = 16.dp)
-                        )
-                        ScreenTimeCard(screenTime, settingsManager, mainActivity)
-                        Spacer(modifier = Modifier.weight(1f))
-                        UsageStatsDisplay(usageStatsList, appDb = appDb)
-                    }
-                }
-            }
-        }
+    SharedAppLayout {
+        ScreenTimeCard(screenTime, settingsManager, mainActivity)
+        Spacer(modifier = Modifier.weight(1f))
+        UsageStatsDisplay(usageStatsList, appDb = appDb)
     }
 }
 
