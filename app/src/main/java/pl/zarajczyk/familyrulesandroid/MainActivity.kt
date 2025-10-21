@@ -40,10 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
-import pl.zarajczyk.familyrulesandroid.core.PackageUsage
-import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
-import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.core.*
 import pl.zarajczyk.familyrulesandroid.database.App
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
@@ -53,6 +50,9 @@ import pl.zarajczyk.familyrulesandroid.utils.toHMS
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private lateinit var appDb: AppDb
+    private lateinit var deviceAdminManager: DeviceAdminManager
+    private lateinit var stealthModeManager: StealthModeManager
+    private lateinit var tamperDetector: TamperDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,14 +65,22 @@ class MainActivity : ComponentActivity() {
 
         settingsManager = SettingsManager(this)
         appDb = AppDb(this)
+        deviceAdminManager = DeviceAdminManager(this)
+        stealthModeManager = StealthModeManager(this)
+        tamperDetector = TamperDetector(this)
 
         val permissionsChecker = PermissionsChecker(this)
         if (!settingsManager.areSettingsComplete() || !permissionsChecker.isAllPermissionsGranted()) {
             startActivity(Intent(this, InitialSetupActivity::class.java))
             finish()
+        } else if (!deviceAdminManager.isDeviceAdminActive()) {
+            // Redirect to protection setup if device admin is not enabled
+            startActivity(Intent(this, ProtectionSetupActivity::class.java))
+            finish()
         } else {
             // Install service if not already running (might have been started in InitialSetupActivity)
             FamilyRulesCoreService.install(this)
+            tamperDetector.startMonitoring()
             setupContent()
         }
     }
