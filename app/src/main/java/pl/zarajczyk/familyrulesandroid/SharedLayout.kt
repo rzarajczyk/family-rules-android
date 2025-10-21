@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun SharedAppLayout(
+    deviceState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState = pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -41,7 +42,10 @@ fun SharedAppLayout(
             .fillMaxSize()
             .systemBarsPadding()
     ) { innerPadding ->
-        val bgColor = Color(0xFFEEEEEE)
+        val bgColor = when (deviceState) {
+            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE -> Color(0xFFEEEEEE)
+            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS -> Color(0xFFFFDEDE)
+        }
         if (isLandscape) {
             // Horizontal layout for landscape orientation
             Row(

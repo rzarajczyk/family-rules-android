@@ -9,5 +9,7 @@
         <expire-password />
         <encrypted-storage />
         <disable-camera />
+        <set-application-restrictions />
+        <set-application-hidden />
     </uses-policies>
 </device-admin>

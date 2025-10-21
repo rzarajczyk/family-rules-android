@@ -23,6 +23,9 @@ class PeriodicReportSender(
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val familyRulesClient: FamilyRulesClient = FamilyRulesClient(context, settingsManager, appDb)
     private val appListChangeDetector = AppListChangeDetector(appDb)
+    private val appBlocker = AppBlocker(context)
+    private var currentDeviceState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState = pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
+    private var coreService: FamilyRulesCoreService? = null
 
     companion object {
         fun install(
@@ -34,6 +37,10 @@ class PeriodicReportSender(
         ) {
             PeriodicReportSender(context, settingsManager, periodicUptimeChecker, delayMillis, appDb).start()
         }
+    }
+    
+    fun setCoreService(service: FamilyRulesCoreService) {
+        coreService = service
     }
 
     fun start() {
@@ -82,6 +89,35 @@ class PeriodicReportSender(
         Log.i("ReportService", "Reporting: ${uptime.screenTimeMillis}")
         val response = familyRulesClient.reportUptime(uptime)
         Log.d("ReportService", "Received device state response: $response")
+        
+        // Handle device state changes
+        handleDeviceStateChange(response)
+    }
+    
+    private fun handleDeviceStateChange(newState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState) {
+        if (currentDeviceState != newState) {
+            Log.i("PeriodicReportSender", "Device state changed from $currentDeviceState to $newState")
+            
+            when (newState) {
+                pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE -> {
+                    // Unblock apps when returning to ACTIVE state
+                    if (currentDeviceState == pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS) {
+                        Log.i("PeriodicReportSender", "Unblocking limited apps")
+                        appBlocker.unblockLimitedApps()
+                    }
+                }
+                pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS -> {
+                    // Block apps when entering BLOCK_LIMITTED_APPS state
+                    Log.i("PeriodicReportSender", "Blocking limited apps")
+                    appBlocker.blockLimitedApps()
+                }
+            }
+            
+            currentDeviceState = newState
+            
+            // Notify the core service about the state change
+            coreService?.updateDeviceState(newState)
+        }
     }
 
 }

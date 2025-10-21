@@ -118,10 +118,10 @@ private object UptimeFetcher {
         )
 
         // Debug: Log all usage stats to understand duplicates
-        Log.d("UptimeFetcher", "Raw usage stats count: ${usageStatsList.size}")
-        usageStatsList.forEach { stat ->
-            Log.d("UptimeFetcher", "Package: ${stat.packageName}, Time: ${stat.totalTimeInForeground}, LastTimeUsed: ${stat.lastTimeUsed}")
-        }
+//        Log.d("UptimeFetcher", "Raw usage stats count: ${usageStatsList.size}")
+//        usageStatsList.forEach { stat ->
+//            Log.d("UptimeFetcher", "Package: ${stat.packageName}, Time: ${stat.totalTimeInForeground}, LastTimeUsed: ${stat.lastTimeUsed}")
+//        }
 
         val filteredStats = usageStatsList
             .asSequence()

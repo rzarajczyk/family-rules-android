@@ -23,6 +23,7 @@ import kotlin.time.Duration.Companion.seconds
 class FamilyRulesCoreService : Service() {
     private val binder = LocalBinder()
     private lateinit var periodicUptimeChecker: PeriodicUptimeChecker
+    private val deviceStateManager = DeviceStateManager()
 
     companion object {
         const val CHANNEL_ID = "FamilyRulesChannel"
@@ -69,6 +70,18 @@ class FamilyRulesCoreService : Service() {
     fun getUptime() = periodicUptimeChecker.getUptime()
     
     fun forceUptimeUpdate() = periodicUptimeChecker.forceUpdate()
+    
+    fun getCurrentDeviceState() = deviceStateManager.getCurrentState()
+    
+    fun getDeviceStateFlow() = deviceStateManager.currentState
+    
+    fun updateDeviceState(newState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState) {
+        val currentState = deviceStateManager.getCurrentState()
+        if (currentState != newState) {
+            deviceStateManager.updateState(newState)
+            updateNotification()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -77,13 +90,15 @@ class FamilyRulesCoreService : Service() {
         FamilyRulesCoreServicePeriodicInstaller.install(this, delayDuration = 30.seconds)
         periodicUptimeChecker = PeriodicUptimeChecker(this, delayDuration = 60.seconds)
             .also { it.start() }
-        PeriodicReportSender.install(
+        val periodicReportSender = PeriodicReportSender(
             this,
             settingsManager = SettingsManager(this),
             periodicUptimeChecker,
-            delayMillis = 10.seconds,
+            delayDuration = 10.seconds,
             appDb = AppDb(this)
         )
+        periodicReportSender.setCoreService(this)
+        periodicReportSender.start()
     }
 
     private fun createNotificationChannel() {
@@ -118,9 +133,15 @@ class FamilyRulesCoreService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val currentState = deviceStateManager.getCurrentState()
+        val notificationText = when (currentState) {
+            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE -> "Monitoring active"
+            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS -> "Monitoring active - apps blocked"
+        }
+        
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Family Rules")
-            .setContentText("Monitoring active")
+            .setContentText(notificationText)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

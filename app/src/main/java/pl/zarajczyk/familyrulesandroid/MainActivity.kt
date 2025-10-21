@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,21 +90,25 @@ class MainActivity : ComponentActivity() {
     }
 
     fun setupContent() {
-        FamilyRulesCoreService.bind(this) {
-            var uptime = it.getUptime()
+        FamilyRulesCoreService.bind(this) { service ->
+            var uptime = service.getUptime()
             
             // If uptime is zero, try to force an immediate update
             if (uptime.screenTimeMillis == 0L && uptime.packageUsages.isEmpty()) {
-                uptime = it.forceUptimeUpdate()
+                uptime = service.forceUptimeUpdate()
             }
             
             setContent {
                 FamilyRulesAndroidTheme {
+                    // Use the reactive state flow for device state
+                    val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
+                    
                     MainScreen(
                         usageStatsList = uptime.packageUsages,
                         screenTime = uptime.screenTimeMillis,
                         settingsManager = settingsManager,
-                        appDb = appDb
+                        appDb = appDb,
+                        deviceState = deviceState
                     )
                 }
             }
@@ -116,9 +121,10 @@ fun MainScreen(
     usageStatsList: List<PackageUsage>,
     screenTime: Long,
     settingsManager: SettingsManager,
-    appDb: AppDb
+    appDb: AppDb,
+    deviceState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState = pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
 ) {
-    SharedAppLayout {
+    SharedAppLayout(deviceState = deviceState) {
         ScreenTimeCard(screenTime, settingsManager)
         Spacer(modifier = Modifier.weight(1f))
         
