@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
 import pl.zarajczyk.familyrulesandroid.core.*
 import pl.zarajczyk.familyrulesandroid.database.App
@@ -152,7 +153,7 @@ fun ScreenTimeCard(
             )
     ) {
         Text(
-            text = "Screen time: ${screenTime.toHMS()}\n(${settingsManager.getVersion()})",
+            text = stringResource(R.string.screen_time, screenTime.toHMS(), settingsManager.getVersion()),
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Black,
             modifier = Modifier.padding(8.dp)
@@ -183,7 +184,7 @@ fun AppUsageCalculationInProgress() {
             )
             Spacer(modifier = Modifier.padding(16.dp))
             Text(
-                text = "App usage calculation in progress, it might take a while",
+                text = stringResource(R.string.app_usage_calculation),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.Black,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -273,7 +274,7 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
                 fontSize = 18.sp
             )
             Text(
-                text = "Total time: $totalTimeFormatted",
+                text = stringResource(R.string.total_time, totalTimeFormatted),
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -303,7 +304,7 @@ private fun AppIcon(iconBase64: String?) {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text("📱", fontSize = 24.sp)
+            Text(stringResource(R.string.app_icon_placeholder), fontSize = 24.sp)
         }
     }
 }

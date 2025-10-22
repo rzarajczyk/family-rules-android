@@ -1,3 +1,54 @@
 <resources>
     <string name="app_name">Family Rules</string>
+    
+    <!-- Initial Setup Activity -->
+    <string name="server_url">Server URL</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="instance_name">Instance Name</string>
+    <string name="install_button">Install!</string>
+    <string name="password_show">👁️</string>
+    <string name="password_hide">🙈</string>
+    
+    <!-- Protection Setup Activity -->
+    <string name="app_protection_setup">App permissions</string>
+    <string name="protection_setup_description">To complete the app setup, please grant the following permissions:</string>
+    <string name="notification_permission">Notification permission</string>
+    <string name="notification_permission_description">Required for app notifications and background operation</string>
+    <string name="app_usage_permission">Reading App Usage permission</string>
+    <string name="app_usage_permission_description">Required to monitor app usage and screen time</string>
+    <string name="display_over_apps">Display over other apps</string>
+    <string name="display_over_apps_description">Required to show blocking overlays when apps are restricted</string>
+    <string name="device_admin_rights">Device administrator rights</string>
+    <string name="device_admin_rights_description">Prevents app uninstallation</string>
+    <string name="battery_optimization">Battery optimization</string>
+    <string name="battery_optimization_description">Prevents system from killing the app to save battery</string>
+    <string name="complete_setup">Complete Setup</string>
+    <string name="enable">Enable</string>
+    <string name="refresh">Refresh</string>
+    <string name="enabled">✓ Enabled</string>
+    <string name="disabled">✗ Disabled</string>
+    <string name="missing_permissions">Please grant all permissions to complete setup: %1$s</string>
+    
+    <!-- Main Activity -->
+    <string name="family_rules">FamilyRules</string>
+    <string name="screen_time">Screen on time: %1$s\n(%2$s)</string>
+    <string name="app_usage_calculation">App usage calculation in progress, it might take a while</string>
+    <string name="total_time">Total time: %1$s</string>
+    <string name="app_icon_placeholder">📱</string>
+    
+    <!-- App Blocking Overlay -->
+    <string name="app_blocked_title">This app is blocked</string>
+    <string name="app_blocked_description">Please close this app and return to allowed applications</string>
+    
+    <!-- Error Messages -->
+    <string name="instance_already_exists">Instance already exists.</string>
+    <string name="illegal_instance_name">Illegal instance name.</string>
+    <string name="invalid_password">Invalid password.</string>
+    <string name="unknown_error">Unknown error.</string>
+    <string name="server_error">Server returned: %1$s</string>
+    <string name="network_error">Network error: %1$s</string>
+    
+    <!-- Content Descriptions -->
+    <string name="family_rules_icon">FamilyRules Icon</string>
 </resources>

@@ -1,0 +1,54 @@
+<resources>
+    <string name="app_name">Family Rules</string>
+    
+    <!-- Initial Setup Activity -->
+    <string name="server_url">URL Serwera</string>
+    <string name="username">Nazwa użytkownika</string>
+    <string name="password">Hasło</string>
+    <string name="instance_name">Nazwa instancji</string>
+    <string name="install_button">Zainstaluj!</string>
+    <string name="password_show">👁️</string>
+    <string name="password_hide">🙈</string>
+    
+    <!-- Protection Setup Activity -->
+    <string name="app_protection_setup">Uprawnienia aplikacji</string>
+    <string name="protection_setup_description">Aby zakończyć konfigurację aplikacji, przyznaj następujące uprawnienia:</string>
+    <string name="notification_permission">Wyświetlanie powiadomień</string>
+    <string name="notification_permission_description">Wymagane do powiadomień aplikacji i działania w tle</string>
+    <string name="app_usage_permission">Odczyt danych użycia aplikacji</string>
+    <string name="app_usage_permission_description">Wymagane do monitorowania użycia aplikacji i czasu ekranu</string>
+    <string name="display_over_apps">Wyświetlanie nad innymi aplikacjami</string>
+    <string name="display_over_apps_description">Wymagane do wyświetlania nakładek blokujących gdy aplikacje są ograniczone</string>
+    <string name="device_admin_rights">Uprawnienia Administratora urządzenia</string>
+    <string name="device_admin_rights_description">Zapobiega odinstalowaniu aplikacji</string>
+    <string name="battery_optimization">Optymalizacja baterii</string>
+    <string name="battery_optimization_description">Zapobiega zabijaniu aplikacji przez system w celu oszczędzania baterii</string>
+    <string name="complete_setup">Zakończ Konfigurację</string>
+    <string name="enable">Włącz</string>
+    <string name="refresh">Odśwież</string>
+    <string name="enabled">✓ Włączone</string>
+    <string name="disabled">✗ Wyłączone</string>
+    <string name="missing_permissions">Przyznaj wszystkie uprawnienia aby zakończyć konfigurację: %1$s</string>
+    
+    <!-- Main Activity -->
+    <string name="family_rules">FamilyRules</string>
+    <string name="screen_time">Czas włączenia ekranu: %1$s\n(%2$s)</string>
+    <string name="app_usage_calculation">Obliczanie użycia aplikacji w toku, może to chwilę potrwać</string>
+    <string name="total_time">Całkowity czas: %1$s</string>
+    <string name="app_icon_placeholder">📱</string>
+    
+    <!-- App Blocking Overlay -->
+    <string name="app_blocked_title">Ta aplikacja jest zablokowana</string>
+    <string name="app_blocked_description">Zamknij tę aplikację i wróć do dozwolonych aplikacji</string>
+    
+    <!-- Error Messages -->
+    <string name="instance_already_exists">Instancja już istnieje.</string>
+    <string name="illegal_instance_name">Nieprawidłowa nazwa instancji.</string>
+    <string name="invalid_password">Nieprawidłowe hasło.</string>
+    <string name="unknown_error">Nieznany błąd.</string>
+    <string name="server_error">Serwer zwrócił: %1$s</string>
+    <string name="network_error">Błąd sieci: %1$s</string>
+    
+    <!-- Content Descriptions -->
+    <string name="family_rules_icon">Ikona FamilyRules</string>
+</resources>

@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import pl.zarajczyk.familyrulesandroid.core.DeviceAdminManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.core.TamperDetector
@@ -149,20 +150,20 @@ fun ProtectionSetupContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "App Protection Setup",
+            text = stringResource(R.string.app_protection_setup),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
         
         Text(
-            text = "To complete the app setup, please grant the following permissions and enable protection features:",
+            text = stringResource(R.string.protection_setup_description),
             style = MaterialTheme.typography.bodyLarge
         )
         
         // Notification Permission
         ProtectionCard(
-            title = "Notification Permission",
-            description = "Required for app notifications and background operation",
+            title = stringResource(R.string.notification_permission),
+            description = stringResource(R.string.notification_permission_description),
             isEnabled = notificationPermissionGranted,
             onEnableClick = onNotificationPermissionRequest,
             onRefresh = { notificationPermissionGranted = permissionChecker.isNotificationPermissionGranted() }
@@ -170,8 +171,8 @@ fun ProtectionSetupContent(
         
         // App Usage Permission
         ProtectionCard(
-            title = "App Usage Permission",
-            description = "Required to monitor app usage and screen time",
+            title = stringResource(R.string.app_usage_permission),
+            description = stringResource(R.string.app_usage_permission_description),
             isEnabled = usageStatsPermissionGranted,
             onEnableClick = onUsageStatsPermissionRequest,
             onRefresh = { usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted() }
@@ -179,8 +180,8 @@ fun ProtectionSetupContent(
         
         // System Alert Window Permission
         ProtectionCard(
-            title = "Display Over Other Apps",
-            description = "Required to show blocking overlays when apps are restricted",
+            title = stringResource(R.string.display_over_apps),
+            description = stringResource(R.string.display_over_apps_description),
             isEnabled = systemAlertWindowPermissionGranted,
             onEnableClick = onSystemAlertWindowPermissionRequest,
             onRefresh = { systemAlertWindowPermissionGranted = permissionChecker.isSystemAlertWindowPermissionGranted() }
@@ -188,8 +189,8 @@ fun ProtectionSetupContent(
         
         // Device Admin Protection
         ProtectionCard(
-            title = "Device Administrator Rights",
-            description = "Prevents app uninstallation and provides device control",
+            title = stringResource(R.string.device_admin_rights),
+            description = stringResource(R.string.device_admin_rights_description),
             isEnabled = deviceAdminEnabled,
             onEnableClick = {
                 val intent = deviceAdminManager.requestDeviceAdminPermission()
@@ -200,8 +201,8 @@ fun ProtectionSetupContent(
         
         // Battery Optimization
         ProtectionCard(
-            title = "Battery Optimization",
-            description = "Prevents system from killing the app to save battery",
+            title = stringResource(R.string.battery_optimization),
+            description = stringResource(R.string.battery_optimization_description),
             isEnabled = batteryOptimizationDisabled,
             onEnableClick = {
                 val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -225,18 +226,18 @@ fun ProtectionSetupContent(
             modifier = Modifier.fillMaxWidth(),
             enabled = allPermissionsGranted
         ) {
-            Text("Complete Setup")
+            Text(stringResource(R.string.complete_setup))
         }
         
         if (!allPermissionsGranted) {
             val missingPermissions = mutableListOf<String>()
-            if (!notificationPermissionGranted) missingPermissions.add("Notification Permission")
-            if (!usageStatsPermissionGranted) missingPermissions.add("App Usage Permission")
-            if (!systemAlertWindowPermissionGranted) missingPermissions.add("Display Over Other Apps")
-            if (!deviceAdminEnabled) missingPermissions.add("Device Administrator Rights")
+            if (!notificationPermissionGranted) missingPermissions.add(stringResource(R.string.notification_permission))
+            if (!usageStatsPermissionGranted) missingPermissions.add(stringResource(R.string.app_usage_permission))
+            if (!systemAlertWindowPermissionGranted) missingPermissions.add(stringResource(R.string.display_over_apps))
+            if (!deviceAdminEnabled) missingPermissions.add(stringResource(R.string.device_admin_rights))
             
             Text(
-                text = "Please grant all permissions to complete setup: ${missingPermissions.joinToString(", ")}",
+                text = stringResource(R.string.missing_permissions, missingPermissions.joinToString(", ")),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
@@ -277,7 +278,7 @@ fun ProtectionCard(
                 )
                 
                 Text(
-                    text = if (isEnabled) "✓ Enabled" else "✗ Disabled",
+                    text = if (isEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (isEnabled) 
                         MaterialTheme.colorScheme.primary 
@@ -300,7 +301,7 @@ fun ProtectionCard(
                         onClick = onEnableClick,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Enable")
+                        Text(stringResource(R.string.enable))
                     }
                 }
                 
@@ -308,7 +309,7 @@ fun ProtectionCard(
                     onClick = onRefresh,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Refresh")
+                    Text(stringResource(R.string.refresh))
                 }
             }
         }

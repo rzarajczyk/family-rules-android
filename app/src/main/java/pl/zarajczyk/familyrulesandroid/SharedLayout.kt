@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 
 /**
  * Shared layout component that provides the common structure for both MainActivity and InitialSetupActivity.
@@ -64,11 +65,11 @@ fun SharedAppLayout(
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.icon),
-                        contentDescription = "Family Rules Icon",
+                        contentDescription = stringResource(R.string.family_rules_icon),
                         modifier = Modifier.size(128.dp)
                     )
                     Text(
-                        text = "FamilyRules",
+                        text = stringResource(R.string.family_rules),
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.Black,
                         modifier = Modifier.padding(top = 16.dp)
@@ -100,13 +101,13 @@ fun SharedAppLayout(
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.icon),
-                            contentDescription = "Family Rules Icon",
+                            contentDescription = stringResource(R.string.family_rules_icon),
                             modifier = Modifier
                                 .size(128.dp)
                                 .padding(top = 32.dp)
                         )
                         Text(
-                            text = "FamilyRules",
+                            text = stringResource(R.string.family_rules),
                             style = MaterialTheme.typography.headlineMedium,
                             color = Color.Black,
                             modifier = Modifier.padding(top = 16.dp)

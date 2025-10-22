@@ -1,5 +1,6 @@
 package pl.zarajczyk.familyrulesandroid
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -45,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +84,7 @@ class InitialSetupActivity : ComponentActivity() {
 
 
     suspend fun registerInstance(
+        context: Context,
         serverUrl: String,
         username: String,
         password: String,
@@ -117,16 +120,16 @@ class InitialSetupActivity : ComponentActivity() {
                             val instanceToken = jsonResponse.getString("token")
                             Result.Success(instanceId, instanceToken)
                         }
-                        "INSTANCE_ALREADY_EXISTS" -> Result.Error("Instance already exists.")
-                        "ILLEGAL_INSTANCE_NAME" -> Result.Error("Illegal instance name.")
-                        "INVALID_PASSWORD" -> Result.Error("Invalid password.")
-                        else -> Result.Error("Unknown error.")
+                        "INSTANCE_ALREADY_EXISTS" -> Result.Error(context.getString(R.string.instance_already_exists))
+                        "ILLEGAL_INSTANCE_NAME" -> Result.Error(context.getString(R.string.illegal_instance_name))
+                        "INVALID_PASSWORD" -> Result.Error(context.getString(R.string.invalid_password))
+                        else -> Result.Error(context.getString(R.string.unknown_error))
                     }
                 } else {
-                    Result.Error("Server returned: ${connection.responseMessage}")
+                    Result.Error(context.getString(R.string.server_error, connection.responseMessage))
                 }
             } catch (e: Exception) {
-                Result.Error(e.message ?: "Unknown error")
+                Result.Error(e.message ?: context.getString(R.string.unknown_error))
             }
         }
     }
@@ -190,7 +193,7 @@ fun showSetupForm(
             onInstallClick = {
                 scope.launch {
                     val result = (context as InitialSetupActivity).registerInstance(
-                        serverUrl, username, password, instanceName
+                        context, serverUrl, username, password, instanceName
                     )
                     when (result) {
                         is InitialSetupActivity.Result.Success -> {
@@ -242,7 +245,7 @@ fun SetupForm(
         TextField(
             value = serverUrl,
             onValueChange = onServerUrlChange,
-            label = { Text("Server URL") },
+            label = { Text(stringResource(R.string.server_url)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
@@ -250,7 +253,7 @@ fun SetupForm(
         TextField(
             value = username,
             onValueChange = onUsernameChange,
-            label = { Text("Username") },
+            label = { Text(stringResource(R.string.username)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
@@ -260,7 +263,7 @@ fun SetupForm(
         TextField(
             value = password,
             onValueChange = onPasswordChange,
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.password)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
@@ -268,7 +271,7 @@ fun SetupForm(
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Text(
-                        text = if (passwordVisible) "👁️" else "🙈",
+                        text = if (passwordVisible) stringResource(R.string.password_show) else stringResource(R.string.password_hide),
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -277,7 +280,7 @@ fun SetupForm(
         TextField(
             value = instanceName,
             onValueChange = onInstanceNameChange,
-            label = { Text("Instance Name") },
+            label = { Text(stringResource(R.string.instance_name)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
@@ -295,7 +298,7 @@ fun SetupForm(
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
         ) {
-            Text("Install!")
+            Text(stringResource(R.string.install_button))
         }
     }
 }

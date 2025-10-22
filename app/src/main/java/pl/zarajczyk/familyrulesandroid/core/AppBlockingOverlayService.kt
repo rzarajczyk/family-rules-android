@@ -152,7 +152,7 @@ class AppBlockingOverlayService : Service() {
         
         // Add main message
         val mainMessage = TextView(this).apply {
-            text = "This app is blocked"
+            text = getString(R.string.app_blocked_title)
             textSize = 28f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
@@ -171,7 +171,7 @@ class AppBlockingOverlayService : Service() {
         
         // Add description
         val description = TextView(this).apply {
-            text = "Please close this app and return to allowed applications"
+            text = getString(R.string.app_blocked_description)
             textSize = 16f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#CCFFFFFF")) // White with 80% alpha
