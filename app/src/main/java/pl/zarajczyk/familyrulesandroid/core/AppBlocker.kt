@@ -10,6 +10,7 @@ class AppBlocker(private val context: Context) {
     
     private val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     private val adminComponent = ComponentName(context, FamilyRulesDeviceAdminReceiver::class.java)
+    private var foregroundAppMonitor: ForegroundAppMonitor? = null
     
     // Hardcoded list of apps to block when BLOCK_LIMITTED_APPS state is active
     private val blockedApps = listOf(
@@ -30,6 +31,9 @@ class AppBlocker(private val context: Context) {
             blockApp(packageName)
         }
         
+        // Start monitoring foreground apps
+        startForegroundAppMonitoring()
+        
         Log.i("AppBlocker", "Completed blocking limited apps: $blockedApps")
     }
     
@@ -46,6 +50,9 @@ class AppBlocker(private val context: Context) {
         blockedApps.forEach { packageName ->
             unblockApp(packageName)
         }
+        
+        // Stop monitoring foreground apps
+        stopForegroundAppMonitoring()
         
         Log.i("AppBlocker", "Completed unblocking limited apps: $blockedApps")
     }
@@ -140,6 +147,25 @@ class AppBlocker(private val context: Context) {
      */
     fun getBlockedAppsList(): List<String> {
         return blockedApps.toList()
+    }
+    
+    /**
+     * Start monitoring foreground apps for blocking
+     */
+    private fun startForegroundAppMonitoring() {
+        if (foregroundAppMonitor == null) {
+            foregroundAppMonitor = ForegroundAppMonitor(context, this)
+        }
+        foregroundAppMonitor?.startMonitoring()
+        Log.i("AppBlocker", "Started foreground app monitoring")
+    }
+    
+    /**
+     * Stop monitoring foreground apps
+     */
+    private fun stopForegroundAppMonitoring() {
+        foregroundAppMonitor?.stopMonitoring()
+        Log.i("AppBlocker", "Stopped foreground app monitoring")
     }
     
     /**

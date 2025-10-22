@@ -76,7 +76,8 @@ class TamperDetector(private val context: Context) {
             "PACKAGE_USAGE_STATS" to checkUsageStatsPermission(),
             "DEVICE_ADMIN" to DeviceAdminManager(context).isDeviceAdminActive(),
             "NOTIFICATION_ACCESS" to checkNotificationAccess(),
-            "ACCESSIBILITY_SERVICE" to checkAccessibilityService()
+            "ACCESSIBILITY_SERVICE" to checkAccessibilityService(),
+            "SYSTEM_ALERT_WINDOW" to checkSystemAlertWindowPermission()
         )
         
         return permissions
@@ -110,6 +111,18 @@ class TamperDetector(private val context: Context) {
         return try {
             val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
             accessibilityManager.isEnabled
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    private fun checkSystemAlertWindowPermission(): Boolean {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                android.provider.Settings.canDrawOverlays(context)
+            } else {
+                true
+            }
         } catch (e: Exception) {
             false
         }

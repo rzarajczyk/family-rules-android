@@ -54,6 +54,12 @@ class ProtectionSetupActivity : ComponentActivity() {
     ) {
         // Permission check will be handled in the UI
     }
+
+    private val systemAlertWindowPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Permission check will be handled in the UI
+    }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,6 +93,9 @@ class ProtectionSetupActivity : ComponentActivity() {
                             val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
                             usageStatsPermissionLauncher.launch(intent)
                         },
+                        onSystemAlertWindowPermissionRequest = {
+                            permissionChecker.navigateToSystemAlertWindowPermissionSettings()
+                        },
                         onSetupComplete = { 
                             finish()
                             startActivity(Intent(this@ProtectionSetupActivity, MainActivity::class.java))
@@ -118,6 +127,7 @@ fun ProtectionSetupContent(
     permissionChecker: PermissionsChecker,
     onNotificationPermissionRequest: () -> Unit,
     onUsageStatsPermissionRequest: () -> Unit,
+    onSystemAlertWindowPermissionRequest: () -> Unit,
     onSetupComplete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -125,6 +135,7 @@ fun ProtectionSetupContent(
     var batteryOptimizationDisabled by remember { mutableStateOf(false) }
     var notificationPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationPermissionGranted()) }
     var usageStatsPermissionGranted by remember { mutableStateOf(permissionChecker.isUsageStatsPermissionGranted()) }
+    var systemAlertWindowPermissionGranted by remember { mutableStateOf(permissionChecker.isSystemAlertWindowPermissionGranted()) }
     
     LaunchedEffect(Unit) {
         batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
@@ -166,6 +177,15 @@ fun ProtectionSetupContent(
             onRefresh = { usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted() }
         )
         
+        // System Alert Window Permission
+        ProtectionCard(
+            title = "Display Over Other Apps",
+            description = "Required to show blocking overlays when apps are restricted",
+            isEnabled = systemAlertWindowPermissionGranted,
+            onEnableClick = onSystemAlertWindowPermissionRequest,
+            onRefresh = { systemAlertWindowPermissionGranted = permissionChecker.isSystemAlertWindowPermissionGranted() }
+        )
+        
         // Device Admin Protection
         ProtectionCard(
             title = "Device Administrator Rights",
@@ -195,7 +215,7 @@ fun ProtectionSetupContent(
         Spacer(modifier = Modifier.height(16.dp))
         
         // Setup Complete Button
-        val allPermissionsGranted = notificationPermissionGranted && usageStatsPermissionGranted && deviceAdminEnabled
+        val allPermissionsGranted = notificationPermissionGranted && usageStatsPermissionGranted && systemAlertWindowPermissionGranted && deviceAdminEnabled
         
         Button(
             onClick = {
@@ -212,6 +232,7 @@ fun ProtectionSetupContent(
             val missingPermissions = mutableListOf<String>()
             if (!notificationPermissionGranted) missingPermissions.add("Notification Permission")
             if (!usageStatsPermissionGranted) missingPermissions.add("App Usage Permission")
+            if (!systemAlertWindowPermissionGranted) missingPermissions.add("Display Over Other Apps")
             if (!deviceAdminEnabled) missingPermissions.add("Device Administrator Rights")
             
             Text(

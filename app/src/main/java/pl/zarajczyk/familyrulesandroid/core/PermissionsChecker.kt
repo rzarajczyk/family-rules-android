@@ -27,7 +27,7 @@ class PermissionsChecker(private val activity: Activity) {
     }
 
     fun isAllPermissionsGranted(): Boolean {
-        return isUsageStatsPermissionGranted() && isNotificationPermissionGranted()
+        return isUsageStatsPermissionGranted() && isNotificationPermissionGranted() && isSystemAlertWindowPermissionGranted()
     }
 
     fun isNotificationPermissionGranted(): Boolean {
@@ -51,6 +51,23 @@ class PermissionsChecker(private val activity: Activity) {
     private fun navigateToUsageStatsPermissionSettings() {
         val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
         activity.startActivity(intent)
+    }
+
+    fun isSystemAlertWindowPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(activity)
+        } else {
+            true
+        }
+    }
+
+    fun navigateToSystemAlertWindowPermissionSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                data = android.net.Uri.parse("package:${activity.packageName}")
+            }
+            activity.startActivity(intent)
+        }
     }
 
 }

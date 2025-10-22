@@ -49,9 +49,12 @@
             android:name=".core.FamilyRulesCoreService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync"
-
-            />
+            android:foregroundServiceType="dataSync" />
+        
+        <service
+            android:name=".core.AppBlockingOverlayService"
+            android:enabled="true"
+            android:exported="false" />
         <receiver
             android:name=".entrypoints.BootReceiver"
             android:enabled="true"
