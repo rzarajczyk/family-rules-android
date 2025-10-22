@@ -14,8 +14,10 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import pl.zarajczyk.familyrulesandroid.R
 
 /**
  * Service that shows a blocking overlay when a blocked app is opened
@@ -126,14 +128,18 @@ class AppBlockingOverlayService : Service() {
             )
         }
         
-        // Add emoji
-        val emojiText = TextView(this).apply {
-            text = "🚫"
-            textSize = 48f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+        // Add icon
+        val iconView = ImageView(this).apply {
+            setImageResource(R.drawable.icon)
+            layoutParams = LinearLayout.LayoutParams(
+                dpToPx(128),
+                dpToPx(128)
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
         }
-        container.addView(emojiText)
+        container.addView(iconView)
         
         // Add spacing
         val spacer1 = View(this).apply {
