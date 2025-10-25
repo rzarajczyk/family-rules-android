@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import android.util.Base64
+import android.util.Log
 
 class AppDb(private val context: Context) {
     private val database = AppDatabase.getDatabase(context)
@@ -27,7 +28,10 @@ class AppDb(private val context: Context) {
             }
 
             // Cache miss, fetch from system
+            val start = System.currentTimeMillis()
             val appInfo = fetchFromSystem(packageName)
+            val end = System.currentTimeMillis()
+            Log.i("AppDb", "Fetching app info from system took ${end - start}ms")
             
             // Cache the result
             cacheAppInfo(appInfo)

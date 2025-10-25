@@ -80,7 +80,7 @@ private object UptimeFetcher {
             .checkUsageToday(usageStatsManager)
             .filter { it.totalTimeInForegroundMillis > 60 * 1000 }
             .sortedByDescending { it.totalTimeInForegroundMillis }
-        Log.d("UptimeFetcher", "Took: ${System.currentTimeMillis() - endTime}ms")
+        Log.d("UptimeFetcher", "Updating uptime took: ${System.currentTimeMillis() - endTime}ms")
 
         // Get screen time using queryEvents for accuracy
         val screenTime = getScreenTime(usageStatsManager, todayMidnight, endTime)
