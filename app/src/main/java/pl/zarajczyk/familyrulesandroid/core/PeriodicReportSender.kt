@@ -86,7 +86,6 @@ class PeriodicReportSender(
 
     private suspend fun performTask() {
         val uptime = periodicUptimeChecker.getUptime()
-        Log.i("ReportService", "Reporting: ${uptime.screenTimeMillis}")
         val response = familyRulesClient.reportUptime(uptime)
         Log.d("ReportService", "Received device state response: $response")
         

@@ -13,7 +13,6 @@ import kotlin.time.Duration
 class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
     Worker(context, params) {
     override fun doWork(): Result {
-        Log.i("KeepAliveWorker", "I'm alive!")
         FamilyRulesCoreService.install(context)
         return Result.success()
     }
