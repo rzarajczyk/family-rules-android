@@ -33,7 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "pl.zarajczyk.familyrulesandroid"
-        minSdk = 23
+        minSdk = 26
         targetSdk = 35
         versionCode = (System.currentTimeMillis() / 1000).toInt()
         versionName = "$gitTag"
