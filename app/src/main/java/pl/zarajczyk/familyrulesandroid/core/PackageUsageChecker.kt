@@ -25,6 +25,39 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
         const val DEBUG_PACKAGE: String = ""
     }
 
+    // Cache for optimization - stores results and last processed timestamp
+    private var cachedResults: List<PackageUsage> = emptyList()
+    private var lastProcessedTimestamp: Long = 0L
+    private var lastProcessedDay: Long = 0L
+
+    private fun isNewDay(currentDay: Long): Boolean {
+        return lastProcessedDay != currentDay
+    }
+
+    private fun getCurrentDay(): Long {
+        val now = Instant.now()
+        return now.atZone(ZoneId.systemDefault()).truncatedTo(ChronoUnit.DAYS).toInstant().toEpochMilli()
+    }
+
+    private fun mergePackageUsageResults(cached: List<PackageUsage>, new: List<PackageUsage>): List<PackageUsage> {
+        val mergedMap = mutableMapOf<String, Long>()
+        
+        // Add cached results
+        cached.forEach { usage ->
+            mergedMap[usage.packageName] = usage.totalTimeInForegroundMillis
+        }
+        
+        // Add/update with new results
+        new.forEach { usage ->
+            val currentTime = mergedMap[usage.packageName] ?: 0L
+            mergedMap[usage.packageName] = currentTime + usage.totalTimeInForegroundMillis
+        }
+        
+        return mergedMap.map { (packageName, totalTime) ->
+            PackageUsage(packageName, totalTime)
+        }
+    }
+
     private fun List<UsageEvents.Event>.convert() = this
         .mapNotNull {
             when (it.eventType) {
@@ -45,11 +78,29 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
 
     // inspiration: https://stackoverflow.com/questions/36238481/android-usagestatsmanager-not-returning-correct-daily-results/50647945#50647945
     override fun checkUsageToday(usageManager: UsageStatsManager): List<PackageUsage> {
-        // Set the starting and ending times to be midnight in the system's default timezone
         val now = Instant.now()
+        val currentDay = getCurrentDay()
         val startOfDay = now.atZone(ZoneId.systemDefault()).truncatedTo(ChronoUnit.DAYS).toInstant()
-        val start = startOfDay.toEpochMilli()
         val end = now.toEpochMilli()
+
+        // Check if it's a new day - reset cache if so
+        if (isNewDay(currentDay)) {
+            Log.d("PackageUsageChecker", "New day detected, resetting cache")
+            cachedResults = emptyList()
+            lastProcessedTimestamp = 0L
+            lastProcessedDay = currentDay
+        }
+
+        // Determine the start time for querying events
+        val start = if (lastProcessedTimestamp == 0L) {
+            // First run of the day - start from midnight
+            startOfDay.toEpochMilli()
+        } else {
+            // Incremental run - start from last processed timestamp
+            lastProcessedTimestamp
+        }
+
+        Log.d("PackageUsageChecker", "Querying events from $start to $end (incremental: ${lastProcessedTimestamp != 0L})")
 
         // This will keep a map of all of the events per package name
         val eventsPerPackage = mutableMapOf<String, MutableList<UsageEvents.Event>>()
@@ -66,8 +117,8 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
             eventsPerPackage[event.packageName] = packageEvents
         }
 
-        // This will keep a list of our final stats
-        val stats = mutableListOf<PackageUsage>()
+        // This will keep a list of our final stats for new events
+        val newStats = mutableListOf<PackageUsage>()
 
         if (LOG_ALL_PACKAGES) {
             eventsPerPackage.keys.forEach {
@@ -101,7 +152,7 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
             }
 
             if (convertedEvents.last().state == State.STARTING) {
-                convertedEvents = convertedEvents + ProcessedEvent(State.STOPPING, now.toEpochMilli())
+                convertedEvents = convertedEvents + ProcessedEvent(State.STOPPING, end)
                 if (packageName == DEBUG_PACKAGE) {
                     Log.d(
                         "PackageUsageChecker",
@@ -129,8 +180,21 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
                 Log.d("PackageUsageChecker", "Total time: $totalTime")
             }
 
-            stats.add(PackageUsage(packageName, totalTime))
+            newStats.add(PackageUsage(packageName, totalTime))
         }
-        return stats
+
+        // Merge cached results with new results
+        val finalResults = if (cachedResults.isEmpty()) {
+            newStats
+        } else {
+            mergePackageUsageResults(cachedResults, newStats)
+        }
+
+        // Update cache with final results and timestamp
+        cachedResults = finalResults
+        lastProcessedTimestamp = end
+
+        Log.d("PackageUsageChecker", "Processed ${eventsPerPackage.size} packages, total results: ${finalResults.size}")
+        return finalResults
     }
 }

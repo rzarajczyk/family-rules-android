@@ -42,7 +42,7 @@ class FamilyRulesCoreService : Service() {
 
         private fun isNotificationAlive(context: Context): Boolean {
             val notificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                context.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             return notificationManager.activeNotifications.any { it.id == NOTIFICATION_ID }
         }
 
@@ -94,7 +94,7 @@ class FamilyRulesCoreService : Service() {
             this,
             settingsManager = SettingsManager(this),
             periodicUptimeChecker,
-            delayDuration = 10.seconds,
+            delayDuration = 30.seconds,
             appDb = AppDb(this)
         )
         periodicReportSender.setCoreService(this)
@@ -102,21 +102,19 @@ class FamilyRulesCoreService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Family Rules Service",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Keeps Family Rules running in background"
-                enableLights(true)
-                setShowBadge(true)
-            }
-
-            val notificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Family Rules Service",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Keeps Family Rules running in background"
+            enableLights(true)
+            setShowBadge(true)
         }
+
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
