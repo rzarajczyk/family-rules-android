@@ -4,8 +4,8 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.util.Log
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 interface PackageUsageChecker {
     fun checkUsageToday(usageManager: UsageStatsManager): List<PackageUsage>
@@ -15,12 +15,14 @@ interface PackageUsageChecker {
 class EventBasedPackageUsageChecker : PackageUsageChecker {
     enum class State { STARTING, STOPPING }
     data class ProcessedEvent(val state: State, val timestamp: Long) {
-        fun debugString() = "ProcessedEvent(state=$state, timestamp=$timestamp [${Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())}])"
+        fun debugString() = "ProcessedEvent(state=$state, timestamp=$timestamp [${
+            Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())
+        }])"
     }
 
     companion object {
         const val LOG_ALL_PACKAGES: Boolean = true
-        const val DEBUG_PACKAGE: String = ""
+        const val DEBUG_PACKAGE: String = "pl.zarajczyk.familyrulesandroid"
     }
 
     private fun List<UsageEvents.Event>.convert() = this
@@ -41,26 +43,16 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
             acc
         }
 
-    // source: https://stackoverflow.com/questions/36238481/android-usagestatsmanager-not-returning-correct-daily-results/50647945#50647945
+    // inspiration: https://stackoverflow.com/questions/36238481/android-usagestatsmanager-not-returning-correct-daily-results/50647945#50647945
     override fun checkUsageToday(usageManager: UsageStatsManager): List<PackageUsage> {
-        // The timezones we'll need
-        val date = LocalDate.now()
-        val utc = ZoneId.of("UTC")
-        val defaultZone = ZoneId.systemDefault()
-
-        // Set the starting and ending times to be midnight in UTC time
-        val startDate = date.atStartOfDay(defaultZone).withZoneSameInstant(utc)
-        val start = startDate.toInstant().toEpochMilli()
-        val end = startDate.plusDays(1).toInstant().toEpochMilli()
+        // Set the starting and ending times to be midnight in the system's default timezone
+        val now = Instant.now()
+        val startOfDay = now.atZone(ZoneId.systemDefault()).truncatedTo(ChronoUnit.DAYS).toInstant()
+        val start = startOfDay.toEpochMilli()
+        val end = now.toEpochMilli()
 
         // This will keep a map of all of the events per package name
         val eventsPerPackage = mutableMapOf<String, MutableList<UsageEvents.Event>>()
-
-        if (LOG_ALL_PACKAGES) {
-            eventsPerPackage.forEach {
-                Log.d("PackageUsageChecker", "Package: $it")
-            }
-        }
 
         // Query the list of events that has happened within that time frame
         val systemEvents = usageManager.queryEvents(start, end)
@@ -77,17 +69,19 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
         // This will keep a list of our final stats
         val stats = mutableListOf<PackageUsage>()
 
+        if (LOG_ALL_PACKAGES) {
+            eventsPerPackage.keys.forEach {
+                Log.d("PackageUsageChecker", "Package: $it")
+            }
+        }
+
         // Go through the events by package name
         eventsPerPackage.forEach { packageName, events ->
-            // Keep track of the current start and end times
-            var startTime = 0L
-            var endTime = 0L
-            // Keep track of the total usage time for this app
-            var totalTime = 0L
-            // Keep track of the start times for this app
-//            val startTimes = mutableListOf<ZonedDateTime>()
+            var convertedEvents: List<ProcessedEvent> = events.convert()
 
-            val convertedEvents = events.convert()
+            if (convertedEvents.isEmpty()) {
+                return@forEach
+            }
 
             if (packageName == DEBUG_PACKAGE) {
                 convertedEvents.forEach {
@@ -95,41 +89,46 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
                 }
             }
 
-            convertedEvents.forEach {
-                if (it.state == State.STARTING) {
-                    // App was moved to the foreground: set the start time
-                    startTime = it.timestamp
-                    // Add the start time within this timezone to the list
-//                    startTimes.add(
-//                        Instant.ofEpochMilli(startTime).atZone(utc)
-//                        .withZoneSameInstant(defaultZone))
-                } else {
-                    endTime = it.timestamp
-                }
-
-                // If there's an end time with no start time, this might mean that
-                //  The app was started on the previous day, so take midnight
-                //  As the start time
-                if (startTime == 0L && endTime != 0L) {
-                    startTime = start
-                }
-
-                // If both start and end are defined, we have a session
-                if (startTime != 0L && endTime != 0L) {
-                    // Add the session time to the total time
-                    totalTime += endTime - startTime
-                    // Reset the start/end times to 0
-                    startTime = 0L
-                    endTime = 0L
+            if (convertedEvents.first().state == State.STOPPING) {
+                convertedEvents =
+                    listOf(ProcessedEvent(State.STARTING, start)) + convertedEvents
+                if (packageName == DEBUG_PACKAGE) {
+                    Log.d(
+                        "PackageUsageChecker",
+                        "Prepending fake STARTING event: ${convertedEvents.first()}"
+                    )
                 }
             }
 
-            // If there is a start time without an end time, this might mean that
-            //  the app was used past midnight, so take (midnight - 1 second)
-            //  as the end time
-            if (startTime != 0L && endTime == 0L) {
-                totalTime += end - 1000 - startTime
+            if (convertedEvents.last().state == State.STARTING) {
+                convertedEvents = convertedEvents + ProcessedEvent(State.STOPPING, now.toEpochMilli())
+                if (packageName == DEBUG_PACKAGE) {
+                    Log.d(
+                        "PackageUsageChecker",
+                        "Appending fake STOPPING event: ${convertedEvents.last()}"
+                    )
+                }
             }
+
+            // group convertedEvents into pairs of STARTING and STOPPING
+            val totalTime = convertedEvents
+                .chunked(2)
+                .sumOf {
+                    if (packageName == DEBUG_PACKAGE) {
+                        Log.d(
+                            "PackageUsageChecker",
+                            "Chunk: ${it.first().debugString()} - ${
+                                it.last().debugString()
+                            } // ${it.last().timestamp - it.first().timestamp}ms"
+                        )
+                    }
+                    it.last().timestamp - it.first().timestamp
+                }
+
+            if (packageName == DEBUG_PACKAGE) {
+                Log.d("PackageUsageChecker", "Total time: $totalTime")
+            }
+
             stats.add(PackageUsage(packageName, totalTime))
         }
         return stats
