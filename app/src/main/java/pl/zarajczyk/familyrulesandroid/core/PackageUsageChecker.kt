@@ -13,16 +13,16 @@ interface PackageUsageChecker {
 
 
 class EventBasedPackageUsageChecker : PackageUsageChecker {
-    enum class State { STARTING, STOPPING }
-    data class ProcessedEvent(val state: State, val timestamp: Long) {
+    private enum class State { STARTING, STOPPING }
+    private data class ProcessedEvent(val state: State, val timestamp: Long) {
         fun debugString() = "ProcessedEvent(state=$state, timestamp=$timestamp [${
             Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())
         }])"
     }
 
     companion object {
-        const val LOG_ALL_PACKAGES: Boolean = true
-        const val DEBUG_PACKAGE: String = "pl.zarajczyk.familyrulesandroid"
+        const val LOG_ALL_PACKAGES: Boolean = false
+        const val DEBUG_PACKAGE: String = ""
     }
 
     private fun List<UsageEvents.Event>.convert() = this
