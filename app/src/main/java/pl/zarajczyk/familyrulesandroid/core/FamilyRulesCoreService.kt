@@ -9,11 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
 import kotlin.time.Duration.Companion.minutes
@@ -28,19 +28,21 @@ class FamilyRulesCoreService : Service() {
     companion object {
         const val CHANNEL_ID = "FamilyRulesChannel"
         const val NOTIFICATION_ID = 1001
+        
+        private lateinit var notificationManager: NotificationManager
 
         fun install(context: Context) {
-            if (!isNotificationAlive(context)) {
+            if (!this::notificationManager.isInitialized) {
+                notificationManager = context.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            }
+            if (!isNotificationAlive()) {
                 val serviceIntent = Intent(context, FamilyRulesCoreService::class.java)
                 context.startForegroundService(serviceIntent)
             }
         }
 
-        private fun isNotificationAlive(context: Context): Boolean {
-            val notificationManager =
-                context.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            return notificationManager.activeNotifications.any { it.id == NOTIFICATION_ID }
-        }
+        private fun isNotificationAlive() =
+            notificationManager.activeNotifications.any { it.id == NOTIFICATION_ID }
 
         fun bind(
             context: Context,
@@ -71,7 +73,7 @@ class FamilyRulesCoreService : Service() {
     
     fun getDeviceStateFlow() = deviceStateManager.currentState
     
-    fun updateDeviceState(newState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState) {
+    fun updateDeviceState(newState: DeviceState) {
         val currentState = deviceStateManager.getCurrentState()
         if (currentState != newState) {
             deviceStateManager.updateState(newState)
@@ -104,8 +106,8 @@ class FamilyRulesCoreService : Service() {
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Keeps Family Rules running in background"
-            enableLights(true)
-            setShowBadge(true)
+            enableLights(false)
+            setShowBadge(false)
         }
 
         val notificationManager =
@@ -115,7 +117,6 @@ class FamilyRulesCoreService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         updateNotification()
-
         return START_STICKY
     }
 
@@ -129,8 +130,8 @@ class FamilyRulesCoreService : Service() {
 
         val currentState = deviceStateManager.getCurrentState()
         val notificationText = when (currentState) {
-            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE -> "Monitoring active"
-            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS -> "Monitoring active - apps blocked"
+            DeviceState.ACTIVE -> "Monitoring active"
+            DeviceState.BLOCK_LIMITTED_APPS -> "Monitoring active - apps blocked"
         }
         
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
