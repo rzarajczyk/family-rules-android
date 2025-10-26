@@ -22,13 +22,16 @@ import kotlin.time.Duration.Companion.seconds
 
 class FamilyRulesCoreService : Service() {
     private val binder = LocalBinder()
-    private lateinit var periodicUptimeChecker: PeriodicUptimeChecker
+    private lateinit var periodicUsageEventsMonitor: PeriodicUsageEventsMonitor
+    private lateinit var screenTimeCalculator: ScreenTimeCalculator
+    private lateinit var packageUsageCalculator: PackageUsageCalculator
+
     private val deviceStateManager = DeviceStateManager()
 
     companion object {
         const val CHANNEL_ID = "FamilyRulesChannel"
         const val NOTIFICATION_ID = 1001
-        
+
         private lateinit var notificationManager: NotificationManager
 
         fun install(context: Context) {
@@ -65,14 +68,14 @@ class FamilyRulesCoreService : Service() {
         }
     }
 
-    fun getUptime() = periodicUptimeChecker.getUptime()
-    
-    fun forceUptimeUpdate() = periodicUptimeChecker.forceUpdate()
-    
+    fun getTodayScreenTime() = screenTimeCalculator.getTodayScreenTime()
+
+    fun getTodayPackageUsage() = packageUsageCalculator.getTodayPackageUsage()
+
     fun getCurrentDeviceState() = deviceStateManager.getCurrentState()
-    
+
     fun getDeviceStateFlow() = deviceStateManager.currentState
-    
+
     fun updateDeviceState(newState: DeviceState) {
         val currentState = deviceStateManager.getCurrentState()
         if (currentState != newState) {
@@ -86,7 +89,9 @@ class FamilyRulesCoreService : Service() {
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
         KeepAliveBackgroundLoop.install(this, delayDuration = 30.seconds)
-        periodicUptimeChecker = PeriodicUptimeChecker.install(this, delayDuration = 60.seconds)
+        periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this, delayDuration = 5.seconds)
+        screenTimeCalculator = ScreenTimeCalculator.install(periodicUsageEventsMonitor)
+        packageUsageCalculator = PackageUsageCalculator.install(periodicUsageEventsMonitor)
         val periodicReportSender = PeriodicReportSender(
             this,
             settingsManager = SettingsManager(this),
@@ -132,7 +137,7 @@ class FamilyRulesCoreService : Service() {
             DeviceState.ACTIVE -> "Monitoring active"
             DeviceState.BLOCK_LIMITTED_APPS -> "Monitoring active - apps blocked"
         }
-        
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Family Rules")
             .setContentText(notificationText)

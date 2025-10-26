@@ -89,21 +89,14 @@ class MainActivity : ComponentActivity() {
 
     fun setupContent() {
         FamilyRulesCoreService.bind(this) { service ->
-            var uptime = service.getUptime()
-            
-            // If uptime is zero, try to force an immediate update
-            if (uptime.screenTimeMillis == 0L && uptime.packageUsages.isEmpty()) {
-                uptime = service.forceUptimeUpdate()
-            }
-            
             setContent {
                 FamilyRulesAndroidTheme {
                     // Use the reactive state flow for device state
                     val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
                     
                     MainScreen(
-                        usageStatsList = uptime.packageUsages,
-                        screenTime = uptime.screenTimeMillis,
+                        usageStatsList = service.getTodayPackageUsage(),
+                        screenTime = service.getTodayScreenTime(),
                         settingsManager = settingsManager,
                         appDb = appDb,
                         deviceState = deviceState
@@ -116,7 +109,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(
-    usageStatsList: List<PackageUsage>,
+    usageStatsList: Map<String, Long>,
     screenTime: Long,
     settingsManager: SettingsManager,
     appDb: AppDb,
@@ -190,14 +183,21 @@ fun AppUsageCalculationInProgress() {
     }
 }
 
+data class PackageUsage(
+    val packageName: String,
+    val totalTimeInForegroundMillis: Long
+)
+
 @Composable
 fun UsageStatsDisplay(
-    usageStatsList: List<PackageUsage>,
+    usageStatsList: Map<String, Long>,
     appDb: AppDb,
     modifier: Modifier = Modifier
 ) {
     // Sort the usageStatsList by totalTimeInForeground in descending order
-    val sortedUsageStatsList = usageStatsList.sortedByDescending { it.totalTimeInForegroundMillis }
+    val sortedUsageStatsList = usageStatsList
+        .map { (packageName, totalTime) -> PackageUsage(packageName, totalTime) }
+        .sortedByDescending { it.totalTimeInForegroundMillis }
 
     LazyColumn(
         modifier = modifier
@@ -321,7 +321,7 @@ fun UsageStatsDisplayPreview() {
     FamilyRulesAndroidTheme {
         // Preview doesn't need real AppDb
         UsageStatsDisplay(
-            emptyList(),
+            emptyMap(),
             appDb = AppDb(androidx.compose.ui.platform.LocalContext.current)
         )
     }
