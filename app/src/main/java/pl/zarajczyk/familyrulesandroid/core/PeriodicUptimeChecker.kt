@@ -73,7 +73,7 @@ private object UptimeFetcher {
 
     // Reusable calendar to avoid allocations
     private val calendar = Calendar.getInstance()
-    private val packageUsageChecker = EventBasedPackageUsageChecker()
+    private val packageUsageChecker = PackageUsageChecker()
 
 
     fun fetchUptime(applicationContext: Context): Uptime {

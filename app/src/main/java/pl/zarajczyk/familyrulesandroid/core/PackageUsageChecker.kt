@@ -7,12 +7,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-interface PackageUsageChecker {
-    fun checkUsageToday(usageManager: UsageStatsManager): List<PackageUsage>
-}
 
-
-class EventBasedPackageUsageChecker : PackageUsageChecker {
+class PackageUsageChecker {
     private enum class State { STARTING, STOPPING }
     private data class ProcessedEvent(val state: State, val timestamp: Long) {
         fun debugString() = "ProcessedEvent(state=$state, timestamp=$timestamp [${
@@ -77,7 +73,7 @@ class EventBasedPackageUsageChecker : PackageUsageChecker {
         }
 
     // inspiration: https://stackoverflow.com/questions/36238481/android-usagestatsmanager-not-returning-correct-daily-results/50647945#50647945
-    override fun checkUsageToday(usageManager: UsageStatsManager): List<PackageUsage> {
+    fun checkUsageToday(usageManager: UsageStatsManager): List<PackageUsage> {
         val now = Instant.now()
         val currentDay = getCurrentDay()
         val startOfDay = now.atZone(ZoneId.systemDefault()).truncatedTo(ChronoUnit.DAYS).toInstant()
