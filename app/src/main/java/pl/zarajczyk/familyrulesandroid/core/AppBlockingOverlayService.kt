@@ -18,6 +18,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import pl.zarajczyk.familyrulesandroid.R
+import androidx.core.graphics.toColorInt
 
 /**
  * Service that shows a blocking overlay when a blocked app is opened
@@ -78,19 +79,14 @@ class AppBlockingOverlayService : Service() {
         }
         
         // Check if we have permission to draw overlays
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+        if (!Settings.canDrawOverlays(this)) {
             Log.e(TAG, "SYSTEM_ALERT_WINDOW permission not granted")
             return
         }
         
         try {
             val layoutParams = WindowManager.LayoutParams().apply {
-                type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                } else {
-                    @Suppress("DEPRECATION")
-                    WindowManager.LayoutParams.TYPE_PHONE
-                }
+                type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                         WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
@@ -189,7 +185,7 @@ class AppBlockingOverlayService : Service() {
         
         // Add decorative line
         val line = View(this).apply {
-            setBackgroundColor(Color.parseColor("#4DFFFFFF")) // White with 30% alpha
+            setBackgroundColor("#4DFFFFFF".toColorInt()) // White with 30% alpha
             layoutParams = LinearLayout.LayoutParams(
                 dpToPx(100),
                 dpToPx(2)
