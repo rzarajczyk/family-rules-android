@@ -21,8 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,8 +50,6 @@ import pl.zarajczyk.familyrulesandroid.utils.toHMS
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private lateinit var appDb: AppDb
-    private lateinit var deviceAdminManager: DeviceAdminManager
-    private lateinit var tamperDetector: TamperDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,23 +62,24 @@ class MainActivity : ComponentActivity() {
 
         settingsManager = SettingsManager(this)
         appDb = AppDb(this)
-        deviceAdminManager = DeviceAdminManager(this)
-        tamperDetector = TamperDetector(this)
 
+        val deviceAdminManager = DeviceAdminManager(this)
         val permissionsChecker = PermissionsChecker(this)
-        if (!settingsManager.areSettingsComplete()) {
-            startActivity(Intent(this, InitialSetupActivity::class.java))
-            finish()
-        } else if (!permissionsChecker.isAllPermissionsGranted() || !deviceAdminManager.isDeviceAdminActive()) {
-            // Redirect to protection setup if permissions or device admin are not enabled
-            startActivity(Intent(this, ProtectionSetupActivity::class.java))
-            finish()
-        } else {
-            // Install service if not already running (might have been started in InitialSetupActivity)
-            FamilyRulesCoreService.install(this)
-            tamperDetector.startMonitoring()
-            setupContent()
+
+        when {
+            !settingsManager.areSettingsComplete() -> switchActivity(InitialSetupActivity::class.java)
+            !permissionsChecker.isAllPermissionsGranted() -> switchActivity(PermissionsSetupActivity::class.java)
+            !deviceAdminManager.isDeviceAdminActive() -> switchActivity(PermissionsSetupActivity::class.java)
+            else -> {
+                FamilyRulesCoreService.install(this)
+                setupContent()
+            }
         }
+    }
+
+    private fun switchActivity(activityClass: Class<*>) {
+        startActivity(Intent(this, activityClass))
+        finish()
     }
 
     override fun onResume() {

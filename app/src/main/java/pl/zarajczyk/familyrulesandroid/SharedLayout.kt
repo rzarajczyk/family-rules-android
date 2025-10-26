@@ -22,6 +22,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS
 
 /**
  * Shared layout component that provides the common structure for both MainActivity and InitialSetupActivity.
@@ -32,7 +35,7 @@ import androidx.compose.ui.res.stringResource
  */
 @Composable
 fun SharedAppLayout(
-    deviceState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState = pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE,
+    deviceState: DeviceState = ACTIVE,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -44,8 +47,8 @@ fun SharedAppLayout(
             .systemBarsPadding()
     ) { innerPadding ->
         val bgColor = when (deviceState) {
-            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE -> Color(0xFFEEEEEE)
-            pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS -> Color(0xFFFFDEDE)
+            ACTIVE -> Color(0xFFEEEEEE)
+            BLOCK_LIMITTED_APPS -> Color(0xFFFFDEDE)
         }
         if (isLandscape) {
             // Horizontal layout for landscape orientation

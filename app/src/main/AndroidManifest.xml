@@ -34,7 +34,7 @@
         android:theme="@style/Theme.FamilyRulesAndroid"
         tools:targetApi="31">
         <activity android:name=".InitialSetupActivity" />
-        <activity android:name=".ProtectionSetupActivity" />
+        <activity android:name=".PermissionsSetupActivity" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

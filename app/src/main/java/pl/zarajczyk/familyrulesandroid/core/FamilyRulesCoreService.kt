@@ -32,11 +32,7 @@ class FamilyRulesCoreService : Service() {
         fun install(context: Context) {
             if (!isNotificationAlive(context)) {
                 val serviceIntent = Intent(context, FamilyRulesCoreService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
+                context.startForegroundService(serviceIntent)
             }
         }
 
