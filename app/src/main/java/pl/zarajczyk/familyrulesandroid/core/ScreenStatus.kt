@@ -4,9 +4,13 @@ import android.content.Context
 import android.os.PowerManager
 
 object ScreenStatus {
+    private lateinit var powerManager: PowerManager
+
 
     fun isScreenOn(context: Context): Boolean {
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!this::powerManager.isInitialized) {
+            powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        }
         return powerManager.isInteractive
     }
 

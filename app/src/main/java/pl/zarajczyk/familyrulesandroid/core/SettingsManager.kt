@@ -18,7 +18,7 @@ class SettingsManager(context: Context) {
     }
 
     fun setString(key: String, value: String) {
-        preferences.edit().putString(key, value).apply()
+        preferences.edit { putString(key, value) }
     }
 
     fun areSettingsComplete(): Boolean {
