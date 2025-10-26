@@ -6,15 +6,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import pl.zarajczyk.familyrulesandroid.core.Uptime
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
+data class Uptime(
+    val screenTimeMillis: Long,
+    val packageUsages: Map<String, Long>
+)
+
 class FamilyRulesClient(
-    private val context: Context,
     private val settingsManager: SettingsManager,
     private val appDb: AppDb
 ) {
@@ -107,7 +110,9 @@ class FamilyRulesClient(
 
         val applications = JSONObject().apply {
             uptime.packageUsages.forEach { stat ->
-                put(stat.packageName, stat.totalTimeInForegroundMillis / 1000)
+                val packageName = stat.key
+                val totalTimeInForegroundMillis = stat.value
+                put(packageName, totalTimeInForegroundMillis / 1000)
             }
         }
 

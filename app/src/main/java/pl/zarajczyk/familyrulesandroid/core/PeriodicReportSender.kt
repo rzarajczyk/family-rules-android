@@ -1,6 +1,5 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -8,114 +7,145 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
+import pl.zarajczyk.familyrulesandroid.adapter.Uptime
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class PeriodicReportSender(
-    private val context: Context,
-    settingsManager: SettingsManager,
-    private val periodicUptimeChecker: PeriodicUptimeChecker,
+    private val coreService: FamilyRulesCoreService,
     private val delayDuration: Duration,
-    private val appDb: AppDb
+    private val appBlocker: AppBlocker,
+    private val appListChangeDetector: AppListChangeDetector,
+    private val familyRulesClient: FamilyRulesClient
+
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val familyRulesClient: FamilyRulesClient = FamilyRulesClient(context, settingsManager, appDb)
-    private val appListChangeDetector = AppListChangeDetector(appDb)
-    private val appBlocker = AppBlocker(context)
-    private var currentDeviceState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState = pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
-    private var coreService: FamilyRulesCoreService? = null
+    private var currentDeviceState: DeviceState = DeviceState.ACTIVE
 
     companion object {
         fun install(
-            context: Context,
-            settingsManager: SettingsManager,
-            periodicUptimeChecker: PeriodicUptimeChecker,
-            delayMillis: Duration,
-            appDb: AppDb
-        ) {
-            PeriodicReportSender(context, settingsManager, periodicUptimeChecker, delayMillis, appDb).start()
+            coreService: FamilyRulesCoreService,
+            delayDuration: Duration
+        ): PeriodicReportSender {
+            val appDb = AppDb(coreService)
+            val instance = PeriodicReportSender(
+                coreService = coreService,
+                delayDuration = delayDuration,
+                appBlocker = AppBlocker(coreService),
+                appListChangeDetector = AppListChangeDetector(appDb),
+                familyRulesClient = FamilyRulesClient(
+                    SettingsManager(coreService),
+                    appDb
+                )
+
+            )
+            instance.start()
+            return instance
         }
-    }
-    
-    fun setCoreService(service: FamilyRulesCoreService) {
-        coreService = service
     }
 
     fun start() {
-        // Send initial client info request
         scope.launch {
+            sendInitialClientInfoRequest()
+        }
+
+        scope.launch {
+            delay(2.minutes)
+            runClientInfoInfiniteLoop { isActive }
+        }
+
+        scope.launch {
+            runUptimeReportInfiniteLoop { isActive }
+        }
+    }
+
+    private suspend fun sendInitialClientInfoRequest() = try {
+        familyRulesClient.sendClientInfoRequest()
+        appListChangeDetector.updateLastSentApps()
+    } catch (e: Exception) {
+        Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
+    }
+
+    private suspend fun runClientInfoInfiniteLoop(isActive: () -> Boolean) {
+        while (isActive()) {
             try {
-                familyRulesClient.sendClientInfoRequest()
-                appListChangeDetector.updateLastSentApps()
+                if (appListChangeDetector.hasAppListChanged()) {
+                    Log.i(
+                        "PeriodicReportSender",
+                        "App list changed, sending client info request"
+                    )
+                    familyRulesClient.sendClientInfoRequest()
+                    appListChangeDetector.updateLastSentApps()
+                }
             } catch (e: Exception) {
-                Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
-            }
-        }
-        
-        scope.launch {
-            while (isActive) {
-                delay(10.minutes)
-                try {
-                    if (appListChangeDetector.hasAppListChanged()) {
-                        Log.i("PeriodicReportSender", "App list changed, sending client info request")
-                        familyRulesClient.sendClientInfoRequest()
-                        appListChangeDetector.updateLastSentApps()
-                    }
-                } catch (e: Exception) {
-                    Log.e("PeriodicReportSender", "Failed to check/send app list changes: ${e.message}", e)
-                }
-            }
-        }
-        
-        // Start the regular uptime reporting
-        scope.launch {
-            while (isActive) {
-                if (ScreenStatus.isScreenOn(context)) {
-                    try {
-                        performTask()
-                    } catch (e: Exception) {
-                        Log.e("PeriodicReportSender", "Failed to perform uptime report: ${e.message}", e)
-                    }
-                }
-                delay(delayDuration)
+                Log.e(
+                    "PeriodicReportSender",
+                    "Failed to check/send app list changes: ${e.message}",
+                    e
+                )
             }
         }
     }
 
-    private suspend fun performTask() {
-        val uptime = periodicUptimeChecker.getUptime()
+    private suspend fun runUptimeReportInfiniteLoop(isActive: () -> Boolean) {
+        while (isActive()) {
+            if (ScreenStatus.isScreenOn(coreService)) {
+                try {
+                    reportUptime()
+                } catch (e: Exception) {
+                    Log.e(
+                        "PeriodicReportSender",
+                        "Failed to perform uptime report: ${e.message}",
+                        e
+                    )
+                }
+            }
+            delay(delayDuration)
+        }
+    }
+
+    private suspend fun reportUptime() {
+        val uptime = Uptime(
+            screenTimeMillis = coreService.getTodayScreenTime(),
+            packageUsages = coreService.getTodayPackageUsage()
+        )
         val response = familyRulesClient.reportUptime(uptime)
         Log.d("ReportService", "Received device state response: $response")
-        
+
         // Handle device state changes
         handleDeviceStateChange(response)
     }
-    
-    private fun handleDeviceStateChange(newState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState) {
+
+    private fun handleDeviceStateChange(newState: DeviceState) {
         if (currentDeviceState != newState) {
-            Log.i("PeriodicReportSender", "Device state changed from $currentDeviceState to $newState")
-            
+            Log.i(
+                "PeriodicReportSender",
+                "Device state changed from $currentDeviceState to $newState"
+            )
+
             when (newState) {
-                pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE -> {
+                DeviceState.ACTIVE -> {
                     // Unblock apps when returning to ACTIVE state
-                    if (currentDeviceState == pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS) {
+                    if (currentDeviceState == DeviceState.BLOCK_LIMITTED_APPS) {
                         Log.i("PeriodicReportSender", "Unblocking limited apps")
                         appBlocker.unblockLimitedApps()
                     }
                 }
-                pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS -> {
+
+                DeviceState.BLOCK_LIMITTED_APPS -> {
                     // Block apps when entering BLOCK_LIMITTED_APPS state
                     Log.i("PeriodicReportSender", "Blocking limited apps")
                     appBlocker.blockLimitedApps()
                 }
             }
-            
+
             currentDeviceState = newState
-            
+
             // Notify the core service about the state change
-            coreService?.updateDeviceState(newState)
+            coreService.updateDeviceState(newState)
         }
     }
 

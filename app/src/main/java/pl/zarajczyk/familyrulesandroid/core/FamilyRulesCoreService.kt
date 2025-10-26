@@ -22,6 +22,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class FamilyRulesCoreService : Service() {
     private val binder = LocalBinder()
+
     private lateinit var periodicUsageEventsMonitor: PeriodicUsageEventsMonitor
     private lateinit var screenTimeCalculator: ScreenTimeCalculator
     private lateinit var packageUsageCalculator: PackageUsageCalculator
@@ -92,15 +93,7 @@ class FamilyRulesCoreService : Service() {
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this, delayDuration = 5.seconds)
         screenTimeCalculator = ScreenTimeCalculator.install(periodicUsageEventsMonitor)
         packageUsageCalculator = PackageUsageCalculator.install(periodicUsageEventsMonitor)
-        val periodicReportSender = PeriodicReportSender(
-            this,
-            settingsManager = SettingsManager(this),
-            periodicUptimeChecker,
-            delayDuration = 30.seconds,
-            appDb = AppDb(this)
-        )
-        periodicReportSender.setCoreService(this)
-        periodicReportSender.start()
+        PeriodicReportSender.install(this, delayDuration = 30.seconds)
     }
 
     private fun createNotificationChannel() {
