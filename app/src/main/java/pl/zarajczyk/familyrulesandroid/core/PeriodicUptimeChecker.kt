@@ -15,6 +15,12 @@ import java.util.TimeZone
 import kotlin.time.Duration
 
 class PeriodicUptimeChecker(private val context: Context, private val delayDuration: Duration) {
+    companion object {
+        fun install(context: Context, delayDuration: Duration): PeriodicUptimeChecker {
+            return PeriodicUptimeChecker(context, delayDuration).also { it.start() }
+        }
+    }
+
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @Volatile

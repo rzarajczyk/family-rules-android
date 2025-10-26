@@ -85,9 +85,8 @@ class FamilyRulesCoreService : Service() {
         super.onCreate()
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
-        FamilyRulesCoreServicePeriodicInstaller.install(this, delayDuration = 30.seconds)
-        periodicUptimeChecker = PeriodicUptimeChecker(this, delayDuration = 60.seconds)
-            .also { it.start() }
+        KeepAliveBackgroundLoop.install(this, delayDuration = 30.seconds)
+        periodicUptimeChecker = PeriodicUptimeChecker.install(this, delayDuration = 60.seconds)
         val periodicReportSender = PeriodicReportSender(
             this,
             settingsManager = SettingsManager(this),

@@ -9,7 +9,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 
-class FamilyRulesCoreServicePeriodicInstaller {
+class KeepAliveBackgroundLoop {
     companion object {
         private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
