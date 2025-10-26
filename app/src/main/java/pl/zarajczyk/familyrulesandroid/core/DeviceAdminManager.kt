@@ -1,5 +1,6 @@
 package pl.zarajczyk.familyrulesandroid.core
 
+import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -23,3 +24,5 @@ class DeviceAdminManager(context: Context) {
         return intent
     }
 }
+
+class FamilyRulesDeviceAdminReceiver : DeviceAdminReceiver()

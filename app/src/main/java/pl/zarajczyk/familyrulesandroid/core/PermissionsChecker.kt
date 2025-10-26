@@ -7,24 +7,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import androidx.core.net.toUri
 
 class PermissionsChecker(private val activity: Activity) {
-
-    fun checkPermissions() {
-        if (!isUsageStatsPermissionGranted()) {
-            navigateToUsageStatsPermissionSettings()
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (activity.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                activity.requestPermissions(
-                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                    1001
-                )
-            }
-        }
-    }
 
     fun isAllPermissionsGranted(): Boolean {
         return isUsageStatsPermissionGranted() && isNotificationPermissionGranted() && isSystemAlertWindowPermissionGranted()
@@ -54,20 +39,14 @@ class PermissionsChecker(private val activity: Activity) {
     }
 
     fun isSystemAlertWindowPermissionGranted(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(activity)
-        } else {
-            true
-        }
+        return Settings.canDrawOverlays(activity)
     }
 
     fun navigateToSystemAlertWindowPermissionSettings() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                data = android.net.Uri.parse("package:${activity.packageName}")
-            }
-            activity.startActivity(intent)
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+            data = "package:${activity.packageName}".toUri()
         }
+        activity.startActivity(intent)
     }
 
 }
