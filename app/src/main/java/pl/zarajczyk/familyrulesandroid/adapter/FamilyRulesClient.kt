@@ -62,12 +62,17 @@ class FamilyRulesClient(
                         DeviceState.ACTIVE -> "Device is active"
                         DeviceState.BLOCK_LIMITTED_APPS -> "Blocking limited apps like Chrome"
                     }
+                    val arguments = when (state) {
+                        DeviceState.ACTIVE -> null
+                        DeviceState.BLOCK_LIMITTED_APPS -> listOf(mapOf("type" to "SET_OF_APP_GROUPS"))
+                    }
 
                     put(JSONObject().apply {
                         put("deviceState", stateName)
                         put("title", stateTitle)
                         put("icon", stateIcon)
                         put("description", stateDescription)
+                        put("arguments", arguments)
                     })
 
                 }
