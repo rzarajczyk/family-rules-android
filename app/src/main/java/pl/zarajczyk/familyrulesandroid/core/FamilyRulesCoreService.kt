@@ -26,6 +26,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var periodicUsageEventsMonitor: PeriodicUsageEventsMonitor
     private lateinit var screenTimeCalculator: ScreenTimeCalculator
     private lateinit var packageUsageCalculator: PackageUsageCalculator
+    private lateinit var foregroundAppCalculator: ForegroundAppCalculator
 
     private val deviceStateManager = DeviceStateManager()
 
@@ -69,6 +70,8 @@ class FamilyRulesCoreService : Service() {
         }
     }
 
+    fun getForegroundApp() = foregroundAppCalculator.getForegroundApp()
+
     fun getTodayScreenTime() = screenTimeCalculator.getTodayScreenTime()
 
     fun getTodayPackageUsage() = packageUsageCalculator.getTodayPackageUsage()
@@ -90,11 +93,14 @@ class FamilyRulesCoreService : Service() {
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
         KeepAliveBackgroundLoop.install(this, delayDuration = 30.seconds)
+
         screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
+        foregroundAppCalculator = ForegroundAppCalculator()
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this, delayDuration = 5.seconds,
-            processors = listOf(screenTimeCalculator, packageUsageCalculator))
-        PeriodicReportSender.install(this, delayDuration = 30.seconds)
+            processors = listOf(screenTimeCalculator, packageUsageCalculator, foregroundAppCalculator))
+        val appBlocker = AppBlocker(this, foregroundAppCalculator)
+        PeriodicReportSender.install(this, delayDuration = 30.seconds, appBlocker)
     }
 
     private fun createNotificationChannel() {

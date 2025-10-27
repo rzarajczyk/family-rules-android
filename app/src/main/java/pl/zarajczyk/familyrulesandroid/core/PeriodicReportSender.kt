@@ -28,13 +28,14 @@ class PeriodicReportSender(
     companion object {
         fun install(
             coreService: FamilyRulesCoreService,
-            delayDuration: Duration
+            delayDuration: Duration,
+            appBlocker: AppBlocker
         ): PeriodicReportSender {
             val appDb = AppDb(coreService)
             val instance = PeriodicReportSender(
                 coreService = coreService,
                 delayDuration = delayDuration,
-                appBlocker = AppBlocker(coreService),
+                appBlocker = appDb,
                 appListChangeDetector = AppListChangeDetector(appDb),
                 familyRulesClient = FamilyRulesClient(
                     SettingsManager(coreService),
