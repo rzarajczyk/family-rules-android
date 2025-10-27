@@ -23,17 +23,16 @@ interface SystemEventProcessor {
 class PeriodicUsageEventsMonitor(
     private val context: Context,
     private val usageManager: UsageStatsManager,
-
-    private val delayDuration: Duration
+    private val delayDuration: Duration,
+    private val processors: List<SystemEventProcessor>
 ) {
     companion object {
-        fun install(context: Context, delayDuration: Duration): PeriodicUsageEventsMonitor {
+        fun install(context: Context, delayDuration: Duration, processors: List<SystemEventProcessor>): PeriodicUsageEventsMonitor {
             val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            return PeriodicUsageEventsMonitor(context, manager, delayDuration).also { it.start() }
+            return PeriodicUsageEventsMonitor(context, manager, delayDuration, processors).also { it.start() }
         }
     }
 
-    private var processors = mutableListOf<SystemEventProcessor>()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun start() {
@@ -51,10 +50,6 @@ class PeriodicUsageEventsMonitor(
 
     private var lastProcessedDay: Instant = Instant.EPOCH
     private var lastProcessedTimestamp: Long = 0L
-
-    fun registerProcessor(processor: SystemEventProcessor) {
-        processors.add(processor)
-    }
 
 
     private fun performTask() {
@@ -93,9 +88,15 @@ class PeriodicUsageEventsMonitor(
             events.add(event)
         }
 
+        if (events.isNotEmpty()) {
+            lastProcessedTimestamp = events.last().timeStamp
+        }
+
         processors.forEach {
             it.onEventBatch(events, start, end)
         }
+
+        Log.d("PeriodicUsageEventsMonitor", "Processed ${events.size} events in ${System.currentTimeMillis() - now.toEpochMilli()}ms")
     }
 
 }

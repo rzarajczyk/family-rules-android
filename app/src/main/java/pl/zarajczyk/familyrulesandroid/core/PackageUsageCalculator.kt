@@ -3,14 +3,6 @@ package pl.zarajczyk.familyrulesandroid.core
 import android.app.usage.UsageEvents
 
 class PackageUsageCalculator : SystemEventProcessor {
-    companion object {
-        fun install(periodicUsageEventsMonitor: PeriodicUsageEventsMonitor): PackageUsageCalculator {
-            val instance = PackageUsageCalculator()
-            periodicUsageEventsMonitor.registerProcessor(instance)
-            return instance
-        }
-    }
-
     fun getTodayPackageUsage(): Map<String, Long> {
         return todayPackageUsage
     }

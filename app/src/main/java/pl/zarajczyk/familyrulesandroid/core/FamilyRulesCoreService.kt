@@ -90,9 +90,10 @@ class FamilyRulesCoreService : Service() {
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
         KeepAliveBackgroundLoop.install(this, delayDuration = 30.seconds)
-        periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this, delayDuration = 5.seconds)
-        screenTimeCalculator = ScreenTimeCalculator.install(periodicUsageEventsMonitor)
-        packageUsageCalculator = PackageUsageCalculator.install(periodicUsageEventsMonitor)
+        screenTimeCalculator = ScreenTimeCalculator()
+        packageUsageCalculator = PackageUsageCalculator()
+        periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this, delayDuration = 5.seconds,
+            processors = listOf(screenTimeCalculator, packageUsageCalculator))
         PeriodicReportSender.install(this, delayDuration = 30.seconds)
     }
 

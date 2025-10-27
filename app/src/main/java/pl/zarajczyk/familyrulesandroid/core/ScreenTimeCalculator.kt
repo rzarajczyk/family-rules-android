@@ -1,16 +1,10 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.usage.UsageEvents
+import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_OFF
+import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_ON
 
 class ScreenTimeCalculator : SystemEventProcessor {
-    companion object {
-        fun install(periodicUsageEventsMonitor: PeriodicUsageEventsMonitor): ScreenTimeCalculator {
-            val instance = ScreenTimeCalculator()
-            periodicUsageEventsMonitor.registerProcessor(instance)
-            return instance
-        }
-    }
-
     fun getTodayScreenTime(): Long {
         return todayScreenTime
     }
@@ -32,11 +26,11 @@ class ScreenTimeCalculator : SystemEventProcessor {
             return
         }
 
-        if (screenEvents.first().state != ScreenState.TURNING_ON) {
-            screenEvents = listOf(ScreenEvent(ScreenState.TURNING_ON, start)) + screenEvents
+        if (screenEvents.first().state != TURNING_ON) {
+            screenEvents = listOf(ScreenEvent(TURNING_ON, start)) + screenEvents
         }
-        if (screenEvents.last().state != ScreenState.TURNING_OFF) {
-            screenEvents = screenEvents + ScreenEvent(ScreenState.TURNING_OFF, end)
+        if (screenEvents.last().state != TURNING_OFF) {
+            screenEvents = screenEvents + ScreenEvent(TURNING_OFF, end)
         }
         val batchScreenOnTime = screenEvents
             .chunked(2)
@@ -50,16 +44,8 @@ class ScreenTimeCalculator : SystemEventProcessor {
     private fun List<UsageEvents.Event>.toScreenEvents(): List<ScreenEvent> =
         this.mapNotNull {
             when (it.eventType) {
-                UsageEvents.Event.SCREEN_INTERACTIVE -> ScreenEvent(
-                    ScreenState.TURNING_ON,
-                    it.timeStamp
-                )
-
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> ScreenEvent(
-                    ScreenState.TURNING_OFF,
-                    it.timeStamp
-                )
-
+                UsageEvents.Event.SCREEN_INTERACTIVE -> ScreenEvent(TURNING_ON, it.timeStamp)
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> ScreenEvent(TURNING_OFF, it.timeStamp)
                 else -> null
             }
         }.fold(mutableListOf()) { acc, event ->
