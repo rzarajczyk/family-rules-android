@@ -35,7 +35,7 @@ class PeriodicReportSender(
             val instance = PeriodicReportSender(
                 coreService = coreService,
                 delayDuration = delayDuration,
-                appBlocker = appDb,
+                appBlocker = appBlocker,
                 appListChangeDetector = AppListChangeDetector(appDb),
                 familyRulesClient = FamilyRulesClient(
                     SettingsManager(coreService),
