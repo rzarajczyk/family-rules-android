@@ -14,7 +14,6 @@ import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
-import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -92,15 +91,20 @@ class FamilyRulesCoreService : Service() {
         super.onCreate()
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
-        KeepAliveBackgroundLoop.install(this, delayDuration = 30.seconds)
+        KeepAliveBackgroundLoop.install(this, delayDuration = 60.seconds)
 
         screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
         foregroundAppCalculator = ForegroundAppCalculator()
-        periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this, delayDuration = 5.seconds,
-            processors = listOf(screenTimeCalculator, packageUsageCalculator, foregroundAppCalculator))
+
+        periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
+            delayDuration = 5.seconds,
+            processors = listOf(screenTimeCalculator, packageUsageCalculator, foregroundAppCalculator)
+        )
         val appBlocker = AppBlocker(this, foregroundAppCalculator)
-        PeriodicReportSender.install(this, delayDuration = 30.seconds, appBlocker)
+        PeriodicReportSender.install(this, appBlocker,
+            reportDuration = 30.seconds,
+            clientInfoDuration = 10.minutes)
     }
 
     private fun createNotificationChannel() {

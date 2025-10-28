@@ -17,8 +17,8 @@ import kotlin.time.Duration.Companion.minutes
 class PeriodicReportSender(
     private val coreService: FamilyRulesCoreService,
     private val delayDuration: Duration,
+    private val clientInfoDuration: Duration,
     private val appBlocker: AppBlocker,
-    private val appListChangeDetector: AppListChangeDetector,
     private val familyRulesClient: FamilyRulesClient
 
 ) {
@@ -28,15 +28,16 @@ class PeriodicReportSender(
     companion object {
         fun install(
             coreService: FamilyRulesCoreService,
-            delayDuration: Duration,
-            appBlocker: AppBlocker
+            appBlocker: AppBlocker,
+            reportDuration: Duration,
+            clientInfoDuration: Duration,
         ): PeriodicReportSender {
             val appDb = AppDb(coreService)
             val instance = PeriodicReportSender(
                 coreService = coreService,
-                delayDuration = delayDuration,
+                delayDuration = reportDuration,
+                clientInfoDuration = clientInfoDuration,
                 appBlocker = appBlocker,
-                appListChangeDetector = AppListChangeDetector(appDb),
                 familyRulesClient = FamilyRulesClient(
                     SettingsManager(coreService),
                     appDb
@@ -65,7 +66,6 @@ class PeriodicReportSender(
 
     private suspend fun sendInitialClientInfoRequest() = try {
         familyRulesClient.sendClientInfoRequest()
-        appListChangeDetector.updateLastSentApps()
     } catch (e: Exception) {
         Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
     }
@@ -73,21 +73,14 @@ class PeriodicReportSender(
     private suspend fun runClientInfoInfiniteLoop(isActive: () -> Boolean) {
         while (isActive()) {
             try {
-                if (appListChangeDetector.hasAppListChanged()) {
-                    Log.i(
-                        "PeriodicReportSender",
-                        "App list changed, sending client info request"
-                    )
+                if (ScreenStatus.isScreenOn(coreService)) {
+                    Log.i("PeriodicReportSender", "Sending client info request")
                     familyRulesClient.sendClientInfoRequest()
-                    appListChangeDetector.updateLastSentApps()
                 }
             } catch (e: Exception) {
-                Log.e(
-                    "PeriodicReportSender",
-                    "Failed to check/send app list changes: ${e.message}",
-                    e
-                )
+                Log.e("PeriodicReportSender", "Failed to send client info", e)
             }
+            delay(clientInfoDuration)
         }
     }
 
@@ -97,11 +90,7 @@ class PeriodicReportSender(
                 try {
                     reportUptime()
                 } catch (e: Exception) {
-                    Log.e(
-                        "PeriodicReportSender",
-                        "Failed to perform uptime report: ${e.message}",
-                        e
-                    )
+                    Log.e("PeriodicReportSender", "Failed to send report", e)
                 }
             }
             delay(delayDuration)
