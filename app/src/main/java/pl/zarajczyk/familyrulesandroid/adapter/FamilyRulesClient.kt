@@ -1,6 +1,5 @@
 package pl.zarajczyk.familyrulesandroid.adapter
 
-import android.content.Context
 import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -64,8 +63,12 @@ class FamilyRulesClient(
                         DeviceState.BLOCK_LIMITTED_APPS -> "Blocking limited apps like Chrome"
                     }
                     val arguments = when (state) {
-                        DeviceState.ACTIVE -> null
-                        DeviceState.BLOCK_LIMITTED_APPS -> listOf(mapOf("type" to "SET_OF_APP_GROUPS"))
+                        DeviceState.ACTIVE -> JSONObject.NULL
+                        DeviceState.BLOCK_LIMITTED_APPS -> JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("type", "SET_OF_APP_GROUPS")
+                            })
+                        }
                     }
 
                     put(JSONObject().apply {
@@ -99,9 +102,15 @@ class FamilyRulesClient(
                     os.write(input, 0, input.size)
                 }
 
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "No error response body"
-                    throw RuntimeException("Server returned HTTP ${connection.responseCode} - $errorResponse")
+                // Debug logging for response details
+                val responseCode = connection.responseCode
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    val errorResponse =
+                        connection.errorStream?.bufferedReader()?.use { it.readText() }
+                            ?: "No error response body"
+                    throw RuntimeException("Server returned HTTP $responseCode - $errorResponse")
+                } else {
+                    Log.d("FamilyRulesClient", "Client-info request successful")
                 }
                 "ok"
             } catch (e: Exception) {
@@ -149,7 +158,9 @@ class FamilyRulesClient(
                 }
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "No error response body"
+                    val errorResponse =
+                        connection.errorStream?.bufferedReader()?.use { it.readText() }
+                            ?: "No error response body"
                     throw RuntimeException("Failed to send report request: HTTP ${connection.responseCode} - $errorResponse")
                 }
 
