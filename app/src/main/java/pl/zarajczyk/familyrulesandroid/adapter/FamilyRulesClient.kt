@@ -1,6 +1,7 @@
 package pl.zarajczyk.familyrulesandroid.adapter
 
 import android.content.Context
+import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -81,14 +82,14 @@ class FamilyRulesClient(
 
         withContext(Dispatchers.IO) {
             try {
-                val url = URL("$serverUrl/api/v2/client-info")
+                val url = URL("$serverUrl/api/v2/launch")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.instanceFollowRedirects = true
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                val auth = android.util.Base64.encodeToString(
+                val auth = Base64.encodeToString(
                     "$instanceId:$instanceToken".toByteArray(),
-                    android.util.Base64.NO_WRAP
+                    Base64.NO_WRAP
                 )
                 connection.setRequestProperty("Authorization", "Basic $auth")
                 connection.doOutput = true
@@ -99,11 +100,11 @@ class FamilyRulesClient(
                 }
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw RuntimeException("Failed to send launch request: HTTP ${connection.responseCode}")
+                    throw RuntimeException("Server returned HTTP ${connection.responseCode}")
                 }
                 "ok"
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to send launch request: ${e.message}", e)
+                Log.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
             }
         }
     }
@@ -134,9 +135,9 @@ class FamilyRulesClient(
                 connection.requestMethod = "POST"
                 connection.instanceFollowRedirects = true
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                val auth = android.util.Base64.encodeToString(
+                val auth = Base64.encodeToString(
                     "$instanceId:$instanceToken".toByteArray(),
-                    android.util.Base64.NO_WRAP
+                    Base64.NO_WRAP
                 )
                 connection.setRequestProperty("Authorization", "Basic $auth")
                 connection.doOutput = true

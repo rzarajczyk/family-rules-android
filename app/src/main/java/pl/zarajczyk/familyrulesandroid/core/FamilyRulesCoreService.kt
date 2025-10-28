@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.Binder
 import android.os.IBinder
@@ -15,6 +16,7 @@ import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
+import pl.zarajczyk.familyrulesandroid.entrypoints.ScreenOffReceiver
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,6 +28,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var screenTimeCalculator: ScreenTimeCalculator
     private lateinit var packageUsageCalculator: PackageUsageCalculator
     private lateinit var foregroundAppCalculator: ForegroundAppCalculator
+    private lateinit var screenOffReceiver: ScreenOffReceiver
 
     private val deviceStateManager = DeviceStateManager()
 
@@ -87,6 +90,10 @@ class FamilyRulesCoreService : Service() {
         }
     }
 
+    fun resetPeriodicUsageEventsMonitor() {
+        periodicUsageEventsMonitor.reset()
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -105,6 +112,13 @@ class FamilyRulesCoreService : Service() {
                 foregroundAppCalculator,
             )
         )
+
+        // Register screen off receiver
+        screenOffReceiver = ScreenOffReceiver {
+            resetPeriodicUsageEventsMonitor()
+        }
+        val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+        registerReceiver(screenOffReceiver, filter)
 
         val appBlocker = AppBlocker(this)
         PeriodicReportSender.install(this, appBlocker,
@@ -160,6 +174,13 @@ class FamilyRulesCoreService : Service() {
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::screenOffReceiver.isInitialized) {
+            unregisterReceiver(screenOffReceiver)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder {

@@ -39,7 +39,6 @@ class PeriodicUsageEventsMonitor(
 
     fun start() {
         scope.launch {
-            delay(2.seconds)
             performTask()
             delay(delayDuration)
             while (isActive) {
