@@ -10,10 +10,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 interface SystemEventProcessor {
     fun reset()
@@ -36,9 +38,10 @@ class PeriodicUsageEventsMonitor(
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun start() {
-        // Perform initial calculation immediately
-        performTask()
         scope.launch {
+            delay(2.seconds)
+            performTask()
+            delay(delayDuration)
             while (isActive) {
                 if (ScreenStatus.isScreenOn(context)) {
                     performTask()

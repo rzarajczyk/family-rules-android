@@ -1,15 +1,11 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.util.Log
 
-class AppBlocker(private val context: Context, private val foregroundAppCalculator: ForegroundAppCalculator) {
-    
-    private val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    private val adminComponent = ComponentName(context, FamilyRulesDeviceAdminReceiver::class.java)
-    private var foregroundAppMonitor: ForegroundAppMonitor = ForegroundAppMonitor(context, foregroundAppCalculator)
+class AppBlocker(coreService: FamilyRulesCoreService) {
+
+    private var foregroundAppMonitor: ForegroundAppMonitor = ForegroundAppMonitor(coreService)
     
     // Hardcoded list of apps to block when BLOCK_LIMITTED_APPS state is active
     private val blockedApps = listOf(
@@ -20,11 +16,6 @@ class AppBlocker(private val context: Context, private val foregroundAppCalculat
      * Block all apps in the blockedApps list
      */
     fun blockLimitedApps() {
-        if (!devicePolicyManager.isAdminActive(adminComponent)) {
-            Log.w("AppBlocker", "Device admin not active, cannot block apps")
-            return
-        }
-        
         Log.i("AppBlocker", "Starting to block limited apps: $blockedApps")
         blockedApps.forEach { packageName ->
             blockedAppsState.add(packageName)
@@ -40,11 +31,6 @@ class AppBlocker(private val context: Context, private val foregroundAppCalculat
      * Unblock all apps in the blockedApps list
      */
     fun unblockLimitedApps() {
-        if (!devicePolicyManager.isAdminActive(adminComponent)) {
-            Log.w("AppBlocker", "Device admin not active, cannot unblock apps")
-            return
-        }
-        
         Log.i("AppBlocker", "Starting to unblock limited apps: $blockedApps")
         blockedApps.forEach { packageName ->
             blockedAppsState.remove(packageName)

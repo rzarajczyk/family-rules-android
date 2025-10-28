@@ -1,6 +1,5 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Monitors foreground apps to detect when blocked apps are opened
  */
-class ForegroundAppMonitor(private val context: Context, private val foregroundAppCalculator: ForegroundAppCalculator) {
+class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var isMonitoring = false
     private var lastForegroundApp: String? = null
@@ -48,7 +47,7 @@ class ForegroundAppMonitor(private val context: Context, private val foregroundA
     }
     
     private fun checkForegroundApp() {
-        val currentApp = foregroundAppCalculator.getForegroundApp()
+        val currentApp = coreService.getForegroundApp()
         
         if (currentApp != null && currentApp != lastForegroundApp) {
             Log.d("ForegroundAppMonitor", "Foreground app changed to: $currentApp")
@@ -65,11 +64,11 @@ class ForegroundAppMonitor(private val context: Context, private val foregroundA
 
     private fun showBlockingOverlay(packageName: String) {
         Log.i("ForegroundAppMonitor", "Showing blocking overlay for: $packageName")
-        AppBlockingOverlayService.showOverlay(context, packageName)
+        AppBlockingOverlayService.showOverlay(coreService, packageName)
     }
     
     private fun hideBlockingOverlay() {
         Log.d("ForegroundAppMonitor", "Hiding blocking overlay")
-        AppBlockingOverlayService.hideOverlay(context)
+        AppBlockingOverlayService.hideOverlay(coreService)
     }
 }

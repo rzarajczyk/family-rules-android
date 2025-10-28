@@ -99,9 +99,14 @@ class FamilyRulesCoreService : Service() {
 
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
             delayDuration = 5.seconds,
-            processors = listOf(screenTimeCalculator, packageUsageCalculator, foregroundAppCalculator)
+            processors = listOf(
+                screenTimeCalculator,
+                packageUsageCalculator,
+                foregroundAppCalculator,
+            )
         )
-        val appBlocker = AppBlocker(this, foregroundAppCalculator)
+
+        val appBlocker = AppBlocker(this)
         PeriodicReportSender.install(this, appBlocker,
             reportDuration = 30.seconds,
             clientInfoDuration = 10.minutes)
