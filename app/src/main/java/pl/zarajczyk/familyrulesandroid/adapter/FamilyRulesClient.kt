@@ -82,7 +82,7 @@ class FamilyRulesClient(
 
         withContext(Dispatchers.IO) {
             try {
-                val url = URL("$serverUrl/api/v2/launch")
+                val url = URL("$serverUrl/api/v2/client-info")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.instanceFollowRedirects = true
@@ -100,7 +100,8 @@ class FamilyRulesClient(
                 }
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw RuntimeException("Server returned HTTP ${connection.responseCode}")
+                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "No error response body"
+                    throw RuntimeException("Server returned HTTP ${connection.responseCode} - $errorResponse")
                 }
                 "ok"
             } catch (e: Exception) {
@@ -148,7 +149,8 @@ class FamilyRulesClient(
                 }
 
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw RuntimeException("Failed to send report request: HTTP ${connection.responseCode}")
+                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "No error response body"
+                    throw RuntimeException("Failed to send report request: HTTP ${connection.responseCode} - $errorResponse")
                 }
 
                 // Read the response
