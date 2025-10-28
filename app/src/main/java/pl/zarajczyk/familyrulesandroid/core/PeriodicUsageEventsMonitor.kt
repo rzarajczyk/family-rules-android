@@ -16,8 +16,8 @@ import java.time.temporal.ChronoUnit
 import kotlin.time.Duration
 
 interface SystemEventProcessor {
-    fun onMidnight()
-    fun onEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long)
+    fun reset()
+    fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long)
 }
 
 class PeriodicUsageEventsMonitor(
@@ -51,6 +51,13 @@ class PeriodicUsageEventsMonitor(
     private var lastProcessedDay: Instant = Instant.EPOCH
     private var lastProcessedTimestamp: Long = 0L
 
+    fun reset() {
+        lastProcessedTimestamp  = 0L
+        processors.forEach {
+            it.reset()
+        }
+    }
+
 
     private fun performTask() {
         val now = Instant.now()
@@ -59,11 +66,8 @@ class PeriodicUsageEventsMonitor(
 
         if (lastProcessedDay != startOfDay) {
             Log.d("PeriodicUsageEventsMonitor", "New day detected, resetting data")
-            lastProcessedTimestamp = 0L
             lastProcessedDay = startOfDay
-            processors.forEach {
-                it.onMidnight()
-            }
+            reset()
         }
 
         val start = if (lastProcessedTimestamp == 0L) {
@@ -93,7 +97,7 @@ class PeriodicUsageEventsMonitor(
         }
 
         processors.forEach {
-            it.onEventBatch(events, start, end)
+            it.processEventBatch(events, start, end)
         }
 
         Log.d("PeriodicUsageEventsMonitor", "Processed ${events.size} events in ${System.currentTimeMillis() - now.toEpochMilli()}ms")

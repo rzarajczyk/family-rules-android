@@ -14,10 +14,10 @@ class ForegroundAppCalculator : SystemEventProcessor {
     private enum class State { STARTING, STOPPING }
     private data class PackageLifecycleEvent(val state: State, val packageName: String, val timestamp: Long)
 
-    override fun onMidnight() {
+    override fun reset() {
     }
 
-    override fun onEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
+    override fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
         val packageLifecycleEvents = events.toPackageLifecycleEvents()
 
         if (packageLifecycleEvents.isEmpty()) {

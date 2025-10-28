@@ -15,11 +15,11 @@ class ScreenTimeCalculator : SystemEventProcessor {
     enum class ScreenState { TURNING_ON, TURNING_OFF }
     data class ScreenEvent(val state: ScreenState, val timestamp: Long)
 
-    override fun onMidnight() {
+    override fun reset() {
         todayScreenTime = 0L
     }
 
-    override fun onEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
+    override fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
         var screenEvents = events.toScreenEvents()
 
         if (screenEvents.isEmpty()) {
