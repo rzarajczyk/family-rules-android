@@ -97,6 +97,10 @@ class PeriodicReportSender(
         }
     }
 
+    fun reportUptimeAsync() = scope.launch {
+        reportUptime()
+    }
+
     private suspend fun reportUptime() {
         val uptime = Uptime(
             screenTimeMillis = coreService.getTodayScreenTime(),

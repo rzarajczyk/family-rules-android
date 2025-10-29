@@ -12,6 +12,8 @@ import android.content.ServiceConnection
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
@@ -29,6 +31,8 @@ class FamilyRulesCoreService : Service() {
     private lateinit var packageUsageCalculator: PackageUsageCalculator
     private lateinit var foregroundAppCalculator: ForegroundAppCalculator
     private lateinit var screenOffReceiver: ScreenOffReceiver
+
+    private lateinit var periodicReportSender: PeriodicReportSender
 
     private val deviceStateManager = DeviceStateManager()
 
@@ -92,6 +96,7 @@ class FamilyRulesCoreService : Service() {
 
     fun resetPeriodicUsageEventsMonitor() {
         periodicUsageEventsMonitor.reset()
+        periodicReportSender.reportUptimeAsync()
     }
 
     override fun onCreate() {
@@ -121,7 +126,7 @@ class FamilyRulesCoreService : Service() {
         registerReceiver(screenOffReceiver, filter)
 
         val appBlocker = AppBlocker(this)
-        PeriodicReportSender.install(this, appBlocker,
+        periodicReportSender = PeriodicReportSender.install(this, appBlocker,
             reportDuration = 30.seconds,
             clientInfoDuration = 10.minutes)
     }
