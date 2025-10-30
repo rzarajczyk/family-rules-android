@@ -83,6 +83,8 @@ class FamilyRulesClient(
             })
         }.toString()
 
+        Log.d("FamilyRulesClient", "Sending client-info request: $json")
+
         withContext(Dispatchers.IO) {
             try {
                 val url = URL("$serverUrl/api/v2/client-info")
@@ -137,6 +139,8 @@ class FamilyRulesClient(
             put("screenTime", uptime.screenTimeMillis / 1000)
             put("applications", applications)
         }.toString()
+
+        Log.d("FamilyRulesClient", "Reporting uptime: $json")
 
         return withContext(Dispatchers.IO) {
             try {
