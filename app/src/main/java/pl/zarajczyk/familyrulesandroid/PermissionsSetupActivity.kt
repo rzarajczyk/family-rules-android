@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import pl.zarajczyk.familyrulesandroid.core.DeviceAdminManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
+import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 
 class PermissionsSetupActivity : ComponentActivity() {
     
@@ -83,7 +84,7 @@ class PermissionsSetupActivity : ComponentActivity() {
         deviceAdminManager = DeviceAdminManager(this)
         permissionChecker = PermissionsChecker(this)
 
-        window.statusBarColor = Color(0xFFEEEEEE).toArgb()
+        window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
         
         setContent {
             FamilyRulesAndroidTheme {
@@ -167,7 +168,7 @@ fun ProtectionSetupContent(
 
             if (allEnabled) break
 
-            delay(5000)
+            delay(3000)
 
             if (!notificationPermissionGranted) {
                 notificationPermissionGranted = permissionChecker.isNotificationPermissionGranted()
@@ -295,9 +296,10 @@ fun ProtectionCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isEnabled)
-                Color(0xFFC8E6C9) // light green for success
-            else 
-                MaterialTheme.colorScheme.surfaceVariant
+                FamilyRulesColors.PERMISSION_GRANTED_COLOR
+            else
+                FamilyRulesColors.PERMISSION_NOT_GRANTED_COLOR,
+            contentColor = FamilyRulesColors.TEXT_COLOR
         )
     ) {
         Column(
@@ -323,10 +325,10 @@ fun ProtectionCard(
                 Text(
                     text = if (isEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isEnabled) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
-                        MaterialTheme.colorScheme.error
+                    color = if (isEnabled)
+                        FamilyRulesColors.TEXT_COLOR
+                    else
+                        FamilyRulesColors.ERROR_TEXT_COLOR
                 )
             }
             

@@ -48,6 +48,7 @@ import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import kotlinx.coroutines.delay
+import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 
 
 class MainActivity : ComponentActivity() {
@@ -98,8 +99,8 @@ class MainActivity : ComponentActivity() {
                     val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
                     // Keep status bar color in sync with SharedAppLayout background color
                     val bgColor = when (deviceState) {
-                        DeviceState.ACTIVE -> Color(0xFFEEEEEE)
-                        DeviceState.BLOCK_LIMITTED_APPS -> Color(0xFFFFDEDE)
+                        DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
+                        DeviceState.BLOCK_LIMITTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
                     }
                     androidx.compose.runtime.SideEffect {
                         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -297,12 +298,12 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
                 text = appInfo?.name ?: stat.packageName,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 18.sp,
-                color = Color(0xFF212121)
+                color = FamilyRulesColors.TEXT_COLOR
             )
             Text(
                 text = stringResource(R.string.total_time, totalTimeFormatted),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF212121)
+                color = FamilyRulesColors.TEXT_COLOR
             )
         }
     }

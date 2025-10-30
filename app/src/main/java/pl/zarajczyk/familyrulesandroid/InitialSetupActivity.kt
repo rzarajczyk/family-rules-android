@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
+import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -51,7 +52,7 @@ class InitialSetupActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         settingsManager = SettingsManager(this)
 
-        window.statusBarColor = Color(0xFFEEEEEE).toArgb()
+        window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
 
         setContent {
             FamilyRulesAndroidTheme {

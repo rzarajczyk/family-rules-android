@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_LIMITTED_APPS
+import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 
 /**
  * Shared layout component that provides the common structure for both MainActivity and InitialSetupActivity.
@@ -47,8 +48,8 @@ fun SharedAppLayout(
             .systemBarsPadding()
     ) { innerPadding ->
         val bgColor = when (deviceState) {
-            ACTIVE -> Color(0xFFEEEEEE)
-            BLOCK_LIMITTED_APPS -> Color(0xFFFFDEDE)
+            ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
+            BLOCK_LIMITTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
         }
         if (isLandscape) {
             // Horizontal layout for landscape orientation
