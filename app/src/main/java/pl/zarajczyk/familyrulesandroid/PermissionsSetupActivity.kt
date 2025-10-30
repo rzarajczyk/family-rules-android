@@ -268,8 +268,8 @@ fun ProtectionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isEnabled) 
-                MaterialTheme.colorScheme.primaryContainer 
+            containerColor = if (isEnabled)
+                Color(0xFFC8E6C9) // light green for success
             else 
                 MaterialTheme.colorScheme.surfaceVariant
         )
