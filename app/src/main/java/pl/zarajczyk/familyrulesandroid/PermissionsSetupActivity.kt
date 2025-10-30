@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -154,6 +155,37 @@ fun ProtectionSetupContent(
     LaunchedEffect(Unit) {
         batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
     }
+
+    // Poll every 5 seconds for permissions that are not yet enabled
+    LaunchedEffect(Unit) {
+        while (true) {
+            val allEnabled = notificationPermissionGranted &&
+                usageStatsPermissionGranted &&
+                systemAlertWindowPermissionGranted &&
+                deviceAdminEnabled &&
+                batteryOptimizationDisabled
+
+            if (allEnabled) break
+
+            delay(5000)
+
+            if (!notificationPermissionGranted) {
+                notificationPermissionGranted = permissionChecker.isNotificationPermissionGranted()
+            }
+            if (!usageStatsPermissionGranted) {
+                usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted()
+            }
+            if (!systemAlertWindowPermissionGranted) {
+                systemAlertWindowPermissionGranted = permissionChecker.isSystemAlertWindowPermissionGranted()
+            }
+            if (!deviceAdminEnabled) {
+                deviceAdminEnabled = deviceAdminManager.isDeviceAdminActive()
+            }
+            if (!batteryOptimizationDisabled) {
+                batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
+            }
+        }
+    }
     
     Column(
         modifier = Modifier
@@ -178,8 +210,7 @@ fun ProtectionSetupContent(
             title = stringResource(R.string.notification_permission),
             description = stringResource(R.string.notification_permission_description),
             isEnabled = notificationPermissionGranted,
-            onEnableClick = onNotificationPermissionRequest,
-            onRefresh = { notificationPermissionGranted = permissionChecker.isNotificationPermissionGranted() }
+            onEnableClick = onNotificationPermissionRequest
         )
         
         // App Usage Permission
@@ -187,8 +218,7 @@ fun ProtectionSetupContent(
             title = stringResource(R.string.app_usage_permission),
             description = stringResource(R.string.app_usage_permission_description),
             isEnabled = usageStatsPermissionGranted,
-            onEnableClick = onUsageStatsPermissionRequest,
-            onRefresh = { usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted() }
+            onEnableClick = onUsageStatsPermissionRequest
         )
         
         // System Alert Window Permission
@@ -196,8 +226,7 @@ fun ProtectionSetupContent(
             title = stringResource(R.string.display_over_apps),
             description = stringResource(R.string.display_over_apps_description),
             isEnabled = systemAlertWindowPermissionGranted,
-            onEnableClick = onSystemAlertWindowPermissionRequest,
-            onRefresh = { systemAlertWindowPermissionGranted = permissionChecker.isSystemAlertWindowPermissionGranted() }
+            onEnableClick = onSystemAlertWindowPermissionRequest
         )
         
         // Device Admin Protection
@@ -208,8 +237,7 @@ fun ProtectionSetupContent(
             onEnableClick = {
                 val intent = deviceAdminManager.requestDeviceAdminPermission()
                 context.startActivity(intent)
-            },
-            onRefresh = { deviceAdminEnabled = deviceAdminManager.isDeviceAdminActive() }
+            }
         )
         
         // Battery Optimization
@@ -222,8 +250,7 @@ fun ProtectionSetupContent(
                     data = Uri.parse("package:${context.packageName}")
                 }
                 context.startActivity(intent)
-            },
-            onRefresh = { batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context) }
+            }
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -262,8 +289,7 @@ fun ProtectionCard(
     title: String,
     description: String,
     isEnabled: Boolean,
-    onEnableClick: () -> Unit,
-    onRefresh: () -> Unit
+    onEnableClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -320,13 +346,6 @@ fun ProtectionCard(
                     ) {
                         Text(stringResource(R.string.enable))
                     }
-                }
-                
-                OutlinedButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.refresh))
                 }
             }
         }
