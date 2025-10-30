@@ -34,12 +34,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.core.*
 import pl.zarajczyk.familyrulesandroid.database.App
 import pl.zarajczyk.familyrulesandroid.database.AppDb
@@ -93,6 +95,17 @@ class MainActivity : ComponentActivity() {
                 FamilyRulesAndroidTheme {
                     // Use the reactive state flow for device state
                     val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
+                    // Keep status bar color in sync with SharedAppLayout background color
+                    val bgColor = when (deviceState) {
+                        DeviceState.ACTIVE -> Color(0xFFEEEEEE)
+                        DeviceState.BLOCK_LIMITTED_APPS -> Color(0xFFFFDEDE)
+                    }
+                    androidx.compose.runtime.SideEffect {
+                        WindowCompat.getInsetsController(window, window.decorView).apply {
+                            isAppearanceLightStatusBars = true
+                        }
+                        window.statusBarColor = bgColor.toArgb()
+                    }
                     
                     MainScreen(
                         usageStatsList = service.getTodayPackageUsage(),
@@ -113,7 +126,7 @@ fun MainScreen(
     screenTime: Long,
     settingsManager: SettingsManager,
     appDb: AppDb,
-    deviceState: pl.zarajczyk.familyrulesandroid.adapter.DeviceState = pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
+    deviceState: DeviceState = DeviceState.ACTIVE
 ) {
     SharedAppLayout(deviceState = deviceState) {
         ScreenTimeCard(screenTime, settingsManager)
