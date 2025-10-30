@@ -282,10 +282,12 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
                 text = appInfo?.name ?: stat.packageName,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 18.sp,
+                color = Color(0xFF212121)
             )
             Text(
                 text = stringResource(R.string.total_time, totalTimeFormatted),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF212121)
             )
         }
     }
