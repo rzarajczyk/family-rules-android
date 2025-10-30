@@ -12,8 +12,6 @@ import android.content.ServiceConnection
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState

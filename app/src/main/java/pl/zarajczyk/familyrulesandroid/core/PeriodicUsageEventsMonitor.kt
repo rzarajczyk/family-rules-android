@@ -58,6 +58,7 @@ class PeriodicUsageEventsMonitor(
         processors.forEach {
             it.reset()
         }
+        performTask()
     }
 
 
