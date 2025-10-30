@@ -281,7 +281,7 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
             Text(
                 text = appInfo?.name ?: stat.packageName,
                 style = MaterialTheme.typography.bodyLarge,
-                fontSize = 18.sp
+                fontSize = 18.sp,
             )
             Text(
                 text = stringResource(R.string.total_time, totalTimeFormatted),
