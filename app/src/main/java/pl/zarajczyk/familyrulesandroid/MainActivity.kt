@@ -47,6 +47,7 @@ import pl.zarajczyk.familyrulesandroid.database.App
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.utils.toHMS
+import kotlinx.coroutines.delay
 
 
 class MainActivity : ComponentActivity() {
@@ -106,10 +107,24 @@ class MainActivity : ComponentActivity() {
                         }
                         window.statusBarColor = bgColor.toArgb()
                     }
+
+                    // Track usage/screenTime and poll until calculated
+                    var usageStatsListState by remember { mutableStateOf(service.getTodayPackageUsage()) }
+                    var screenTimeState by remember { mutableStateOf(service.getTodayScreenTime()) }
+
+                    LaunchedEffect(usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                        if (usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                            while (usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                                delay(1000)
+                                usageStatsListState = service.getTodayPackageUsage()
+                                screenTimeState = service.getTodayScreenTime()
+                            }
+                        }
+                    }
                     
                     MainScreen(
-                        usageStatsList = service.getTodayPackageUsage(),
-                        screenTime = service.getTodayScreenTime(),
+                        usageStatsList = usageStatsListState,
+                        screenTime = screenTimeState,
                         settingsManager = settingsManager,
                         appDb = appDb,
                         deviceState = deviceState
