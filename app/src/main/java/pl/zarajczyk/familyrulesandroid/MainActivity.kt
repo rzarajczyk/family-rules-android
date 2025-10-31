@@ -49,11 +49,13 @@ import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import kotlinx.coroutines.delay
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
+import android.content.ServiceConnection
 
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private lateinit var appDb: AppDb
+    private var serviceConnection: ServiceConnection? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,46 +94,62 @@ class MainActivity : ComponentActivity() {
     }
 
     fun setupContent() {
-        FamilyRulesCoreService.bind(this) { service ->
-            setContent {
-                FamilyRulesAndroidTheme {
-                    // Use the reactive state flow for device state
-                    val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
-                    // Keep status bar color in sync with SharedAppLayout background color
-                    val bgColor = when (deviceState) {
-                        DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
-                        DeviceState.BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
-                    }
-                    androidx.compose.runtime.SideEffect {
-                        WindowCompat.getInsetsController(window, window.decorView).apply {
-                            isAppearanceLightStatusBars = true
+        // Only bind if not already bound
+        if (serviceConnection == null) {
+            serviceConnection = FamilyRulesCoreService.bind(this) { service ->
+                setContent {
+                    FamilyRulesAndroidTheme {
+                        // Use the reactive state flow for device state
+                        val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
+                        // Keep status bar color in sync with SharedAppLayout background color
+                        val bgColor = when (deviceState) {
+                            DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
+                            DeviceState.BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
                         }
-                        window.statusBarColor = bgColor.toArgb()
-                    }
+                        androidx.compose.runtime.SideEffect {
+                            WindowCompat.getInsetsController(window, window.decorView).apply {
+                                isAppearanceLightStatusBars = true
+                            }
+                            window.statusBarColor = bgColor.toArgb()
+                        }
 
-                    // Track usage/screenTime and poll until calculated
-                    var usageStatsListState by remember { mutableStateOf(service.getTodayPackageUsage()) }
-                    var screenTimeState by remember { mutableStateOf(service.getTodayScreenTime()) }
+                        // Track usage/screenTime and poll until calculated
+                        var usageStatsListState by remember { mutableStateOf(service.getTodayPackageUsage()) }
+                        var screenTimeState by remember { mutableStateOf(service.getTodayScreenTime()) }
 
-                    LaunchedEffect(usageStatsListState.isEmpty() && screenTimeState == 0L) {
-                        if (usageStatsListState.isEmpty() && screenTimeState == 0L) {
-                            while (usageStatsListState.isEmpty() && screenTimeState == 0L) {
-                                delay(1000)
-                                usageStatsListState = service.getTodayPackageUsage()
-                                screenTimeState = service.getTodayScreenTime()
+                        LaunchedEffect(usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                            if (usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                                while (usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                                    delay(1000)
+                                    usageStatsListState = service.getTodayPackageUsage()
+                                    screenTimeState = service.getTodayScreenTime()
+                                }
                             }
                         }
+                        
+                        MainScreen(
+                            usageStatsList = usageStatsListState,
+                            screenTime = screenTimeState,
+                            settingsManager = settingsManager,
+                            appDb = appDb,
+                            deviceState = deviceState
+                        )
                     }
-                    
-                    MainScreen(
-                        usageStatsList = usageStatsListState,
-                        screenTime = screenTimeState,
-                        settingsManager = settingsManager,
-                        appDb = appDb,
-                        deviceState = deviceState
-                    )
                 }
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Unbind service when activity is destroyed to prevent leaks
+        serviceConnection?.let { connection ->
+            try {
+                unbindService(connection)
+            } catch (e: IllegalArgumentException) {
+                // Service might not be bound, ignore
+            }
+            serviceConnection = null
         }
     }
 }

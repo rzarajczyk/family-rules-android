@@ -56,21 +56,23 @@ class FamilyRulesCoreService : Service() {
         fun bind(
             context: Context,
             callback: (FamilyRulesCoreService) -> Unit
-        ) {
+        ): ServiceConnection {
+            val serviceConnection = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                    val binder = service as LocalBinder
+                    val familyRulesCoreService = binder.getService()
+                    callback(familyRulesCoreService)
+                }
+
+                override fun onServiceDisconnected(name: ComponentName) {
+                }
+            }
             context.bindService(
                 Intent(context, FamilyRulesCoreService::class.java),
-                object : ServiceConnection {
-                    override fun onServiceConnected(name: ComponentName, service: IBinder) {
-                        val binder = service as LocalBinder
-                        val familyRulesCoreService = binder.getService()
-                        callback(familyRulesCoreService)
-                    }
-
-                    override fun onServiceDisconnected(name: ComponentName) {
-                    }
-                },
+                serviceConnection,
                 Context.BIND_AUTO_CREATE
             )
+            return serviceConnection
         }
     }
 
