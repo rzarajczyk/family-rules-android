@@ -18,10 +18,10 @@ data class Uptime(
 )
 
 data class ClientInfoResponse(
-    val monitoredApps: Map<String, MonitoredApp>
+    val restrictedApps: Map<String, App>
 )
 
-data class MonitoredApp(
+data class App(
     val appName: String,
     val iconBase64Png: String?
 )
@@ -126,32 +126,32 @@ class FamilyRulesClient(
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
 
                 val jsonResponse = JSONObject(response)
-                val monitoredAppsJson = jsonResponse.optJSONObject("monitoredApps")
+                val restrictedAppsJson = jsonResponse.optJSONObject("restrictedApps")
 
-                val monitoredApps: Map<String, MonitoredApp> = if (monitoredAppsJson == null) {
+                val restrictedApps: Map<String, App> = if (restrictedAppsJson == null) {
                     emptyMap()
                 } else {
                     buildMap {
-                        val keys = monitoredAppsJson.keys()
+                        val keys = restrictedAppsJson.keys()
                         while (keys.hasNext()) {
                             val packageName = keys.next()
-                            val appJson = monitoredAppsJson.optJSONObject(packageName)
+                            val appJson = restrictedAppsJson.optJSONObject(packageName)
                             if (appJson != null) {
                                 val appName = appJson.optString("appName", packageName)
                                 val icon = if (appJson.isNull("iconBase64Png")) null else appJson.optString("iconBase64Png")
-                                put(packageName, MonitoredApp(appName = appName, iconBase64Png = icon))
+                                put(packageName, App(appName = appName, iconBase64Png = icon))
                             } else {
-                                put(packageName, MonitoredApp(appName = packageName, iconBase64Png = null))
+                                put(packageName, App(appName = packageName, iconBase64Png = null))
                             }
                         }
                     }
                 }
 
-                Log.d("FamilyRulesClient", "Client-info returned monitored apps: ${monitoredApps.keys}")
-                ClientInfoResponse(monitoredApps = monitoredApps)
+                Log.d("FamilyRulesClient", "Client-info returned restricted apps: ${restrictedApps.keys}")
+                ClientInfoResponse(restrictedApps = restrictedApps)
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
-                ClientInfoResponse(monitoredApps = emptyMap())
+                ClientInfoResponse(restrictedApps = emptyMap())
             }
         }
     }

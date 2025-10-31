@@ -67,8 +67,8 @@ class PeriodicReportSender(
     private suspend fun sendInitialClientInfoRequest() {
         try {
             val response = familyRulesClient.sendClientInfoRequest()
-            if (response.monitoredApps.isNotEmpty()) {
-                appBlocker.setMonitoredApps(response.monitoredApps.keys.toList())
+            if (response.restrictedApps.isNotEmpty()) {
+                appBlocker.setRestrictedApps(response.restrictedApps.keys.toList())
             }
         } catch (e: Exception) {
             Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
@@ -81,7 +81,7 @@ class PeriodicReportSender(
                 if (ScreenStatus.isScreenOn(coreService)) {
                     Log.i("PeriodicReportSender", "Sending client info request")
                     val response = familyRulesClient.sendClientInfoRequest()
-                    appBlocker.setMonitoredApps(response.monitoredApps.keys.toList())
+                    appBlocker.setRestrictedApps(response.restrictedApps.keys.toList())
                 }
             } catch (e: Exception) {
                 Log.e("PeriodicReportSender", "Failed to send client info", e)
@@ -131,14 +131,14 @@ class PeriodicReportSender(
                     // Unblock apps when returning to ACTIVE state
                     if (currentDeviceState == DeviceState.BLOCK_RESTRICTED_APPS) {
                         Log.i("PeriodicReportSender", "Unblocking restricted apps")
-                        appBlocker.unblockMonitoredApps()
+                        appBlocker.unblock()
                     }
                 }
 
                 DeviceState.BLOCK_RESTRICTED_APPS -> {
                     // Block apps when entering BLOCK_RESTRICTED_APPS state
                     Log.i("PeriodicReportSender", "Blocking restricted apps")
-                    appBlocker.blockMonitoredApps()
+                    appBlocker.block()
                 }
             }
 

@@ -9,7 +9,7 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
     // Dynamic list of packages to block, received from server
     private var packagesToBlock: List<String> = emptyList()
     
-    fun setMonitoredApps(packages: List<String>) {
+    fun setRestrictedApps(packages: List<String>) {
         packagesToBlock = packages
         Log.i("AppBlocker", "Updated packages to block: $packagesToBlock")
     }
@@ -17,8 +17,8 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
     /**
      * Block all apps in the blockedApps list
      */
-    fun blockMonitoredApps() {
-        Log.i("AppBlocker", "Starting to block monitored apps: $packagesToBlock")
+    fun block() {
+        Log.i("AppBlocker", "Starting to block apps: $packagesToBlock")
         packagesToBlock.forEach { packageName ->
             blockedAppsState.add(packageName)
         }
@@ -26,14 +26,14 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
         // Start monitoring foreground apps
         startForegroundAppMonitoring()
         
-        Log.i("AppBlocker", "Completed blocking monitored apps: $packagesToBlock")
+        Log.i("AppBlocker", "Completed blocking apps: $packagesToBlock")
     }
     
     /**
      * Unblock all apps in the blockedApps list
      */
-    fun unblockMonitoredApps() {
-        Log.i("AppBlocker", "Starting to unblock monitored apps: $packagesToBlock")
+    fun unblock() {
+        Log.i("AppBlocker", "Starting to unblock apps: $packagesToBlock")
         packagesToBlock.forEach { packageName ->
             blockedAppsState.remove(packageName)
         }
@@ -41,7 +41,7 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
         // Stop monitoring foreground apps
         stopForegroundAppMonitoring()
         
-        Log.i("AppBlocker", "Completed unblocking monitored apps: $packagesToBlock")
+        Log.i("AppBlocker", "Completed unblocking apps: $packagesToBlock")
     }
 
     /**
