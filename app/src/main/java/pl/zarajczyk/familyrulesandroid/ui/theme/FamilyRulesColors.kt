@@ -12,4 +12,7 @@ object FamilyRulesColors {
 
     val TEXT_COLOR = Color(0xFF212121)
     val ERROR_TEXT_COLOR = Color(0xFFFF0000)
+
+    val BUTTON_COLOR = Color(0xFF8DC1EA)
+    val DISABLED_BUTTON_COLOR = Color(0xFFBEBEBE)
 }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -198,12 +199,14 @@ fun ProtectionSetupContent(
         Text(
             text = stringResource(R.string.app_protection_setup),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = FamilyRulesColors.TEXT_COLOR
         )
         
         Text(
             text = stringResource(R.string.protection_setup_description),
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = FamilyRulesColors.TEXT_COLOR
         )
         
         // Notification Permission
@@ -264,7 +267,13 @@ fun ProtectionSetupContent(
                 onSetupComplete()
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = allPermissionsGranted
+            enabled = allPermissionsGranted,
+            colors = ButtonColors(
+                containerColor = FamilyRulesColors.BUTTON_COLOR,
+                contentColor = FamilyRulesColors.TEXT_COLOR ,
+                disabledContainerColor = FamilyRulesColors.DISABLED_BUTTON_COLOR,
+                disabledContentColor = FamilyRulesColors.TEXT_COLOR
+            )
         ) {
             Text(stringResource(R.string.complete_setup))
         }
@@ -279,7 +288,7 @@ fun ProtectionSetupContent(
             Text(
                 text = stringResource(R.string.missing_permissions, missingPermissions.joinToString(", ")),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
+                color = FamilyRulesColors.ERROR_TEXT_COLOR
             )
         }
     }
@@ -344,7 +353,13 @@ fun ProtectionCard(
                 if (!isEnabled) {
                     Button(
                         onClick = onEnableClick,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonColors(
+                            containerColor = FamilyRulesColors.BUTTON_COLOR,
+                            contentColor = FamilyRulesColors.TEXT_COLOR ,
+                            disabledContainerColor = FamilyRulesColors.DISABLED_BUTTON_COLOR,
+                            disabledContentColor = FamilyRulesColors.TEXT_COLOR
+                        )
                     ) {
                         Text(stringResource(R.string.enable))
                     }
@@ -355,10 +370,6 @@ fun ProtectionCard(
 }
 
 private fun isBatteryOptimizationEnabled(context: android.content.Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val powerManager = context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
-        powerManager.isIgnoringBatteryOptimizations(context.packageName)
-    } else {
-        true
-    }
+    val powerManager = context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+    return powerManager.isIgnoringBatteryOptimizations(context.packageName)
 }
