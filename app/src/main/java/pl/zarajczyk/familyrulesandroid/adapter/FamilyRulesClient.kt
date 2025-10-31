@@ -17,12 +17,21 @@ data class Uptime(
     val packageUsages: Map<String, Long>
 )
 
+data class ClientInfoResponse(
+    val monitoredApps: Map<String, MonitoredApp>
+)
+
+data class MonitoredApp(
+    val appName: String,
+    val iconBase64Png: String?
+)
+
 class FamilyRulesClient(
     private val settingsManager: SettingsManager,
     private val appDb: AppDb
 ) {
 
-    suspend fun sendClientInfoRequest(): List<String> {
+    suspend fun sendClientInfoRequest(): ClientInfoResponse {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
@@ -117,22 +126,32 @@ class FamilyRulesClient(
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
 
                 val jsonResponse = JSONObject(response)
-                val monitoredApps = jsonResponse.optJSONObject("monitoredApps")
+                val monitoredAppsJson = jsonResponse.optJSONObject("monitoredApps")
 
-                if (monitoredApps == null) {
-                    emptyList()
+                val monitoredApps: Map<String, MonitoredApp> = if (monitoredAppsJson == null) {
+                    emptyMap()
                 } else {
-                    val packages = mutableListOf<String>()
-                    val keys = monitoredApps.keys()
-                    while (keys.hasNext()) {
-                        val packageName = keys.next()
-                        packages.add(packageName)
+                    buildMap {
+                        val keys = monitoredAppsJson.keys()
+                        while (keys.hasNext()) {
+                            val packageName = keys.next()
+                            val appJson = monitoredAppsJson.optJSONObject(packageName)
+                            if (appJson != null) {
+                                val appName = appJson.optString("appName", packageName)
+                                val icon = if (appJson.isNull("iconBase64Png")) null else appJson.optString("iconBase64Png")
+                                put(packageName, MonitoredApp(appName = appName, iconBase64Png = icon))
+                            } else {
+                                put(packageName, MonitoredApp(appName = packageName, iconBase64Png = null))
+                            }
+                        }
                     }
-                    packages
                 }
+
+                Log.d("FamilyRulesClient", "Client-info returned monitored apps: $monitoredApps")
+                ClientInfoResponse(monitoredApps = monitoredApps)
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
-                emptyList()
+                ClientInfoResponse(monitoredApps = emptyMap())
             }
         }
     }

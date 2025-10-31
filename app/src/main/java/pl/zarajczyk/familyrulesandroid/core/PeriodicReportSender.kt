@@ -66,9 +66,9 @@ class PeriodicReportSender(
 
     private suspend fun sendInitialClientInfoRequest() {
         try {
-            val packages = familyRulesClient.sendClientInfoRequest()
-            if (packages.isNotEmpty()) {
-                appBlocker.setMonitoredApps(packages)
+            val response = familyRulesClient.sendClientInfoRequest()
+            if (response.monitoredApps.isNotEmpty()) {
+                appBlocker.setMonitoredApps(response.monitoredApps.keys.toList())
             }
         } catch (e: Exception) {
             Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
@@ -80,8 +80,8 @@ class PeriodicReportSender(
             try {
                 if (ScreenStatus.isScreenOn(coreService)) {
                     Log.i("PeriodicReportSender", "Sending client info request")
-                    val packages = familyRulesClient.sendClientInfoRequest()
-                    appBlocker.setMonitoredApps(packages)
+                    val response = familyRulesClient.sendClientInfoRequest()
+                    appBlocker.setMonitoredApps(response.monitoredApps.keys.toList())
                 }
             } catch (e: Exception) {
                 Log.e("PeriodicReportSender", "Failed to send client info", e)
