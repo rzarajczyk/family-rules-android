@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
                     // Keep status bar color in sync with SharedAppLayout background color
                     val bgColor = when (deviceState) {
                         DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
-                        DeviceState.BLOCK_LIMITTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
+                        DeviceState.BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
                     }
                     androidx.compose.runtime.SideEffect {
                         WindowCompat.getInsetsController(window, window.decorView).apply {

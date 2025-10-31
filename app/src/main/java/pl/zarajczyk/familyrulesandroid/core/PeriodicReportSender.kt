@@ -129,15 +129,15 @@ class PeriodicReportSender(
             when (newState) {
                 DeviceState.ACTIVE -> {
                     // Unblock apps when returning to ACTIVE state
-                    if (currentDeviceState == DeviceState.BLOCK_LIMITTED_APPS) {
-                        Log.i("PeriodicReportSender", "Unblocking limited apps")
+                    if (currentDeviceState == DeviceState.BLOCK_RESTRICTED_APPS) {
+                        Log.i("PeriodicReportSender", "Unblocking restricted apps")
                         appBlocker.unblockMonitoredApps()
                     }
                 }
 
-                DeviceState.BLOCK_LIMITTED_APPS -> {
-                    // Block apps when entering BLOCK_LIMITTED_APPS state
-                    Log.i("PeriodicReportSender", "Blocking limited apps")
+                DeviceState.BLOCK_RESTRICTED_APPS -> {
+                    // Block apps when entering BLOCK_RESTRICTED_APPS state
+                    Log.i("PeriodicReportSender", "Blocking restricted apps")
                     appBlocker.blockMonitoredApps()
                 }
             }

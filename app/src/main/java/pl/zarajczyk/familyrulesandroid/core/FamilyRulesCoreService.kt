@@ -161,7 +161,7 @@ class FamilyRulesCoreService : Service() {
         val currentState = deviceStateManager.getCurrentState()
         val notificationText = when (currentState) {
             DeviceState.ACTIVE -> "Monitoring active"
-            DeviceState.BLOCK_LIMITTED_APPS -> "Monitoring active - apps blocked"
+            DeviceState.BLOCK_RESTRICTED_APPS -> "Monitoring active - apps blocked"
         }
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
