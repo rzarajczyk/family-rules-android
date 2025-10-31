@@ -7,10 +7,13 @@ import androidx.compose.ui.graphics.Color
 
 object FamilyRulesColors {
 	val NORMAL_BACKGROUND: Color
-		@Composable get() = if (isSystemInDarkTheme()) Color(0xFF4B4B4B) else Color(0xFFEEEEEE)
+		@Composable get() = if (isSystemInDarkTheme()) Color(0xFF3B3B3B) else Color(0xFFEEEEEE)
 
 	val BLOCKING_COLOR: Color
 		@Composable get() = if (isSystemInDarkTheme()) Color(0xFF7A2A2A) else Color(0xFFFFDEDE)
+
+	val SECONDARY_BACKGROUND_COLOR: Color
+		@Composable get() = if (isSystemInDarkTheme()) Color(0xFF757575) else Color(0xFFF5F5F5)
 
 	val PERMISSION_GRANTED_COLOR: Color
 		@Composable get() = if (isSystemInDarkTheme()) Color(0xFF2E7D32) else Color(0xFFC8E6C9)

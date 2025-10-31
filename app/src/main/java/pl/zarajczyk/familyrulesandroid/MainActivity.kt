@@ -167,14 +167,14 @@ fun ScreenTimeCard(
             .fillMaxWidth()
             .padding(start = 16.dp, end=16.dp, bottom = 0.dp, top = 16.dp)
             .background(
-                color = Color.White,
+                color = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
                 shape = RoundedCornerShape(16.dp)
             )
     ) {
         Text(
             text = stringResource(R.string.screen_time, screenTime.toHMS(), settingsManager.getVersion()),
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.Black,
+            color = FamilyRulesColors.TEXT_COLOR,
             modifier = Modifier.padding(8.dp)
         )
     }
@@ -205,7 +205,7 @@ fun AppUsageCalculationInProgress() {
             Text(
                 text = stringResource(R.string.app_usage_calculation),
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.Black,
+                color = FamilyRulesColors.TEXT_COLOR,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
@@ -232,7 +232,7 @@ fun UsageStatsDisplay(
         modifier = modifier
             .padding(16.dp)
             .background(
-                color = Color.White,
+                color = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
                 shape = RoundedCornerShape(16.dp)
             )
     ) {

@@ -11,7 +11,6 @@
     <string name="password_hide">🙈</string>
     
     <!-- Protection Setup Activity -->
-    <string name="app_protection_setup">Uprawnienia aplikacji</string>
     <string name="protection_setup_description">Aby zakończyć konfigurację aplikacji, przyznaj następujące uprawnienia:</string>
     <string name="notification_permission">Wyświetlanie powiadomień</string>
     <string name="notification_permission_description">Wymagane do powiadomień aplikacji i działania w tle</string>

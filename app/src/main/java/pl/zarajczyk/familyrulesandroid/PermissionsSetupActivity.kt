@@ -197,13 +197,6 @@ fun ProtectionSetupContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = stringResource(R.string.app_protection_setup),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = FamilyRulesColors.TEXT_COLOR
-        )
-        
-        Text(
             text = stringResource(R.string.protection_setup_description),
             style = MaterialTheme.typography.bodyLarge,
             color = FamilyRulesColors.TEXT_COLOR
