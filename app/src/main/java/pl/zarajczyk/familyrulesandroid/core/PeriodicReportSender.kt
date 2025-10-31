@@ -64,10 +64,15 @@ class PeriodicReportSender(
         }
     }
 
-    private suspend fun sendInitialClientInfoRequest() = try {
-        familyRulesClient.sendClientInfoRequest()
-    } catch (e: Exception) {
-        Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
+    private suspend fun sendInitialClientInfoRequest() {
+        try {
+            val packages = familyRulesClient.sendClientInfoRequest()
+            if (packages.isNotEmpty()) {
+                appBlocker.setMonitoredApps(packages)
+            }
+        } catch (e: Exception) {
+            Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
+        }
     }
 
     private suspend fun runClientInfoInfiniteLoop(isActive: () -> Boolean) {
@@ -75,7 +80,8 @@ class PeriodicReportSender(
             try {
                 if (ScreenStatus.isScreenOn(coreService)) {
                     Log.i("PeriodicReportSender", "Sending client info request")
-                    familyRulesClient.sendClientInfoRequest()
+                    val packages = familyRulesClient.sendClientInfoRequest()
+                    appBlocker.setMonitoredApps(packages)
                 }
             } catch (e: Exception) {
                 Log.e("PeriodicReportSender", "Failed to send client info", e)
@@ -125,14 +131,14 @@ class PeriodicReportSender(
                     // Unblock apps when returning to ACTIVE state
                     if (currentDeviceState == DeviceState.BLOCK_LIMITTED_APPS) {
                         Log.i("PeriodicReportSender", "Unblocking limited apps")
-                        appBlocker.unblockLimitedApps()
+                        appBlocker.unblockMonitoredApps()
                     }
                 }
 
                 DeviceState.BLOCK_LIMITTED_APPS -> {
                     // Block apps when entering BLOCK_LIMITTED_APPS state
                     Log.i("PeriodicReportSender", "Blocking limited apps")
-                    appBlocker.blockLimitedApps()
+                    appBlocker.blockMonitoredApps()
                 }
             }
 

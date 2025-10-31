@@ -22,7 +22,7 @@ class FamilyRulesClient(
     private val appDb: AppDb
 ) {
 
-    suspend fun sendClientInfoRequest() {
+    suspend fun sendClientInfoRequest(): List<String> {
         val serverUrl = settingsManager.getString("serverUrl", "")
         val instanceId = settingsManager.getString("instanceId", "")
         val instanceToken = settingsManager.getString("instanceToken", "")
@@ -85,7 +85,7 @@ class FamilyRulesClient(
 
         Log.d("FamilyRulesClient", "Sending client-info request: $json")
 
-        withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             try {
                 val url = URL("$serverUrl/api/v2/client-info")
                 val connection = url.openConnection() as HttpURLConnection
@@ -111,12 +111,28 @@ class FamilyRulesClient(
                         connection.errorStream?.bufferedReader()?.use { it.readText() }
                             ?: "No error response body"
                     throw RuntimeException("Server returned HTTP $responseCode - $errorResponse")
-                } else {
-                    Log.d("FamilyRulesClient", "Client-info request successful")
                 }
-                "ok"
+
+                // Read and parse the response
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+
+                val jsonResponse = JSONObject(response)
+                val monitoredApps = jsonResponse.optJSONObject("monitoredApps")
+
+                if (monitoredApps == null) {
+                    emptyList()
+                } else {
+                    val packages = mutableListOf<String>()
+                    val keys = monitoredApps.keys()
+                    while (keys.hasNext()) {
+                        val packageName = keys.next()
+                        packages.add(packageName)
+                    }
+                    packages
+                }
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
+                emptyList()
             }
         }
     }

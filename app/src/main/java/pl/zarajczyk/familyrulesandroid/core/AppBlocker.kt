@@ -1,45 +1,47 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.content.Context
 import android.util.Log
 
 class AppBlocker(coreService: FamilyRulesCoreService) {
 
     private var foregroundAppMonitor: ForegroundAppMonitor = ForegroundAppMonitor(coreService)
     
-    // Hardcoded list of apps to block when BLOCK_LIMITTED_APPS state is active
-    private val blockedApps = listOf(
-        "com.android.chrome"
-    )
+    // Dynamic list of packages to block, received from server
+    private var packagesToBlock: List<String> = emptyList()
+    
+    fun setMonitoredApps(packages: List<String>) {
+        packagesToBlock = packages
+        Log.i("AppBlocker", "Updated packages to block: $packagesToBlock")
+    }
     
     /**
      * Block all apps in the blockedApps list
      */
-    fun blockLimitedApps() {
-        Log.i("AppBlocker", "Starting to block limited apps: $blockedApps")
-        blockedApps.forEach { packageName ->
+    fun blockMonitoredApps() {
+        Log.i("AppBlocker", "Starting to block monitored apps: $packagesToBlock")
+        packagesToBlock.forEach { packageName ->
             blockedAppsState.add(packageName)
         }
 
         // Start monitoring foreground apps
         startForegroundAppMonitoring()
         
-        Log.i("AppBlocker", "Completed blocking limited apps: $blockedApps")
+        Log.i("AppBlocker", "Completed blocking monitored apps: $packagesToBlock")
     }
     
     /**
      * Unblock all apps in the blockedApps list
      */
-    fun unblockLimitedApps() {
-        Log.i("AppBlocker", "Starting to unblock limited apps: $blockedApps")
-        blockedApps.forEach { packageName ->
+    fun unblockMonitoredApps() {
+        Log.i("AppBlocker", "Starting to unblock monitored apps: $packagesToBlock")
+        packagesToBlock.forEach { packageName ->
             blockedAppsState.remove(packageName)
         }
 
         // Stop monitoring foreground apps
         stopForegroundAppMonitoring()
         
-        Log.i("AppBlocker", "Completed unblocking limited apps: $blockedApps")
+        Log.i("AppBlocker", "Completed unblocking monitored apps: $packagesToBlock")
     }
 
     /**
@@ -52,7 +54,7 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
      * Start monitoring foreground apps for blocking
      */
     private fun startForegroundAppMonitoring() {
-        foregroundAppMonitor.startMonitoring(blockedApps)
+        foregroundAppMonitor.startMonitoring(packagesToBlock)
         Log.i("AppBlocker", "Started foreground app monitoring")
     }
     
