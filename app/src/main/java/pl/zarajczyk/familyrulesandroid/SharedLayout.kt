@@ -75,7 +75,7 @@ fun SharedAppLayout(
                     Text(
                         text = stringResource(R.string.family_rules),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = Color.Black,
+                        color = FamilyRulesColors.TEXT_COLOR,
                         modifier = Modifier.padding(top = 16.dp)
                     )
                 }
@@ -113,7 +113,7 @@ fun SharedAppLayout(
                         Text(
                             text = stringResource(R.string.family_rules),
                             style = MaterialTheme.typography.headlineMedium,
-                            color = Color.Black,
+                            color = FamilyRulesColors.TEXT_COLOR,
                             modifier = Modifier.padding(top = 16.dp)
                         )
                         Spacer(modifier = Modifier.weight(1f))

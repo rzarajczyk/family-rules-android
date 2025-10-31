@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,10 +86,9 @@ class PermissionsSetupActivity : ComponentActivity() {
         deviceAdminManager = DeviceAdminManager(this)
         permissionChecker = PermissionsChecker(this)
 
-        window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
-        
         setContent {
             FamilyRulesAndroidTheme {
+                window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
                 SharedAppLayout {
                     ProtectionSetupContent(
                         deviceAdminManager = deviceAdminManager,
