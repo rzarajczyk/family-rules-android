@@ -1,6 +1,7 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.usage.UsageEvents
+import java.util.LinkedList
 
 class PackageUsageCalculator : SystemEventProcessor {
     fun getTodayPackageUsage(): Map<String, Long> {
@@ -21,20 +22,23 @@ class PackageUsageCalculator : SystemEventProcessor {
         val eventsPerPackage = events.groupBy { it.packageName }
 
         eventsPerPackage.forEach { (packageName, events) ->
-            var packageLifecycleEvents = events.toPackageLifecycleEvents()
+            val packageLifecycleEvents = LinkedList(events.toPackageLifecycleEvents())
 
             if (packageLifecycleEvents.isEmpty()) {
                 return@forEach
             }
 
             if (packageLifecycleEvents.first().state == State.STOPPING) {
-                packageLifecycleEvents =
-                    listOf(PackageLifecycleEvent(State.STARTING, start)) + packageLifecycleEvents
+                packageLifecycleEvents.add(
+                    index = 0,
+                    PackageLifecycleEvent(State.STARTING, start)
+                )
             }
 
             if (packageLifecycleEvents.last().state == State.STARTING) {
-                packageLifecycleEvents =
-                    packageLifecycleEvents + PackageLifecycleEvent(State.STOPPING, end)
+                packageLifecycleEvents.add(
+                    PackageLifecycleEvent(State.STOPPING, end)
+                )
             }
 
             val totalTime = packageLifecycleEvents
