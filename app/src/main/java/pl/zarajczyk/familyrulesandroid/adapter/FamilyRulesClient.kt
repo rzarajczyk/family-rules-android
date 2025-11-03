@@ -7,6 +7,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import retrofit2.Retrofit
@@ -52,8 +54,7 @@ class FamilyRulesClient(
         }
     }
 
-
-    private fun buildFamilyRulesApiService(): FamilyRulesApiService {
+    private val apiService: FamilyRulesApiService by lazy {
         val serverUrlRaw = settingsManager.getString("serverUrl", "")
         val baseUrl = if (serverUrlRaw.endsWith("/")) serverUrlRaw else "$serverUrlRaw/"
         val instanceId = settingsManager.getString("instanceId", "")
@@ -75,13 +76,17 @@ class FamilyRulesClient(
             .followRedirects(true)
             .build()
 
+        val moshi = Moshi.Builder()
+            .add(KotlinJsonAdapterFactory())
+            .build()
+
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
-            .addConverterFactory(MoshiConverterFactory.create())
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
 
-        return retrofit.create(FamilyRulesApiService::class.java)
+        retrofit.create(FamilyRulesApiService::class.java)
     }
 
     suspend fun sendClientInfoRequest(): ClientInfoResponse {
@@ -107,8 +112,7 @@ class FamilyRulesClient(
 
         return withContext(Dispatchers.IO) {
             try {
-                val api = buildFamilyRulesApiService()
-                val response = api.sendClientInfo(request)
+                val response = apiService.sendClientInfo(request)
                 val restrictedApps = response.restrictedApps ?: emptyMap()
                 Log.d(
                     "FamilyRulesClient",
@@ -136,8 +140,7 @@ class FamilyRulesClient(
 
         return withContext(Dispatchers.IO) {
             try {
-                val api = buildFamilyRulesApiService()
-                val response = api.report(request)
+                val response = apiService.report(request)
                 DeviceState.valueOf(response.deviceState)
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)

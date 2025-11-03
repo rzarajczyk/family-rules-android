@@ -17,8 +17,8 @@ class SettingsManager(context: Context) {
         return preferences.getString(key, defaultValue)!!
     }
 
-    fun getString(key: String, defaultValue: String? = null): String? {
-        return preferences.getString(key, defaultValue)
+    fun getString(key: String): String? {
+        return preferences.getString(key, null)
     }
 
     fun setString(key: String, value: String) {
