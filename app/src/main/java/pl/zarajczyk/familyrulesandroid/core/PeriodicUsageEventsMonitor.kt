@@ -10,17 +10,21 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 interface SystemEventProcessor {
     fun reset()
-    fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long)
+    fun processEventBatch(events: List<Event>, start: Long, end: Long)
 }
+
+data class Event(
+    val timestamp: Long,
+    val packageName: String,
+    val eventType: Int
+)
 
 class PeriodicUsageEventsMonitor(
     private val context: Context,
@@ -31,7 +35,8 @@ class PeriodicUsageEventsMonitor(
     companion object {
         fun install(context: Context, delayDuration: Duration, processors: List<SystemEventProcessor>): PeriodicUsageEventsMonitor {
             val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            return PeriodicUsageEventsMonitor(context, manager, delayDuration, processors).also { it.start() }
+            return PeriodicUsageEventsMonitor(context, manager, delayDuration, processors)
+                .also { it.start() }
         }
     }
 
@@ -83,20 +88,29 @@ class PeriodicUsageEventsMonitor(
 
         Log.d(
             "PeriodicUsageEventsMonitor",
-            "Querying events from $start to $end (incremental: ${lastProcessedTimestamp != 0L})"
+            "Querying events from $start (${Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault())}) to $end (${Instant.ofEpochMilli(end).atZone(ZoneId.systemDefault())})"
         )
 
-        val events = mutableListOf<UsageEvents.Event>()
+        val events = mutableListOf<Event>()
         // Query the list of events that has happened within that time frame
         val systemEvents = usageManager.queryEvents(start, end)
-        while (systemEvents.hasNextEvent()) {
-            val event = UsageEvents.Event()
-            systemEvents.getNextEvent(event)
-            events.add(event)
+        if (systemEvents != null) {
+            while (systemEvents.hasNextEvent()) {
+                val event = UsageEvents.Event()
+                val result = systemEvents.getNextEvent(event)
+                if (!result) {
+                    Log.w("PeriodicUsageEventsMonitor", "getNextEvent returned false")
+                }
+                events.add(Event(
+                    timestamp = event.timeStamp,
+                    packageName = event.packageName,
+                    eventType = event.eventType
+                ))
+            }
         }
 
         if (events.isNotEmpty()) {
-            lastProcessedTimestamp = events.last().timeStamp
+            lastProcessedTimestamp = events.last().timestamp
         }
 
         processors.forEach {

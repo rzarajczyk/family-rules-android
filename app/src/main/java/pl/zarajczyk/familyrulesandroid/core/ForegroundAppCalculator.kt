@@ -17,7 +17,7 @@ class ForegroundAppCalculator : SystemEventProcessor {
     override fun reset() {
     }
 
-    override fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
+    override fun processEventBatch(events: List<Event>, start: Long, end: Long) {
         val packageLifecycleEvents = events.toPackageLifecycleEvents()
 
         if (packageLifecycleEvents.isEmpty()) {
@@ -38,26 +38,26 @@ class ForegroundAppCalculator : SystemEventProcessor {
         Log.d("ForegroundAppCalculator", "Foreground app: $foregroundApp")
     }
 
-    private fun List<UsageEvents.Event>.toPackageLifecycleEvents(): List<PackageLifecycleEvent> =
+    private fun List<Event>.toPackageLifecycleEvents(): List<PackageLifecycleEvent> =
         this
             .mapNotNull {
                 when (it.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> PackageLifecycleEvent(
                         State.STARTING,
                         it.packageName,
-                        it.timeStamp
+                        it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_PAUSED -> PackageLifecycleEvent(
                         State.STOPPING,
                         it.packageName,
-                        it.timeStamp
+                        it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_STOPPED -> PackageLifecycleEvent(
                         State.STOPPING,
                         it.packageName,
-                        it.timeStamp
+                        it.timestamp
                     )
 
                     else -> null

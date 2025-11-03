@@ -17,7 +17,7 @@ class PackageUsageCalculator : SystemEventProcessor {
         todayPackageUsage = mutableMapOf()
     }
 
-    override fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
+    override fun processEventBatch(events: List<Event>, start: Long, end: Long) {
         val eventsPerPackage = events.groupBy { it.packageName }
 
         eventsPerPackage.forEach { (packageName, events) ->
@@ -50,23 +50,23 @@ class PackageUsageCalculator : SystemEventProcessor {
 
     }
 
-    private fun List<UsageEvents.Event>.toPackageLifecycleEvents(): List<PackageLifecycleEvent> =
+    private fun List<Event>.toPackageLifecycleEvents(): List<PackageLifecycleEvent> =
         this
             .mapNotNull {
                 when (it.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> PackageLifecycleEvent(
                         State.STARTING,
-                        it.timeStamp
+                        it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_PAUSED -> PackageLifecycleEvent(
                         State.STOPPING,
-                        it.timeStamp
+                        it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_STOPPED -> PackageLifecycleEvent(
                         State.STOPPING,
-                        it.timeStamp
+                        it.timestamp
                     )
 
                     else -> null

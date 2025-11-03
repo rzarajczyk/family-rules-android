@@ -1,6 +1,8 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.usage.UsageEvents
+import android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE
+import android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE
 import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_OFF
 import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_ON
 
@@ -19,7 +21,7 @@ class ScreenTimeCalculator : SystemEventProcessor {
         todayScreenTime = 0L
     }
 
-    override fun processEventBatch(events: List<UsageEvents.Event>, start: Long, end: Long) {
+    override fun processEventBatch(events: List<Event>, start: Long, end: Long) {
         var screenEvents = events.toScreenEvents()
 
         if (screenEvents.isEmpty()) {
@@ -41,11 +43,11 @@ class ScreenTimeCalculator : SystemEventProcessor {
         todayScreenTime += batchScreenOnTime
     }
 
-    private fun List<UsageEvents.Event>.toScreenEvents(): List<ScreenEvent> =
+    private fun List<Event>.toScreenEvents(): List<ScreenEvent> =
         this.mapNotNull {
             when (it.eventType) {
-                UsageEvents.Event.SCREEN_INTERACTIVE -> ScreenEvent(TURNING_ON, it.timeStamp)
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> ScreenEvent(TURNING_OFF, it.timeStamp)
+                SCREEN_INTERACTIVE -> ScreenEvent(TURNING_ON, it.timestamp)
+                SCREEN_NON_INTERACTIVE -> ScreenEvent(TURNING_OFF, it.timestamp)
                 else -> null
             }
         }.fold(mutableListOf()) { acc, event ->
