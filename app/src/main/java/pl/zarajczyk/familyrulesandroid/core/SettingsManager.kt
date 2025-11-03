@@ -13,7 +13,11 @@ class SettingsManager(context: Context) {
         ?.trim()
         ?: "v?.?"
 
-    fun getString(key: String, defaultValue: String?): String? {
+    fun getString(key: String, defaultValue: String): String {
+        return preferences.getString(key, defaultValue)!!
+    }
+
+    fun getString(key: String, defaultValue: String? = null): String? {
         return preferences.getString(key, defaultValue)
     }
 
@@ -22,15 +26,11 @@ class SettingsManager(context: Context) {
     }
 
     fun areSettingsComplete(): Boolean {
-        return getString("serverUrl", null) != null &&
-                getString("username", null) != null &&
-                getString("instanceId", null) != null &&
-                getString("instanceName", null) != null &&
-                getString("instanceToken", null) != null
-    }
-
-    fun clearSettings() {
-        preferences.edit { clear() }
+        return getString("serverUrl") != null &&
+                getString("username") != null &&
+                getString("instanceId") != null &&
+                getString("instanceName") != null &&
+                getString("instanceToken") != null
     }
 
     fun getVersion(): String {
