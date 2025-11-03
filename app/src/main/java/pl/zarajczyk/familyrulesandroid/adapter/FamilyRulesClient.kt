@@ -18,10 +18,10 @@ data class Uptime(
 )
 
 data class ClientInfoResponse(
-    val restrictedApps: Map<String, App>
+    val restrictedApps: Map<String, AppDetails>
 )
 
-data class App(
+data class AppDetails(
     val appName: String,
     val iconBase64Png: String?
 )
@@ -39,17 +39,13 @@ class FamilyRulesClient(
 
         // Get known apps from AppDb
         val knownApps = JSONObject()
-        try {
-            val allAppInfo = appDb.getAllAppInfo()
-            allAppInfo.forEach { appInfo ->
-                val appData = JSONObject().apply {
-                    put("appName", appInfo.appName)
-                    put("iconBase64Png", appInfo.iconBase64 ?: JSONObject.NULL)
-                }
-                knownApps.put(appInfo.packageName, appData)
+        val allAppInfo = appDb.getAllAppInfo()
+        allAppInfo.forEach { appInfo ->
+            val appData = JSONObject().apply {
+                put("appName", appInfo.appName)
+                put("iconBase64Png", appInfo.iconBase64 ?: JSONObject.NULL)
             }
-        } catch (e: Exception) {
-            Log.e("FamilyRulesClient", "Failed to get known apps: ${e.message}", e)
+            knownApps.put(appInfo.packageName, appData)
         }
 
         val json = JSONObject().apply {
@@ -128,7 +124,7 @@ class FamilyRulesClient(
                 val jsonResponse = JSONObject(response)
                 val restrictedAppsJson = jsonResponse.optJSONObject("restrictedApps")
 
-                val restrictedApps: Map<String, App> = if (restrictedAppsJson == null) {
+                val restrictedApps: Map<String, AppDetails> = if (restrictedAppsJson == null) {
                     emptyMap()
                 } else {
                     buildMap {
@@ -139,9 +135,9 @@ class FamilyRulesClient(
                             if (appJson != null) {
                                 val appName = appJson.optString("appName", packageName)
                                 val icon = if (appJson.isNull("iconBase64Png")) null else appJson.optString("iconBase64Png")
-                                put(packageName, App(appName = appName, iconBase64Png = icon))
+                                put(packageName, AppDetails(appName = appName, iconBase64Png = icon))
                             } else {
-                                put(packageName, App(appName = packageName, iconBase64Png = null))
+                                put(packageName, AppDetails(appName = packageName, iconBase64Png = null))
                             }
                         }
                     }
