@@ -12,7 +12,7 @@ class PackageUsageCalculator : SystemEventProcessor {
     private var todayPackageUsage = mutableMapOf<String, Long>()
 
     private enum class State { STARTING, STOPPING }
-    private data class PackageLifecycleEvent(val state: State, val timestamp: Long)
+    private data class PackageLifecycleEvent(val state: State, val packageName: String, val timestamp: Long)
 
     override fun reset() {
         todayPackageUsage = mutableMapOf()
@@ -31,13 +31,13 @@ class PackageUsageCalculator : SystemEventProcessor {
             if (packageLifecycleEvents.first().state == State.STOPPING) {
                 packageLifecycleEvents.add(
                     index = 0,
-                    PackageLifecycleEvent(State.STARTING, start)
+                    PackageLifecycleEvent(State.STARTING, packageName, start)
                 )
             }
 
             if (packageLifecycleEvents.last().state == State.STARTING) {
                 packageLifecycleEvents.add(
-                    PackageLifecycleEvent(State.STOPPING, end)
+                    PackageLifecycleEvent(State.STOPPING, packageName, end)
                 )
             }
 
@@ -60,16 +60,19 @@ class PackageUsageCalculator : SystemEventProcessor {
                 when (it.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> PackageLifecycleEvent(
                         State.STARTING,
+                        it.packageName,
                         it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_PAUSED -> PackageLifecycleEvent(
                         State.STOPPING,
+                        it.packageName,
                         it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_STOPPED -> PackageLifecycleEvent(
                         State.STOPPING,
+                        it.packageName,
                         it.timestamp
                     )
 
