@@ -13,7 +13,8 @@ data class AvailableState(
     val deviceState: String,
     val title: String,
     val icon: String,
-    val description: String
+    val description: String,
+    val arguments: Set<String>?
 )
 
 data class ClientInfoRequest(
