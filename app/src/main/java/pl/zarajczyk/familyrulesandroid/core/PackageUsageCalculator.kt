@@ -1,6 +1,8 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.usage.UsageEvents
+import android.util.Log
+import java.time.Instant
 import java.util.LinkedList
 
 class PackageUsageCalculator : SystemEventProcessor {
@@ -55,19 +57,32 @@ class PackageUsageCalculator : SystemEventProcessor {
                         index = 0,
                         PackageLifecycleEvent(State.STARTING, packageName, start)
                     )
+//                    if (packageName == "com.android.settings")
+//                        Log.i("PackageUsageCalculator", "Adding initial starting event for package: $packageName")
                 }
 
                 if (packageLifecycleEventsPerPackage.last().state == State.STARTING) {
                     packageLifecycleEventsPerPackage.add(
                         PackageLifecycleEvent(State.STOPPING, packageName, end)
                     )
+//                    if (packageName == "com.android.settings")
+//                        Log.i("PackageUsageCalculator", "Adding final stopping event for package: $packageName")
                 }
 
                 val totalTime = packageLifecycleEventsPerPackage
                     .chunked(2)
                     .sumOf {
-                        it.last().timestamp - it.first().timestamp
+                        val sum = it.last().timestamp - it.first().timestamp
+//                        if (packageName == "com.android.settings") {
+//                            Log.i(
+//                                "PackageUsageCalculator",
+//                                " - adding time for package $packageName: $sum (${Instant.ofEpochMilli(it.first().timestamp)} - ${Instant.ofEpochMilli(it.last().timestamp)})"
+//                            )
+//                        }
+                        sum
                     }
+
+//                Log.i("PackageUsageCalculator", "Total time for package $packageName: $totalTime")
 
                 todayPackageUsage[packageName] =
                     todayPackageUsage[packageName]?.let { it + totalTime }
