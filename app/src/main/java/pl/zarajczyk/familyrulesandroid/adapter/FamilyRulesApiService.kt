@@ -35,7 +35,8 @@ data class ClientInfoResponseDto(
 )
 
 data class ReportResponseDto(
-    val deviceState: String
+    val deviceState: String,
+    val extra: String?
 )
 
 interface FamilyRulesApiService {

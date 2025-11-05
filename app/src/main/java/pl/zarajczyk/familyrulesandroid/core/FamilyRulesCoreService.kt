@@ -96,6 +96,7 @@ class FamilyRulesCoreService : Service() {
     fun resetPeriodicUsageEventsMonitor() {
         periodicUsageEventsMonitor.reset()
         periodicReportSender.reportUptimeAsync()
+        periodicReportSender.sendClientInfoAsync()
     }
 
     override fun onCreate() {
