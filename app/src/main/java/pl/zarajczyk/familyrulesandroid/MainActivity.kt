@@ -50,6 +50,7 @@ import pl.zarajczyk.familyrulesandroid.utils.toHMS
 import kotlinx.coroutines.delay
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import android.content.ServiceConnection
+import androidx.compose.runtime.mutableLongStateOf
 
 
 class MainActivity : ComponentActivity() {
@@ -115,11 +116,11 @@ class MainActivity : ComponentActivity() {
 
                         // Track usage/screenTime and poll until calculated
                         var usageStatsListState by remember { mutableStateOf(service.getTodayPackageUsage()) }
-                        var screenTimeState by remember { mutableStateOf(service.getTodayScreenTime()) }
+                        var screenTimeState by remember { mutableLongStateOf(service.getTodayScreenTime()) }
 
-                        LaunchedEffect(usageStatsListState.isEmpty() && screenTimeState == 0L) {
-                            if (usageStatsListState.isEmpty() && screenTimeState == 0L) {
-                                while (usageStatsListState.isEmpty() && screenTimeState == 0L) {
+                        LaunchedEffect(usageStatsListState.isEmpty() || screenTimeState == 0L) {
+                            if (usageStatsListState.isEmpty() || screenTimeState == 0L) {
+                                while (usageStatsListState.isEmpty() || screenTimeState == 0L) {
                                     delay(1000)
                                     usageStatsListState = service.getTodayPackageUsage()
                                     screenTimeState = service.getTodayScreenTime()
