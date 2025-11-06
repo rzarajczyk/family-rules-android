@@ -141,9 +141,25 @@ class PeriodicReportSender(
                 }
 
                 DeviceState.BLOCK_RESTRICTED_APPS -> {
-                    // Block apps when entering BLOCK_RESTRICTED_APPS state
-                    Log.i("PeriodicReportSender", "Blocking restricted apps")
-                    appBlocker.block()
+                    // Block apps when entering BLOCK_RESTRICTED_APPS state for the first time
+                    if (currentDeviceState != newState) {
+                        val appGroupId = newState.extra
+                        if (appGroupId != null) {
+                            Log.i("PeriodicReportSender", "Fetching apps for group: $appGroupId")
+                            scope.launch {
+                                try {
+                                    val appList = familyRulesClient.getAppGroupReport(appGroupId)
+                                    appBlocker.setRestrictedApps(appList)
+                                    appBlocker.block()
+                                    Log.i("PeriodicReportSender", "Blocking ${appList.size} restricted apps")
+                                } catch (e: Exception) {
+                                    Log.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
+                                }
+                            }
+                        } else {
+                            Log.w("PeriodicReportSender", "No appGroupId provided in BLOCK_RESTRICTED_APPS state")
+                        }
+                    }
                 }
             }
 

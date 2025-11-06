@@ -153,6 +153,27 @@ class FamilyRulesClient(
             }
         }
     }
+
+    suspend fun getAppGroupReport(appGroupId: String): List<String> {
+        val request = AppGroupReportRequest(appGroupId = appGroupId)
+
+        Log.d("FamilyRulesClient", "Fetching app group report for group: $appGroupId")
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.groupReport(request)
+                val appPackages = response.apps.keys.toList()
+                Log.d(
+                    "FamilyRulesClient",
+                    "App group report returned ${appPackages.size} apps: $appPackages"
+                )
+                appPackages
+            } catch (e: Exception) {
+                Log.e("FamilyRulesClient", "Failed to fetch app group report: ${e.message}", e)
+                emptyList()
+            }
+        }
+    }
 }
 
 enum class DeviceState {

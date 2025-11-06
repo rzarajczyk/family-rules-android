@@ -40,12 +40,29 @@ data class ReportResponseDto(
     val extra: String?
 )
 
+data class AppGroupReportRequest(
+    val appGroupId: String
+)
+
+data class AppGroupReportResponse(
+    val appGroupId: String,
+    val apps: Map<String, App>
+)
+
+data class App(
+    val appName: String,
+    val iconBase64Png: String?
+)
+
 interface FamilyRulesApiService {
     @POST("/api/v2/client-info")
     suspend fun sendClientInfo(@Body body: ClientInfoRequest): ClientInfoResponseDto
 
     @POST("/api/v2/report")
     suspend fun report(@Body body: ReportRequest): ReportResponseDto
+
+    @POST("/api/v2/group-report")
+    suspend fun groupReport(@Body body: AppGroupReportRequest): AppGroupReportResponse
 }
 
 
