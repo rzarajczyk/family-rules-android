@@ -1,6 +1,7 @@
 package pl.zarajczyk.familyrulesandroid.entrypoints
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
@@ -12,12 +13,18 @@ import kotlin.time.Duration
 
 class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
     Worker(context, params) {
+    
     override fun doWork(): Result {
-        FamilyRulesCoreService.install(context)
+        if (!FamilyRulesCoreService.isServiceRunning(context)) {
+            FamilyRulesCoreService.install(context)
+        }
+        
         return Result.success()
     }
 
     companion object {
+        private const val TAG = "KeepAliveWorker"
+        
         fun install(context: Context, delayDuration: Duration) {
             val workRequest: PeriodicWorkRequest =
                 PeriodicWorkRequest.Builder(

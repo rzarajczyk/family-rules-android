@@ -1,6 +1,8 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.Context
+import android.os.Build
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,12 +13,15 @@ import kotlin.time.Duration
 
 class KeepAliveBackgroundLoop {
     companion object {
+        private const val TAG = "KeepAliveBackgroundLoop"
         private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
         fun install(context: Context, delayDuration: Duration) {
             scope.launch {
                 while (isActive) {
-                    FamilyRulesCoreService.install(context)
+                    if (!FamilyRulesCoreService.isServiceRunning(context)) {
+                        FamilyRulesCoreService.install(context)
+                    }
                     delay(delayDuration)
                 }
             }

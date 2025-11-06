@@ -1,5 +1,6 @@
 package pl.zarajczyk.familyrulesandroid.core
 
+import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -10,7 +11,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
@@ -36,16 +39,48 @@ class FamilyRulesCoreService : Service() {
     companion object {
         const val CHANNEL_ID = "FamilyRulesChannel"
         const val NOTIFICATION_ID = 1001
+        private const val TAG = "FamilyRulesCoreService"
 
         private lateinit var notificationManager: NotificationManager
 
         fun install(context: Context) {
             if (!this::notificationManager.isInitialized) {
-                notificationManager = context.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             }
-            if (!isNotificationAlive()) {
+            
+            try {
                 val serviceIntent = Intent(context, FamilyRulesCoreService::class.java)
                 context.startForegroundService(serviceIntent)
+                Log.d(TAG, "Service start requested")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start service: ${e.message}", e)
+                // If startForegroundService fails, the service should auto-restart via START_STICKY
+                // when the system allows it
+            }
+        }
+
+        /**
+         * Checks if the service is actually running (not just if notification exists)
+         */
+        fun isServiceRunning(context: Context): Boolean {
+            // First check notification (fast check)
+            if (!this::notificationManager.isInitialized) {
+                notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            }
+            if (isNotificationAlive()) {
+                return true
+            }
+            
+            // Then check if service process is actually running
+            // Note: getRunningServices is deprecated but still functional for this use case
+            // Alternative would be to use ServiceConnection binding, but that's more complex
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            val runningServices = activityManager.getRunningServices(Integer.MAX_VALUE)
+            val serviceClassName = FamilyRulesCoreService::class.java.name
+            
+            return runningServices.any { serviceInfo ->
+                serviceInfo.service.className == serviceClassName
             }
         }
 
