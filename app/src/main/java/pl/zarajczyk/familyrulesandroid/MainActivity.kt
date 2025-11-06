@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
                         // Use the reactive state flow for device state
                         val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
                         // Keep status bar color in sync with SharedAppLayout background color
-                        val bgColor = when (deviceState) {
+                        val bgColor = when (deviceState.state) {
                             DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
                             DeviceState.BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
                         }
@@ -133,7 +133,7 @@ class MainActivity : ComponentActivity() {
                             screenTime = screenTimeState,
                             settingsManager = settingsManager,
                             appDb = appDb,
-                            deviceState = deviceState
+                            deviceState = deviceState.state
                         )
                     }
                 }

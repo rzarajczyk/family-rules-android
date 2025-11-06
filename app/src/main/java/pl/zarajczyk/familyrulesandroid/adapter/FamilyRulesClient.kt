@@ -131,7 +131,7 @@ class FamilyRulesClient(
         }
     }
 
-    suspend fun reportUptime(uptime: Uptime): DeviceState {
+    suspend fun reportUptime(uptime: Uptime): ActualDeviceState {
         val instanceId = settingsManager.getString("instanceId", "")
 
         val applications: Map<String, Long> = uptime.packageUsages.mapValues { it.value / 1000 }
@@ -146,10 +146,10 @@ class FamilyRulesClient(
         return withContext(Dispatchers.IO) {
             try {
                 val response = apiService.report(request)
-                DeviceState.valueOf(response.deviceState)
+                ActualDeviceState.from(response)
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
-                DeviceState.ACTIVE
+                ActualDeviceState.ACTIVE
             }
         }
     }
@@ -158,4 +158,21 @@ class FamilyRulesClient(
 enum class DeviceState {
     ACTIVE,
     BLOCK_RESTRICTED_APPS
+}
+
+data class ActualDeviceState(
+    val state: DeviceState,
+    val extra: String?
+) {
+    companion object {
+        val ACTIVE = ActualDeviceState(DeviceState.ACTIVE, null)
+        fun from(responseDto: ReportResponseDto) = when (responseDto.deviceState) {
+            "ACTIVE" -> ACTIVE
+            "BLOCK_RESTRICTED_APPS" -> ActualDeviceState(
+                DeviceState.BLOCK_RESTRICTED_APPS,
+                responseDto.extra
+            )
+            else -> throw IllegalArgumentException("Unknown device state: ${responseDto.deviceState}")
+        }
+    }
 }

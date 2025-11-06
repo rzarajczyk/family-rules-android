@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import pl.zarajczyk.familyrulesandroid.adapter.ActualDeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.adapter.Uptime
@@ -23,7 +24,7 @@ class PeriodicReportSender(
 
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var currentDeviceState: DeviceState = DeviceState.ACTIVE
+    private var currentDeviceState: ActualDeviceState = ActualDeviceState.ACTIVE
 
     companion object {
         fun install(
@@ -123,17 +124,17 @@ class PeriodicReportSender(
         handleDeviceStateChange(response)
     }
 
-    private fun handleDeviceStateChange(newState: DeviceState) {
+    private fun handleDeviceStateChange(newState: ActualDeviceState) {
         if (currentDeviceState != newState) {
             Log.i(
                 "PeriodicReportSender",
                 "Device state changed from $currentDeviceState to $newState"
             )
 
-            when (newState) {
+            when (newState.state) {
                 DeviceState.ACTIVE -> {
                     // Unblock apps when returning to ACTIVE state
-                    if (currentDeviceState == DeviceState.BLOCK_RESTRICTED_APPS) {
+                    if (currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS) {
                         Log.i("PeriodicReportSender", "Unblocking restricted apps")
                         appBlocker.unblock()
                     }

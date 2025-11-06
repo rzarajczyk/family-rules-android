@@ -17,6 +17,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.adapter.ActualDeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.entrypoints.ScreenOffReceiver
@@ -120,7 +121,7 @@ class FamilyRulesCoreService : Service() {
 
     fun getDeviceStateFlow() = deviceStateManager.currentState
 
-    fun updateDeviceState(newState: DeviceState) {
+    fun updateDeviceState(newState: ActualDeviceState) {
         val currentState = deviceStateManager.getCurrentState()
         if (currentState != newState) {
             deviceStateManager.updateState(newState)
@@ -194,7 +195,7 @@ class FamilyRulesCoreService : Service() {
         )
 
         val currentState = deviceStateManager.getCurrentState()
-        val notificationText = when (currentState) {
+        val notificationText = when (currentState.state) {
             DeviceState.ACTIVE -> "Monitoring active"
             DeviceState.BLOCK_RESTRICTED_APPS -> "Monitoring active - apps blocked"
         }
