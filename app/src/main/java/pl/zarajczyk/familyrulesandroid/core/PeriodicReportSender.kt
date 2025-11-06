@@ -67,10 +67,7 @@ class PeriodicReportSender(
 
     private suspend fun sendInitialClientInfoRequest() {
         try {
-            val response = familyRulesClient.sendClientInfoRequest()
-            if (response.restrictedApps.isNotEmpty()) {
-                appBlocker.setRestrictedApps(response.restrictedApps.keys.toList())
-            }
+            familyRulesClient.sendClientInfoRequest()
         } catch (e: Exception) {
             Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
         }
@@ -81,8 +78,7 @@ class PeriodicReportSender(
             try {
                 if (ScreenStatus.isScreenOn(coreService)) {
                     Log.i("PeriodicReportSender", "Sending client info request")
-                    val response = familyRulesClient.sendClientInfoRequest()
-                    appBlocker.setRestrictedApps(response.restrictedApps.keys.toList())
+                    familyRulesClient.sendClientInfoRequest()
                 }
             } catch (e: Exception) {
                 Log.e("PeriodicReportSender", "Failed to send client info", e)
@@ -149,9 +145,8 @@ class PeriodicReportSender(
                             scope.launch {
                                 try {
                                     val appList = familyRulesClient.getAppGroupReport(appGroupId)
-                                    appBlocker.setRestrictedApps(appList)
-                                    appBlocker.block()
-                                    Log.i("PeriodicReportSender", "Blocking ${appList.size} restricted apps")
+                                    appBlocker.block(appList)
+                                    Log.i("PeriodicReportSender", "Blocking ${appList.size} restricted apps: $appList")
                                 } catch (e: Exception) {
                                     Log.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
                                 }

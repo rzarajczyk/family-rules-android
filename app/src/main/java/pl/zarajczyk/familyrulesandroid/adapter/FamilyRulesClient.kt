@@ -19,10 +19,6 @@ data class Uptime(
     val packageUsages: Map<String, Long>
 )
 
-data class ClientInfoResponse(
-    val restrictedApps: Map<String, AppDetails>
-)
-
 data class AppDetails(
     val appName: String,
     val iconBase64Png: String?
@@ -94,7 +90,7 @@ class FamilyRulesClient(
         retrofit.create(FamilyRulesApiService::class.java)
     }
 
-    suspend fun sendClientInfoRequest(): ClientInfoResponse {
+    suspend fun sendClientInfoRequest() {
         val instanceId = settingsManager.getString("instanceId", "")
         val version = settingsManager.getVersion()
         val knownApps: Map<String, AppData> = appDb
@@ -115,7 +111,7 @@ class FamilyRulesClient(
 
         Log.d("FamilyRulesClient", "Sending client-info request (DTO)")
 
-        return withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             try {
                 val response = apiService.sendClientInfo(request)
                 val restrictedApps = response.restrictedApps ?: emptyMap()
@@ -123,10 +119,8 @@ class FamilyRulesClient(
                     "FamilyRulesClient",
                     "Client-info returned restricted apps: ${restrictedApps.keys}"
                 )
-                ClientInfoResponse(restrictedApps = restrictedApps)
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
-                ClientInfoResponse(restrictedApps = emptyMap())
             }
         }
     }

@@ -9,15 +9,11 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
     // Dynamic list of packages to block, received from server
     private var packagesToBlock: List<String> = emptyList()
     
-    fun setRestrictedApps(packages: List<String>) {
-        packagesToBlock = packages
-        Log.i("AppBlocker", "Updated packages to block: $packagesToBlock")
-    }
-    
     /**
      * Block all apps in the blockedApps list
      */
-    fun block() {
+    fun block(packages: List<String>) {
+        packagesToBlock = packages
         Log.i("AppBlocker", "Starting to block apps: $packagesToBlock")
         packagesToBlock.forEach { packageName ->
             blockedAppsState.add(packageName)
