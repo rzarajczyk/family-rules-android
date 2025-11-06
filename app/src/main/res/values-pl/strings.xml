@@ -50,4 +50,11 @@
     
     <!-- Content Descriptions -->
     <string name="family_rules_icon">Ikona FamilyRules</string>
+    
+    <!-- Menu -->
+    <string name="menu">Menu</string>
+    <string name="export_crash_logs">Eksportuj logi błędów</string>
+    <string name="no_crash_logs">Brak logów błędów</string>
+    <string name="crash_logs_export_subject">Family Rules - Logi Błędów</string>
 </resources>
+
