@@ -361,13 +361,14 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
                 modifier = Modifier
                     .size(48.dp)
                     .background(
-                        Color.Gray.copy(alpha = 0.3f),
+                        FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
+                    color = FamilyRulesColors.TEXT_COLOR,
                     strokeWidth = 2.dp
                 )
             }

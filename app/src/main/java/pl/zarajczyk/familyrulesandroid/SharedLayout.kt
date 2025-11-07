@@ -119,7 +119,8 @@ fun SharedAppLayout(
                         
                         DropdownMenu(
                             expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
+                            onDismissRequest = { showMenu = false },
+                            containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.export_crash_logs)) },
@@ -194,7 +195,8 @@ fun SharedAppLayout(
                     
                     DropdownMenu(
                         expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
+                        onDismissRequest = { showMenu = false },
+                        containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.export_crash_logs)) },
