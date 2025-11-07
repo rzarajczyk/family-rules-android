@@ -40,11 +40,11 @@ data class ReportResponseDto(
     val extra: String?
 )
 
-data class AppGroupReportRequest(
+data class AppGroupMembershipRequest(
     val appGroupId: String
 )
 
-data class AppGroupReportResponse(
+data class AppGroupMembershipResponse(
     val appGroupId: String,
     val apps: Map<String, App>
 )
@@ -61,8 +61,8 @@ interface FamilyRulesApiService {
     @POST("/api/v2/report")
     suspend fun report(@Body body: ReportRequest): ReportResponseDto
 
-    @POST("/api/v2/group-report")
-    suspend fun groupReport(@Body body: AppGroupReportRequest): AppGroupReportResponse
+    @POST("/api/v2/group-membership-for-device")
+    suspend fun groupMembershipForDevice(@Body body: AppGroupMembershipRequest): AppGroupMembershipResponse
 }
 
 
