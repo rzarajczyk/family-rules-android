@@ -42,7 +42,7 @@ class PackageUsageCalculator : SystemEventProcessor {
         if (packageLifecycleEvents.isEmpty()) {
             foregroundApp?.let { fg ->
                 todayPackageUsage.increment(fg, end - start)
-                Log.d("PackageUsageCalculator",  "Incrementing time (no events) for foreground package $fg by ${end - start}")
+//                Log.d("PackageUsageCalculator",  "Incrementing time (no events) for foreground package $fg by ${end - start}")
             }
             return
         }
@@ -95,13 +95,13 @@ class PackageUsageCalculator : SystemEventProcessor {
 //                Log.i("PackageUsageCalculator", "Total time for package $packageName: $totalTime")
 
                 todayPackageUsage.increment(packageName, totalTime)
-                Log.d("PackageUsageCalculator", "Total time for package $packageName: ${todayPackageUsage[packageName]}")
+//                Log.d("PackageUsageCalculator", "Total time for package $packageName: ${todayPackageUsage[packageName]}")
             }
 
         foregroundApp?.let { fg ->
             if (fg !in groupedPackageLifecycleEvents.keys) {
                 todayPackageUsage.increment(fg, end - start)
-                Log.d("PackageUsageCalculator",  "Incrementing time (despite having events!) for foreground package $fg by ${end - start} // $packageLifecycleEvents")
+//                Log.d("PackageUsageCalculator",  "Incrementing time (despite having events!) for foreground package $fg by ${end - start} // $packageLifecycleEvents")
             }
         }
     }

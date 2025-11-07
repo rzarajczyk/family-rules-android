@@ -86,10 +86,10 @@ class PeriodicUsageEventsMonitor(
             lastProcessedTimestamp + 1
         }
 
-        Log.d(
-            "PeriodicUsageEventsMonitor",
-            "Querying events from $start (${Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault())}) to $end (${Instant.ofEpochMilli(end).atZone(ZoneId.systemDefault())})"
-        )
+//        Log.d(
+//            "PeriodicUsageEventsMonitor",
+//            "Querying events from $start (${Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault())}) to $end (${Instant.ofEpochMilli(end).atZone(ZoneId.systemDefault())})"
+//        )
 
         val events = mutableListOf<Event>()
         // Query the list of events that has happened within that time frame
