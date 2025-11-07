@@ -3,6 +3,7 @@ package pl.zarajczyk.familyrulesandroid.core
 import android.app.usage.UsageEvents
 import android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE
 import android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE
+import android.util.Log
 import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_OFF
 import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_ON
 
@@ -13,6 +14,9 @@ class ScreenTimeCalculator : SystemEventProcessor {
 
     @Volatile
     private var todayScreenTime: Long = 0L
+
+    @Volatile
+    private var isScreenOn: Boolean = false
 
     enum class ScreenState { TURNING_ON, TURNING_OFF }
     data class ScreenEvent(val state: ScreenState, val timestamp: Long)
@@ -25,8 +29,13 @@ class ScreenTimeCalculator : SystemEventProcessor {
         var screenEvents = events.toScreenEvents()
 
         if (screenEvents.isEmpty()) {
+            if (isScreenOn)
+                todayScreenTime += end - start
+            Log.d("ScreenTimeCalculator", "Total screen time $todayScreenTime")
             return
         }
+
+        isScreenOn = screenEvents.last().state == TURNING_ON
 
         if (screenEvents.first().state != TURNING_ON) {
             screenEvents = listOf(ScreenEvent(TURNING_ON, start)) + screenEvents
@@ -41,6 +50,7 @@ class ScreenTimeCalculator : SystemEventProcessor {
             }
 
         todayScreenTime += batchScreenOnTime
+        Log.d("ScreenTimeCalculator", "Total screen time $todayScreenTime")
     }
 
     private fun List<Event>.toScreenEvents(): List<ScreenEvent> =
