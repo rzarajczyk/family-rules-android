@@ -54,7 +54,7 @@ class FamilyRulesCoreService : Service() {
                 context.startForegroundService(serviceIntent)
                 Log.d(TAG, "Service start requested")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start service: ${e.message}", e)
+                Log.w(TAG, "Failed to start service: ${e.message} - this might be fine in Android 12+", e)
                 // If startForegroundService fails, the service should auto-restart via START_STICKY
                 // when the system allows it
             }
@@ -212,7 +212,11 @@ class FamilyRulesCoreService : Service() {
             .setSilent(true)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to start service: ${e.message} - this might be fine in Android 12+", e)
+        }
     }
 
     override fun onDestroy() {
