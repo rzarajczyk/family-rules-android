@@ -31,6 +31,9 @@
     
     <!-- Main Activity -->
     <string name="family_rules">FamilyRules</string>
+    <string name="tab_this_device">This device</string>
+    <string name="tab_all_devices">All your devices</string>
+    <string name="all_devices_coming_soon">Coming soon</string>
     <string name="screen_time">Screen on time: %1$s\n(%2$s)</string>
     <string name="app_usage_calculation">App usage calculation in progress, it might take a while</string>
     <string name="total_time">Total time: %1$s</string>

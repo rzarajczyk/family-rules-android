@@ -31,6 +31,9 @@
     
     <!-- Main Activity -->
     <string name="family_rules">FamilyRules</string>
+    <string name="tab_this_device">To urządzenie</string>
+    <string name="tab_all_devices">Wszystkie Twoje urządzenia</string>
+    <string name="all_devices_coming_soon">Wkrótce</string>
     <string name="screen_time">Czas włączenia ekranu: %1$s\n(%2$s)</string>
     <string name="app_usage_calculation">Obliczanie użycia aplikacji w toku, może to chwilę potrwać</string>
     <string name="total_time">Całkowity czas: %1$s</string>

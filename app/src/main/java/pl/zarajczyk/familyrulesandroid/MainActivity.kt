@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
@@ -163,7 +166,52 @@ fun MainScreen(
     appDb: AppDb,
     deviceState: DeviceState = DeviceState.ACTIVE
 ) {
+    var selectedTabIndex by remember { mutableStateOf(0) }
+    val tabs = listOf(
+        stringResource(R.string.tab_this_device),
+        stringResource(R.string.tab_all_devices)
+    )
+
     SharedAppLayout(deviceState = deviceState) {
+        Column {
+            TabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
+                contentColor = FamilyRulesColors.TEXT_COLOR,
+                modifier = Modifier
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = { selectedTabIndex = index },
+                        text = { Text(title) }
+                    )
+                }
+            }
+
+            when (selectedTabIndex) {
+                0 -> ThisDeviceTab(
+                    usageStatsList = usageStatsList,
+                    screenTime = screenTime,
+                    settingsManager = settingsManager,
+                    appDb = appDb
+                )
+                1 -> AllDevicesTab()
+            }
+        }
+    }
+}
+
+@Composable
+fun ThisDeviceTab(
+    usageStatsList: Map<String, Long>,
+    screenTime: Long,
+    settingsManager: SettingsManager,
+    appDb: AppDb
+) {
+    Column {
         ScreenTimeCard(screenTime, settingsManager)
         Spacer(modifier = Modifier.weight(1f))
         
@@ -173,6 +221,22 @@ fun MainScreen(
         } else {
             UsageStatsDisplay(usageStatsList, appDb = appDb)
         }
+    }
+}
+
+@Composable
+fun AllDevicesTab() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(R.string.all_devices_coming_soon),
+            style = MaterialTheme.typography.bodyLarge,
+            color = FamilyRulesColors.TEXT_COLOR
+        )
     }
 }
 
