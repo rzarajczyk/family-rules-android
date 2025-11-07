@@ -54,6 +54,29 @@ data class App(
     val iconBase64Png: String?
 )
 
+// Groups Usage Report DTOs
+data class AppGroupsUsageReportResponse(
+    val appGroups: List<AppGroupUsageReport>
+)
+
+data class AppGroupUsageReport(
+    val appGroupId: String,
+    val apps: Map<String, AppUsageReport>,
+    val totalTimeSeconds: Long
+)
+
+data class AppUsageReport(
+    val app: AppGroupApp,
+    val uptimeSeconds: Long
+)
+
+data class AppGroupApp(
+    val appName: String,
+    val iconBase64Png: String?,
+    val deviceName: String,
+    val deviceId: String
+)
+
 interface FamilyRulesApiService {
     @POST("/api/v2/client-info")
     suspend fun sendClientInfo(@Body body: ClientInfoRequest): ClientInfoResponseDto
@@ -63,6 +86,9 @@ interface FamilyRulesApiService {
 
     @POST("/api/v2/group-membership-for-device")
     suspend fun groupMembershipForDevice(@Body body: AppGroupMembershipRequest): AppGroupMembershipResponse
+
+    @POST("/api/v2/groups-usage-report")
+    suspend fun getGroupsUsageReport(): AppGroupsUsageReportResponse
 }
 
 

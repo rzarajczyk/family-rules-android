@@ -226,17 +226,170 @@ fun ThisDeviceTab(
 
 @Composable
 fun AllDevicesTab() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
+    val appDb = remember { AppDb(context) }
+    val familyRulesClient = remember { pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient(settingsManager, appDb) }
+    
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var usageReport by remember { mutableStateOf<pl.zarajczyk.familyrulesandroid.adapter.AppGroupsUsageReportResponse?>(null) }
+    
+    LaunchedEffect(Unit) {
+        try {
+            isLoading = true
+            errorMessage = null
+            val response = familyRulesClient.getGroupsUsageReport()
+            usageReport = response
+            if (response == null) {
+                errorMessage = "Failed to load data"
+            }
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Unknown error"
+        } finally {
+            isLoading = false
+        }
+    }
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+            .padding(16.dp)
     ) {
+        when {
+            isLoading -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        strokeWidth = 4.dp
+                    )
+                    Spacer(modifier = Modifier.padding(16.dp))
+                    Text(
+                        text = stringResource(R.string.loading),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = FamilyRulesColors.TEXT_COLOR
+                    )
+                }
+            }
+            errorMessage != null -> {
+                Text(
+                    text = errorMessage ?: "",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.Red,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            usageReport != null -> {
+                GroupsUsageReportDisplay(usageReport!!)
+            }
+        }
+    }
+}
+
+@Composable
+fun GroupsUsageReportDisplay(report: pl.zarajczyk.familyrulesandroid.adapter.AppGroupsUsageReportResponse) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
+                shape = RoundedCornerShape(16.dp)
+            )
+    ) {
+        items(report.appGroups) { group ->
+            AppGroupUsageCard(group)
+        }
+    }
+}
+
+@Composable
+fun AppGroupUsageCard(group: pl.zarajczyk.familyrulesandroid.adapter.AppGroupUsageReport) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
+        // Group header
         Text(
-            text = stringResource(R.string.all_devices_coming_soon),
-            style = MaterialTheme.typography.bodyLarge,
-            color = FamilyRulesColors.TEXT_COLOR
+            text = "Group: ${group.appGroupId}",
+            style = MaterialTheme.typography.titleMedium,
+            color = FamilyRulesColors.TEXT_COLOR,
+            modifier = Modifier.padding(bottom = 4.dp)
         )
+        Text(
+            text = stringResource(R.string.total_time, group.totalTimeSeconds.toHMS()),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FamilyRulesColors.TEXT_COLOR,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        
+        // Apps in group
+        group.apps.forEach { (packageName, appUsageReport) ->
+            AppUsageReportItem(packageName, appUsageReport)
+        }
+    }
+}
+
+@Composable
+fun AppUsageReportItem(
+    packageName: String,
+    appUsageReport: pl.zarajczyk.familyrulesandroid.adapter.AppUsageReport
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppIconFromBase64(appUsageReport.app.iconBase64Png)
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = appUsageReport.app.appName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = 16.sp,
+                color = FamilyRulesColors.TEXT_COLOR
+            )
+            Text(
+                text = "${appUsageReport.app.deviceName} • ${appUsageReport.uptimeSeconds.toHMS()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = FamilyRulesColors.TEXT_COLOR
+            )
+        }
+    }
+}
+
+@Composable
+fun AppIconFromBase64(iconBase64: String?) {
+    val bitmap = remember(iconBase64) {
+        iconBase64?.let { base64ToBitmap(it) }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.size(48.dp)
+        )
+    } else {
+        // Placeholder for apps without icons
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(
+                    Color.Gray.copy(alpha = 0.3f),
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(stringResource(R.string.app_icon_placeholder), fontSize = 24.sp)
+        }
     }
 }
 
