@@ -83,7 +83,7 @@ class PeriodicUsageEventsMonitor(
             startOfDay.toEpochMilli()
         } else {
             // Incremental run - start from last processed timestamp
-            lastProcessedTimestamp
+            lastProcessedTimestamp + 1
         }
 
         Log.d(

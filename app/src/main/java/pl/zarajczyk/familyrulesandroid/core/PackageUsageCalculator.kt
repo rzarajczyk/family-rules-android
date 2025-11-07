@@ -32,10 +32,18 @@ class PackageUsageCalculator : SystemEventProcessor {
         todayPackageUsage = mutableMapOf()
     }
 
+    private fun MutableMap<String, Long>.increment(key: String, value: Long) {
+        this[key] = this[key]?.let { it + value } ?: value
+    }
+
     override fun processEventBatch(events: List<Event>, start: Long, end: Long) {
         val packageLifecycleEvents = events.toPackageLifecycleEvents()
 
         if (packageLifecycleEvents.isEmpty()) {
+            foregroundApp?.let { fg ->
+                todayPackageUsage.increment(fg, end - start)
+                Log.d("PackageUsageCalculator",  "Incrementing time (no events) for foreground package $fg by ${end - start}")
+            }
             return
         }
 
@@ -47,8 +55,10 @@ class PackageUsageCalculator : SystemEventProcessor {
             foregroundApp = if (correspondingStoppedEventExists) null else lastStartingEvent.packageName
         }
 
-        packageLifecycleEvents
-            .groupBy<PackageLifecycleEvent, String> { it.packageName }
+        val groupedPackageLifecycleEvents = packageLifecycleEvents
+            .groupBy { it.packageName }
+
+        groupedPackageLifecycleEvents
             .forEach { (packageName, events) ->
                 val packageLifecycleEventsPerPackage = LinkedList(events.deduplicate())
 
@@ -84,11 +94,16 @@ class PackageUsageCalculator : SystemEventProcessor {
 
 //                Log.i("PackageUsageCalculator", "Total time for package $packageName: $totalTime")
 
-                todayPackageUsage[packageName] =
-                    todayPackageUsage[packageName]?.let { it + totalTime }
-                        ?: totalTime
+                todayPackageUsage.increment(packageName, totalTime)
+                Log.d("PackageUsageCalculator", "Total time for package $packageName: ${todayPackageUsage[packageName]}")
             }
 
+        foregroundApp?.let { fg ->
+            if (fg !in groupedPackageLifecycleEvents.keys) {
+                todayPackageUsage.increment(fg, end - start)
+                Log.d("PackageUsageCalculator",  "Incrementing time (despite having events!) for foreground package $fg by ${end - start} // $packageLifecycleEvents")
+            }
+        }
     }
 
     private fun List<Event>.toPackageLifecycleEvents(): List<PackageLifecycleEvent> =
