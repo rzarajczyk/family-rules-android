@@ -141,9 +141,10 @@ fun InitialSetupScreen(
 // Generic layout wrapper that uses the shared layout component
 @Composable
 fun GenericSetupLayout(
+    settingsManager: SettingsManager,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
-    SharedAppLayout(content = content)
+    SharedAppLayout(settingsManager = settingsManager, content = content)
 }
 
 // Setup form screen
@@ -165,7 +166,7 @@ fun showSetupForm(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     
-    GenericSetupLayout {
+    GenericSetupLayout(settingsManager = settingsManager) {
         SetupForm(
             serverUrl = serverUrl,
             onServerUrlChange = { serverUrl = it },

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +41,7 @@ import androidx.core.content.FileProvider
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_RESTRICTED_APPS
+import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import pl.zarajczyk.familyrulesandroid.utils.CrashLogger
 
@@ -54,6 +56,7 @@ import pl.zarajczyk.familyrulesandroid.utils.CrashLogger
 @Composable
 fun SharedAppLayout(
     deviceState: DeviceState = ACTIVE,
+    settingsManager: SettingsManager,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -128,6 +131,12 @@ fun SharedAppLayout(
                                     showMenu = false
                                     exportCrashLogs(context)
                                 }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(settingsManager.getVersion()) },
+                                onClick = { },
+                                enabled = false
                             )
                         }
                     }
@@ -204,6 +213,12 @@ fun SharedAppLayout(
                                 showMenu = false
                                 exportCrashLogs(context)
                             }
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text(settingsManager.getVersion()) },
+                            onClick = { },
+                            enabled = false
                         )
                     }
                 }

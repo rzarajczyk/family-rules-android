@@ -172,7 +172,7 @@ fun MainScreen(
         stringResource(R.string.tab_all_devices)
     )
 
-    SharedAppLayout(deviceState = deviceState) {
+    SharedAppLayout(deviceState = deviceState, settingsManager = settingsManager) {
         Column {
             TabRow(
                 selectedTabIndex = selectedTabIndex,
@@ -408,7 +408,7 @@ fun ScreenTimeCard(
             )
     ) {
         Text(
-            text = stringResource(R.string.screen_time, screenTime.toHMS(), settingsManager.getVersion()),
+            text = stringResource(R.string.screen_time, screenTime.toHMS()),
             style = MaterialTheme.typography.bodyMedium,
             color = FamilyRulesColors.TEXT_COLOR,
             modifier = Modifier.padding(8.dp)

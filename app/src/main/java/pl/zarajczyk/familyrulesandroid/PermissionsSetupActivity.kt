@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pl.zarajczyk.familyrulesandroid.core.DeviceAdminManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
+import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 
@@ -51,6 +52,7 @@ class PermissionsSetupActivity : ComponentActivity() {
     
     private lateinit var deviceAdminManager: DeviceAdminManager
     private lateinit var permissionChecker: PermissionsChecker
+    private lateinit var settingsManager: SettingsManager
     
     // Permission request launchers
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -85,11 +87,12 @@ class PermissionsSetupActivity : ComponentActivity() {
         
         deviceAdminManager = DeviceAdminManager(this)
         permissionChecker = PermissionsChecker(this)
+        settingsManager = SettingsManager(this)
 
         setContent {
             FamilyRulesAndroidTheme {
                 window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
-                SharedAppLayout {
+                SharedAppLayout(settingsManager = settingsManager) {
                     ProtectionSetupContent(
                         deviceAdminManager = deviceAdminManager,
                         permissionChecker = permissionChecker,
