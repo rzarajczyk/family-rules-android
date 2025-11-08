@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import pl.zarajczyk.familyrulesandroid.utils.FileLogger
 import kotlin.time.Duration
 
 /**
@@ -61,11 +62,8 @@ class NotificationRestorer private constructor(
         }
 
         if (!isNotificationVisible) {
-            Log.w(TAG, "Notification was dismissed! Restoring immediately...")
+            FileLogger.w(TAG, "SECURITY ALERT: Parental control notification was dismissed by user - restoring")
             coreService.ensureNotificationVisible()
-            
-            // Log this event for monitoring - in production, you might want to report this
-            Log.w(TAG, "SECURITY ALERT: Parental control notification was dismissed and has been restored")
         }
     }
 

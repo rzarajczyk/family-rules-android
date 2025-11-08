@@ -173,38 +173,67 @@ object CrashLogger {
     
     /**
      * Creates a combined crash log file for sharing/export
-     * Returns null if there are no crash logs
+     * Now includes both crash logs AND application logs from FileLogger
+     * Returns null if there are no logs to export
      */
     fun exportAllCrashLogs(context: Context): File? {
         return try {
             val crashLogs = getCrashLogFiles(context)
-            if (crashLogs.isEmpty()) {
+            val appLogs = FileLogger.getLogFiles(context)
+            
+            if (crashLogs.isEmpty() && appLogs.isEmpty()) {
                 return null
             }
             
             // Create a temporary file in cache directory for sharing
-            val exportFile = File(context.cacheDir, "crash_logs_export.txt")
+            val exportFile = File(context.cacheDir, "family_rules_logs_export.txt")
             
             exportFile.bufferedWriter().use { writer ->
-                writer.write("FAMILY RULES - CRASH LOGS EXPORT\n")
+                writer.write("FAMILY RULES - COMPLETE LOGS EXPORT\n")
                 writer.write("Generated: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}\n")
                 writer.write("Total crash logs: ${crashLogs.size}\n")
+                writer.write("Total application logs: ${appLogs.size}\n")
                 writer.write("=" .repeat(80) + "\n\n")
                 
-                crashLogs.forEachIndexed { index, logFile ->
+                // Export application logs first (more detailed)
+                if (appLogs.isNotEmpty()) {
                     writer.write("\n")
-                    writer.write("=" .repeat(80) + "\n")
-                    writer.write("LOG ${index + 1} of ${crashLogs.size}: ${logFile.name}\n")
-                    writer.write("=" .repeat(80) + "\n")
-                    writer.write(readCrashLog(logFile))
-                    writer.write("\n\n")
+                    writer.write("#" .repeat(80) + "\n")
+                    writer.write("# APPLICATION LOGS (Debug, Info, Warnings, Errors)\n")
+                    writer.write("#" .repeat(80) + "\n\n")
+                    
+                    appLogs.forEachIndexed { index, logFile ->
+                        writer.write("\n")
+                        writer.write("=" .repeat(80) + "\n")
+                        writer.write("APP LOG ${index + 1} of ${appLogs.size}: ${logFile.name}\n")
+                        writer.write("=" .repeat(80) + "\n")
+                        writer.write(FileLogger.readLogFile(logFile))
+                        writer.write("\n\n")
+                    }
+                }
+                
+                // Export crash logs
+                if (crashLogs.isNotEmpty()) {
+                    writer.write("\n")
+                    writer.write("#" .repeat(80) + "\n")
+                    writer.write("# CRASH LOGS (Unhandled Exceptions)\n")
+                    writer.write("#" .repeat(80) + "\n\n")
+                    
+                    crashLogs.forEachIndexed { index, logFile ->
+                        writer.write("\n")
+                        writer.write("=" .repeat(80) + "\n")
+                        writer.write("CRASH LOG ${index + 1} of ${crashLogs.size}: ${logFile.name}\n")
+                        writer.write("=" .repeat(80) + "\n")
+                        writer.write(readCrashLog(logFile))
+                        writer.write("\n\n")
+                    }
                 }
             }
             
-            Log.d(TAG, "Crash logs exported to: ${exportFile.absolutePath}")
+            Log.d(TAG, "All logs exported to: ${exportFile.absolutePath}")
             exportFile
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to export crash logs", e)
+            Log.e(TAG, "Failed to export logs", e)
             null
         }
     }

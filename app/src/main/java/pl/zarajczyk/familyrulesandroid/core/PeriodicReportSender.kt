@@ -12,6 +12,7 @@ import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.adapter.Uptime
 import pl.zarajczyk.familyrulesandroid.database.AppDb
+import pl.zarajczyk.familyrulesandroid.utils.FileLogger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -69,7 +70,7 @@ class PeriodicReportSender(
         try {
             familyRulesClient.sendClientInfoRequest()
         } catch (e: Exception) {
-            Log.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
+            FileLogger.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
         }
     }
 
@@ -77,11 +78,11 @@ class PeriodicReportSender(
         while (isActive()) {
             try {
                 if (ScreenStatus.isScreenOn(coreService)) {
-                    Log.i("PeriodicReportSender", "Sending client info request")
+                    FileLogger.i("PeriodicReportSender", "Sending client info request")
                     familyRulesClient.sendClientInfoRequest()
                 }
             } catch (e: Exception) {
-                Log.e("PeriodicReportSender", "Failed to send client info", e)
+                FileLogger.e("PeriodicReportSender", "Failed to send client info", e)
             }
             delay(clientInfoDuration)
         }
@@ -93,7 +94,7 @@ class PeriodicReportSender(
                 try {
                     reportUptime()
                 } catch (e: Exception) {
-                    Log.e("PeriodicReportSender", "Failed to send report", e)
+                    FileLogger.e("PeriodicReportSender", "Failed to send report", e)
                 }
             }
             delay(delayDuration)
@@ -114,7 +115,7 @@ class PeriodicReportSender(
             packageUsages = coreService.getTodayPackageUsage()
         )
         val response = familyRulesClient.reportUptime(uptime)
-        Log.d("ReportService", "Received device state response: $response")
+        FileLogger.i("ReportService", "Uptime reported to server, received device state: ${response.state}")
 
         // Handle device state changes
         handleDeviceStateChange(response)
@@ -122,16 +123,16 @@ class PeriodicReportSender(
 
     private fun handleDeviceStateChange(newState: ActualDeviceState) {
         if (currentDeviceState != newState) {
-            Log.i(
+            FileLogger.i(
                 "PeriodicReportSender",
-                "Device state changed from $currentDeviceState to $newState"
+                "Device state changed from ${currentDeviceState.state} to ${newState.state}"
             )
 
             when (newState.state) {
                 DeviceState.ACTIVE -> {
                     // Unblock apps when returning to ACTIVE state
                     if (currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS) {
-                        Log.i("PeriodicReportSender", "Unblocking restricted apps")
+                        FileLogger.i("PeriodicReportSender", "Unblocking restricted apps - returning to ACTIVE state")
                         appBlocker.unblock()
                     }
                 }
@@ -141,18 +142,18 @@ class PeriodicReportSender(
                     if (currentDeviceState != newState) {
                         val appGroupId = newState.extra
                         if (appGroupId != null) {
-                            Log.i("PeriodicReportSender", "Fetching apps for group: $appGroupId")
+                            FileLogger.w("PeriodicReportSender", "Blocking apps - fetching group: $appGroupId")
                             scope.launch {
                                 try {
                                     val appList = familyRulesClient.getAppGroupReport(appGroupId)
                                     appBlocker.block(appList)
-                                    Log.i("PeriodicReportSender", "Blocking ${appList.size} restricted apps: $appList")
+                                    FileLogger.w("PeriodicReportSender", "Blocking ${appList.size} restricted apps")
                                 } catch (e: Exception) {
-                                    Log.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
+                                    FileLogger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
                                 }
                             }
                         } else {
-                            Log.w("PeriodicReportSender", "No appGroupId provided in BLOCK_RESTRICTED_APPS state")
+                            FileLogger.w("PeriodicReportSender", "No appGroupId provided in BLOCK_RESTRICTED_APPS state")
                         }
                     }
                 }
