@@ -161,29 +161,27 @@ fun SharedAppLayout(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.Center
+                    // Top-aligned header and content area
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.icon),
-                                contentDescription = stringResource(R.string.family_rules_icon),
-                                modifier = Modifier
-                                    .size(128.dp)
-                                    .padding(top = 32.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.family_rules),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = FamilyRulesColors.TEXT_COLOR,
-                                modifier = Modifier.padding(top = 16.dp)
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            content()
-                        }
+                        Image(
+                            painter = painterResource(id = R.drawable.icon),
+                            contentDescription = stringResource(R.string.family_rules_icon),
+                            modifier = Modifier
+                                .size(128.dp)
+                                .padding(top = 32.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.family_rules),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = FamilyRulesColors.TEXT_COLOR,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                        )
+                        // TabRow/content injected by caller should appear directly under header
+                        content()
                     }
                 }
                 

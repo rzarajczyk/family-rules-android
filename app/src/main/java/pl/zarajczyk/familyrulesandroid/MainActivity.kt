@@ -463,6 +463,7 @@ fun UsageStatsDisplay(
     val sortedUsageStatsList = usageStatsList
         .map { (packageName, totalTime) -> PackageUsage(packageName, totalTime) }
         .sortedByDescending { it.totalTimeInForegroundMillis }
+        .filter { it.totalTimeInForegroundMillis > 60*1000 }
 
     LazyColumn(
         modifier = modifier
