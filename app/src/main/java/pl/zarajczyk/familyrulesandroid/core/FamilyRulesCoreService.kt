@@ -34,6 +34,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var screenOffReceiver: ScreenOffReceiver
 
     private lateinit var periodicReportSender: PeriodicReportSender
+    private lateinit var notificationRestorer: NotificationRestorer
 
     private val deviceStateManager = DeviceStateManager()
     
@@ -146,6 +147,13 @@ class FamilyRulesCoreService : Service() {
         periodicReportSender.reportUptimeAsync()
         periodicReportSender.sendClientInfoAsync()
     }
+    
+    /**
+     * Ensures the notification is visible. Called by NotificationRestorer.
+     */
+    internal fun ensureNotificationVisible() {
+        updateNotification()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -177,17 +185,22 @@ class FamilyRulesCoreService : Service() {
         periodicReportSender = PeriodicReportSender.install(this, appBlocker,
             reportDuration = 30.seconds,
             clientInfoDuration = 10.minutes)
+        
+        // Install notification restorer to prevent dismissal
+        notificationRestorer = NotificationRestorer.install(this, checkInterval = 5.seconds)
     }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Family Rules Service",
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH  // Changed from DEFAULT to HIGH
         ).apply {
             description = "Keeps Family Rules running in background"
             enableLights(false)
             setShowBadge(false)
+            // Prevent user from disabling notifications for this channel
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
         }
 
         val notificationManager =
@@ -219,11 +232,15 @@ class FamilyRulesCoreService : Service() {
             .setContentText(notificationText)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)  // Changed from DEFAULT to HIGH
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
+            .setOngoing(true)  // Makes notification non-dismissible
+            .setAutoCancel(false)  // Prevents auto-dismissal
+            .setShowWhen(false)  // Removes timestamp to look more permanent
             .setSilent(true)
+            .setOnlyAlertOnce(true)  // No repeated alerts
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)  // API 31+
             .build()
 
         try {
@@ -250,6 +267,10 @@ class FamilyRulesCoreService : Service() {
         
         if (::screenOffReceiver.isInitialized) {
             unregisterReceiver(screenOffReceiver)
+        }
+        
+        if (::notificationRestorer.isInitialized) {
+            notificationRestorer.stop()
         }
     }
     
