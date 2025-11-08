@@ -61,6 +61,7 @@ data class AppGroupsUsageReportResponse(
 
 data class AppGroupUsageReport(
     val appGroupId: String,
+    val appGroupName: String,
     val apps: Map<String, AppUsageReport>,
     val totalTimeSeconds: Long
 )

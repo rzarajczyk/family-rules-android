@@ -315,7 +315,7 @@ fun AppGroupUsageCard(group: pl.zarajczyk.familyrulesandroid.adapter.AppGroupUsa
     ) {
         // Group header
         Text(
-            text = "Group: ${group.appGroupId}",
+            text = group.appGroupName,
             style = MaterialTheme.typography.titleMedium,
             color = FamilyRulesColors.TEXT_COLOR,
             modifier = Modifier.padding(bottom = 4.dp)
