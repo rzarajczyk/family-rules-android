@@ -49,11 +49,14 @@ import pl.zarajczyk.familyrulesandroid.core.*
 import pl.zarajczyk.familyrulesandroid.database.App
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
-import pl.zarajczyk.familyrulesandroid.utils.toHMS
+import pl.zarajczyk.familyrulesandroid.utils.millisToHMS
 import kotlinx.coroutines.delay
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import android.content.ServiceConnection
 import androidx.compose.runtime.mutableLongStateOf
+import pl.zarajczyk.familyrulesandroid.adapter.AppGroupUsageReportResponse
+import pl.zarajczyk.familyrulesandroid.adapter.AppUsageReportResponse
+import pl.zarajczyk.familyrulesandroid.utils.secondsToHMS
 
 
 class MainActivity : ComponentActivity() {
@@ -307,7 +310,7 @@ fun GroupsUsageReportDisplay(report: pl.zarajczyk.familyrulesandroid.adapter.App
 }
 
 @Composable
-fun AppGroupUsageCard(group: pl.zarajczyk.familyrulesandroid.adapter.AppGroupUsageReport) {
+fun AppGroupUsageCard(group: AppGroupUsageReportResponse) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -321,23 +324,25 @@ fun AppGroupUsageCard(group: pl.zarajczyk.familyrulesandroid.adapter.AppGroupUsa
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = stringResource(R.string.total_time, group.totalTimeSeconds.toHMS()),
+            text = stringResource(R.string.total_time, group.totalTimeSeconds.secondsToHMS()),
             style = MaterialTheme.typography.bodyMedium,
             color = FamilyRulesColors.TEXT_COLOR,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         
         // Apps in group
-        group.apps.forEach { (packageName, appUsageReport) ->
-            AppUsageReportItem(packageName, appUsageReport)
+        group.apps
+            .sortedByDescending { it.uptimeSeconds }
+            .filter { it.uptimeSeconds > 60 }
+            .forEach {
+            AppUsageReportItem(it)
         }
     }
 }
 
 @Composable
 fun AppUsageReportItem(
-    packageName: String,
-    appUsageReport: pl.zarajczyk.familyrulesandroid.adapter.AppUsageReport
+    appUsageReport: AppUsageReportResponse
 ) {
     Row(
         modifier = Modifier
@@ -345,19 +350,19 @@ fun AppUsageReportItem(
             .padding(vertical = 4.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AppIconFromBase64(appUsageReport.app.iconBase64Png)
+        AppIconFromBase64(appUsageReport.iconBase64Png)
         
         Spacer(modifier = Modifier.width(12.dp))
         
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = appUsageReport.app.appName,
+                text = appUsageReport.appName,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 16.sp,
                 color = FamilyRulesColors.TEXT_COLOR
             )
             Text(
-                text = "${appUsageReport.app.deviceName} • ${appUsageReport.uptimeSeconds.toHMS()}",
+                text = "${appUsageReport.deviceName} • ${appUsageReport.uptimeSeconds.secondsToHMS()}",
                 style = MaterialTheme.typography.bodySmall,
                 color = FamilyRulesColors.TEXT_COLOR
             )
@@ -408,7 +413,7 @@ fun ScreenTimeCard(
             )
     ) {
         Text(
-            text = stringResource(R.string.screen_time, screenTime.toHMS()),
+            text = stringResource(R.string.screen_time, screenTime.millisToHMS()),
             style = MaterialTheme.typography.bodyMedium,
             color = FamilyRulesColors.TEXT_COLOR,
             modifier = Modifier.padding(8.dp)
@@ -481,7 +486,7 @@ fun UsageStatsDisplay(
 
 @Composable
 private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
-    val totalTimeFormatted = stat.totalTimeInForegroundMillis.toHMS()
+    val totalTimeFormatted = stat.totalTimeInForegroundMillis.millisToHMS()
 
     // State to hold the app info
     var appInfo by remember(stat.packageName) {

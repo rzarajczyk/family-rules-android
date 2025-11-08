@@ -149,14 +149,14 @@ class FamilyRulesClient(
     }
 
     suspend fun getAppGroupReport(appGroupId: String): List<String> {
-        val request = AppGroupMembershipRequest(appGroupId = appGroupId)
+        val request = MembershipRequest(appGroupId = appGroupId)
 
         Log.d("FamilyRulesClient", "Fetching app group report for group: $appGroupId")
 
         return withContext(Dispatchers.IO) {
             try {
                 val response = apiService.groupMembershipForDevice(request)
-                val appPackages = response.apps.keys.toList()
+                val appPackages = response.apps.map { it.appPath }
                 Log.d(
                     "FamilyRulesClient",
                     "App group report returned ${appPackages.size} apps: $appPackages"
