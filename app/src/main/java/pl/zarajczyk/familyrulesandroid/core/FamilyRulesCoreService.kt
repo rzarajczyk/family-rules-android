@@ -36,6 +36,9 @@ class FamilyRulesCoreService : Service() {
     private lateinit var periodicReportSender: PeriodicReportSender
 
     private val deviceStateManager = DeviceStateManager()
+    
+    @Volatile
+    private var foregroundStarted = false
 
     companion object {
         const val CHANNEL_ID = "FamilyRulesChannel"
@@ -43,10 +46,19 @@ class FamilyRulesCoreService : Service() {
         private const val TAG = "FamilyRulesCoreService"
 
         private lateinit var notificationManager: NotificationManager
+        
+        @Volatile
+        private var serviceStarted = false
 
         fun install(context: Context) {
             if (!this::notificationManager.isInitialized) {
                 notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            }
+            
+            // Check if service is already running - prevent repeated FGS starts
+            if (serviceStarted || isNotificationAlive()) {
+                Log.d(TAG, "Service already running, skipping start")
+                return
             }
             
             try {
@@ -137,9 +149,11 @@ class FamilyRulesCoreService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        serviceStarted = true
+        
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
-        KeepAliveBackgroundLoop.install(this, delayDuration = 60.seconds)
+        // Removed: KeepAliveBackgroundLoop - it was causing excessive FGS starts every 60 seconds
 
         screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
@@ -213,17 +227,38 @@ class FamilyRulesCoreService : Service() {
             .build()
 
         try {
-            startForeground(NOTIFICATION_ID, notification)
+            if (!foregroundStarted) {
+                // Only call startForeground() once to avoid exhausting FGS budget
+                startForeground(NOTIFICATION_ID, notification)
+                foregroundStarted = true
+                Log.d(TAG, "Service started in foreground")
+            } else {
+                // Update existing notification without re-entering foreground
+                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                nm.notify(NOTIFICATION_ID, notification)
+                Log.d(TAG, "Notification updated")
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to start service: ${e.message} - this might be fine in Android 12+", e)
+            Log.w(TAG, "Failed to update notification: ${e.message}", e)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceStarted = false
+        foregroundStarted = false
+        
         if (::screenOffReceiver.isInitialized) {
             unregisterReceiver(screenOffReceiver)
         }
+    }
+    
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        // For parental control: if task is removed, schedule immediate service restart
+        // This helps ensure the monitoring continues even if the child swipes the app
+        Log.i(TAG, "Task removed - service will continue running")
+        KeepAliveWorker.scheduleImmediateWork(this)
     }
 
     override fun onBind(intent: Intent?): IBinder {
