@@ -3,17 +3,14 @@ package pl.zarajczyk.familyrulesandroid
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -126,10 +123,10 @@ fun SharedAppLayout(
                             containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR
                         ) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.export_crash_logs)) },
+                                text = { Text(stringResource(R.string.show_logs)) },
                                 onClick = {
                                     showMenu = false
-                                    exportCrashLogs(context)
+                                    exportLogs(context)
                                 }
                             )
                             HorizontalDivider()
@@ -206,10 +203,10 @@ fun SharedAppLayout(
                         containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.export_crash_logs)) },
+                            text = { Text(stringResource(R.string.show_logs)) },
                             onClick = {
                                 showMenu = false
-                                exportCrashLogs(context)
+                                exportLogs(context)
                             }
                         )
                         HorizontalDivider()
@@ -228,7 +225,7 @@ fun SharedAppLayout(
 /**
  * Exports crash logs and opens a share dialog
  */
-private fun exportCrashLogs(context: android.content.Context) {
+private fun exportLogs(context: android.content.Context) {
     val exportFile = CrashLogger.exportAllCrashLogs(context)
     
     if (exportFile == null) {
@@ -257,5 +254,5 @@ private fun exportCrashLogs(context: android.content.Context) {
     }
     
     // Start share activity
-    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.export_crash_logs)))
+    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.show_logs)))
 }

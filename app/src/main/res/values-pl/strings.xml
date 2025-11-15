@@ -57,8 +57,8 @@
     
     <!-- Menu -->
     <string name="menu">Menu</string>
-    <string name="export_crash_logs">Eksportuj logi błędów</string>
-    <string name="no_crash_logs">Brak logów błędów</string>
-    <string name="crash_logs_export_subject">Family Rules - Logi Błędów</string>
+    <string name="show_logs">Pokaż logi</string>
+    <string name="no_crash_logs">Brak logów</string>
+    <string name="crash_logs_export_subject">Family Rules - Logi</string>
 </resources>
 
