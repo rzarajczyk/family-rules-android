@@ -40,7 +40,7 @@ import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_RESTRICTED_APPS
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
-import pl.zarajczyk.familyrulesandroid.utils.CrashLogger
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 
 /**
  * Shared layout component that provides the common structure for both MainActivity and InitialSetupActivity.
@@ -129,6 +129,13 @@ fun SharedAppLayout(
                                     exportLogs(context)
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.clean_logs)) },
+                                onClick = {
+                                    showMenu = false
+                                    cleanLogs(context)
+                                }
+                            )
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text(settingsManager.getVersion()) },
@@ -209,6 +216,13 @@ fun SharedAppLayout(
                                 exportLogs(context)
                             }
                         )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.clean_logs)) },
+                            onClick = {
+                                showMenu = false
+                                cleanLogs(context)
+                            }
+                        )
                         HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text(settingsManager.getVersion()) },
@@ -223,13 +237,13 @@ fun SharedAppLayout(
 }
 
 /**
- * Exports crash logs and opens a share dialog
+ * Exports all log files and opens a share dialog
  */
 private fun exportLogs(context: android.content.Context) {
-    val exportFile = CrashLogger.exportAllCrashLogs(context)
+    val logFiles = Logger.exportLogs(context)
     
-    if (exportFile == null) {
-        // No crash logs to export - could show a toast here
+    if (logFiles == null || logFiles.isEmpty()) {
+        // No logs to export
         android.widget.Toast.makeText(
             context,
             context.getString(R.string.no_crash_logs),
@@ -238,21 +252,61 @@ private fun exportLogs(context: android.content.Context) {
         return
     }
     
-    // Create a content URI for the file using FileProvider
-    val contentUri = FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        exportFile
-    )
+    // Android supports sharing multiple files
+    if (logFiles.size == 1) {
+        // Share single file
+        val contentUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            logFiles[0]
+        )
+        
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, contentUri)
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_logs_export_subject))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.show_logs)))
+    } else {
+        // Share multiple files
+        val uris = ArrayList<android.net.Uri>()
+        logFiles.forEach { file ->
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            uris.add(uri)
+        }
+        
+        val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "text/plain"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_logs_export_subject))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        
+        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.show_logs)))
+    }
+}
+
+/**
+ * Cleans all log files
+ */
+private fun cleanLogs(context: android.content.Context) {
+    val success = Logger.clearAllLogs(context)
     
-    // Create share intent
-    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_STREAM, contentUri)
-        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_logs_export_subject))
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    val message = if (success) {
+        context.getString(R.string.logs_cleaned)
+    } else {
+        context.getString(R.string.logs_clean_failed)
     }
     
-    // Start share activity
-    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.show_logs)))
+    android.widget.Toast.makeText(
+        context,
+        message,
+        android.widget.Toast.LENGTH_SHORT
+    ).show()
 }

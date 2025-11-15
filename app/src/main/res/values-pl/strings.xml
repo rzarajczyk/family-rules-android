@@ -58,6 +58,9 @@
     <!-- Menu -->
     <string name="menu">Menu</string>
     <string name="show_logs">Pokaż logi</string>
+    <string name="clean_logs">Wyczyść pliki logów</string>
+    <string name="logs_cleaned">Pliki logów wyczyszczone pomyślnie</string>
+    <string name="logs_clean_failed">Nie udało się wyczyścić plików logów</string>
     <string name="no_crash_logs">Brak logów</string>
     <string name="crash_logs_export_subject">Family Rules - Logi</string>
 </resources>

@@ -58,6 +58,9 @@
     <!-- Menu -->
     <string name="menu">Menu</string>
     <string name="show_logs">Show logs</string>
+    <string name="clean_logs">Clean log files</string>
+    <string name="logs_cleaned">Log files cleaned successfully</string>
+    <string name="logs_clean_failed">Failed to clean log files</string>
     <string name="no_crash_logs">No logs available</string>
     <string name="crash_logs_export_subject">Family Rules - Crash</string>
 </resources>

@@ -11,9 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
 import pl.zarajczyk.familyrulesandroid.R
@@ -21,7 +19,7 @@ import pl.zarajczyk.familyrulesandroid.adapter.ActualDeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.entrypoints.ScreenOffReceiver
-import pl.zarajczyk.familyrulesandroid.utils.FileLogger
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -59,16 +57,16 @@ class FamilyRulesCoreService : Service() {
             
             // Check if service is already running - prevent repeated FGS starts
             if (serviceStarted || isNotificationAlive()) {
-                FileLogger.d(TAG, "Service already running, skipping start")
+                Logger.d(TAG, "Service already running, skipping start")
                 return
             }
             
             try {
                 val serviceIntent = Intent(context, FamilyRulesCoreService::class.java)
                 context.startForegroundService(serviceIntent)
-                FileLogger.i(TAG, "Foreground service start requested")
+                Logger.i(TAG, "Foreground service start requested")
             } catch (e: Exception) {
-                FileLogger.w(TAG, "Failed to start service: ${e.message} - this might be fine in Android 12+", e)
+                Logger.w(TAG, "Failed to start service: ${e.message} - this might be fine in Android 12+", e)
                 // If startForegroundService fails, the service should auto-restart via START_STICKY
                 // when the system allows it
             }
@@ -140,7 +138,7 @@ class FamilyRulesCoreService : Service() {
         if (currentState != newState) {
             deviceStateManager.updateState(newState)
             updateNotification()
-            FileLogger.i(TAG, "Device state changed: ${currentState.state} -> ${newState.state}")
+            Logger.i(TAG, "Device state changed: ${currentState.state} -> ${newState.state}")
         }
     }
 
@@ -160,7 +158,7 @@ class FamilyRulesCoreService : Service() {
     override fun onCreate() {
         super.onCreate()
         serviceStarted = true
-        FileLogger.i(TAG, "FamilyRulesCoreService onCreate() - service starting")
+        Logger.i(TAG, "FamilyRulesCoreService onCreate() - service starting")
         
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
@@ -251,15 +249,15 @@ class FamilyRulesCoreService : Service() {
                 // Only call startForeground() once to avoid exhausting FGS budget
                 startForeground(NOTIFICATION_ID, notification)
                 foregroundStarted = true
-                FileLogger.i(TAG, "Service started in foreground with notification")
+                Logger.i(TAG, "Service started in foreground with notification")
             } else {
                 // Update existing notification without re-entering foreground
                 val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 nm.notify(NOTIFICATION_ID, notification)
-                FileLogger.d(TAG, "Notification content updated")
+                Logger.d(TAG, "Notification content updated")
             }
         } catch (e: Exception) {
-            FileLogger.w(TAG, "Failed to update notification", e)
+            Logger.w(TAG, "Failed to update notification", e)
         }
     }
 
@@ -267,7 +265,7 @@ class FamilyRulesCoreService : Service() {
         super.onDestroy()
         serviceStarted = false
         foregroundStarted = false
-        FileLogger.w(TAG, "FamilyRulesCoreService onDestroy() - service stopping")
+        Logger.w(TAG, "FamilyRulesCoreService onDestroy() - service stopping")
         
         if (::screenOffReceiver.isInitialized) {
             unregisterReceiver(screenOffReceiver)
@@ -282,7 +280,7 @@ class FamilyRulesCoreService : Service() {
         super.onTaskRemoved(rootIntent)
         // For parental control: if task is removed, schedule immediate service restart
         // This helps ensure the monitoring continues even if the child swipes the app
-        FileLogger.w(TAG, "Task removed from recents - scheduling immediate restart check")
+        Logger.w(TAG, "Task removed from recents - scheduling immediate restart check")
         KeepAliveWorker.scheduleImmediateWork(this)
     }
 
