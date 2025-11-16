@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pl.zarajczyk.familyrulesandroid.core.DeviceAdminManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
+import pl.zarajczyk.familyrulesandroid.core.ServiceKeepAliveAlarm
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
@@ -153,12 +154,14 @@ fun ProtectionSetupContent(
     val context = LocalContext.current
     var deviceAdminEnabled by remember { mutableStateOf(deviceAdminManager.isDeviceAdminActive()) }
     var batteryOptimizationDisabled by remember { mutableStateOf(false) }
+    var exactAlarmsEnabled by remember { mutableStateOf(false) }
     var notificationPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationPermissionGranted()) }
     var usageStatsPermissionGranted by remember { mutableStateOf(permissionChecker.isUsageStatsPermissionGranted()) }
     var systemAlertWindowPermissionGranted by remember { mutableStateOf(permissionChecker.isSystemAlertWindowPermissionGranted()) }
     
     LaunchedEffect(Unit) {
         batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
+        exactAlarmsEnabled = ServiceKeepAliveAlarm.canScheduleExactAlarms(context)
     }
 
     // Poll every 5 seconds for permissions that are not yet enabled
@@ -168,7 +171,8 @@ fun ProtectionSetupContent(
                 usageStatsPermissionGranted &&
                 systemAlertWindowPermissionGranted &&
                 deviceAdminEnabled &&
-                batteryOptimizationDisabled
+                batteryOptimizationDisabled &&
+                exactAlarmsEnabled
 
             if (allEnabled) break
 
@@ -188,6 +192,9 @@ fun ProtectionSetupContent(
             }
             if (!batteryOptimizationDisabled) {
                 batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
+            }
+            if (!exactAlarmsEnabled) {
+                exactAlarmsEnabled = ServiceKeepAliveAlarm.canScheduleExactAlarms(context)
             }
         }
     }
@@ -253,10 +260,30 @@ fun ProtectionSetupContent(
             }
         )
         
+        // Exact Alarms Permission (Android 12+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ProtectionCard(
+                title = stringResource(R.string.exact_alarms),
+                description = stringResource(R.string.exact_alarms_description),
+                isEnabled = exactAlarmsEnabled,
+                onEnableClick = {
+                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    }
+                    context.startActivity(intent)
+                }
+            )
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
         
         // Setup Complete Button
-        val allPermissionsGranted = notificationPermissionGranted && usageStatsPermissionGranted && systemAlertWindowPermissionGranted && deviceAdminEnabled
+        val allPermissionsGranted = notificationPermissionGranted && 
+            usageStatsPermissionGranted && 
+            systemAlertWindowPermissionGranted && 
+            deviceAdminEnabled &&
+            batteryOptimizationDisabled &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || exactAlarmsEnabled)
         
         Button(
             onClick = {
@@ -280,6 +307,8 @@ fun ProtectionSetupContent(
             if (!usageStatsPermissionGranted) missingPermissions.add(stringResource(R.string.app_usage_permission))
             if (!systemAlertWindowPermissionGranted) missingPermissions.add(stringResource(R.string.display_over_apps))
             if (!deviceAdminEnabled) missingPermissions.add(stringResource(R.string.device_admin_rights))
+            if (!batteryOptimizationDisabled) missingPermissions.add(stringResource(R.string.battery_optimization))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAlarmsEnabled) missingPermissions.add(stringResource(R.string.exact_alarms))
             
             Text(
                 text = stringResource(R.string.missing_permissions, missingPermissions.joinToString(", ")),

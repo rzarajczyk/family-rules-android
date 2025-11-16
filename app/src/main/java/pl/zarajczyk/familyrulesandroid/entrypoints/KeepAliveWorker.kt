@@ -18,7 +18,10 @@ class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
     Worker(context, params) {
     
     override fun doWork(): Result {
+        // This is a backup check - primary keep-alive is via AlarmManager
+        // which is more reliable on Android 12+
         if (!FamilyRulesCoreService.isServiceRunning(context)) {
+            Log.w(TAG, "Service stopped - requesting restart")
             FamilyRulesCoreService.install(context)
         }
         

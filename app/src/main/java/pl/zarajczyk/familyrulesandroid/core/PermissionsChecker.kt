@@ -1,6 +1,7 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
@@ -12,7 +13,24 @@ import androidx.core.net.toUri
 class PermissionsChecker(private val activity: Activity) {
 
     fun isAllPermissionsGranted(): Boolean {
-        return isUsageStatsPermissionGranted() && isNotificationPermissionGranted() && isSystemAlertWindowPermissionGranted()
+        val exactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            isExactAlarmPermissionGranted()
+        } else {
+            true // Not required on Android < 12
+        }
+        
+        return isUsageStatsPermissionGranted() && 
+               isNotificationPermissionGranted() && 
+               isSystemAlertWindowPermissionGranted() &&
+               exactAlarmGranted
+    }
+    
+    fun isExactAlarmPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ServiceKeepAliveAlarm.canScheduleExactAlarms(activity)
+        } else {
+            true // Always granted on Android < 12
+        }
     }
 
     fun isNotificationPermissionGranted(): Boolean {

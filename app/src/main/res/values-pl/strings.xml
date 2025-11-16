@@ -17,9 +17,11 @@
     <string name="app_usage_permission">Odczyt danych użycia aplikacji</string>
     <string name="app_usage_permission_description">Wymagane do monitorowania użycia aplikacji i czasu ekranu</string>
     <string name="display_over_apps">Wyświetlanie nad innymi aplikacjami</string>
-    <string name="display_over_apps_description">Wymagane do wyświetlania nakładek blokujących gdy aplikacje są ograniczone</string>
-    <string name="device_admin_rights">Uprawnienia Administratora urządzenia</string>
+    <string name="display_over_apps_description">Wymagane do wyświetlania nakładek blokujących aplikacje</string>
+    <string name="device_admin_rights">Uprawnienia administratora urządzenia</string>
     <string name="device_admin_rights_description">Zapobiega odinstalowaniu aplikacji</string>
+    <string name="exact_alarms">Uprawnienie do dokładnych alarmów</string>
+    <string name="exact_alarms_description">Wymagane do niezawodnego działania usługi w tle (Android 12+)</string>
     <string name="battery_optimization">Optymalizacja baterii</string>
     <string name="battery_optimization_description">Zapobiega zabijaniu aplikacji przez system w celu oszczędzania baterii</string>
     <string name="complete_setup">Zakończ Konfigurację</string>

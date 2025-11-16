@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import pl.zarajczyk.familyrulesandroid.MainActivity
@@ -66,9 +67,9 @@ class FamilyRulesCoreService : Service() {
                 context.startForegroundService(serviceIntent)
                 Logger.i(TAG, "Foreground service start requested")
             } catch (e: Exception) {
-                Logger.w(TAG, "Failed to start service: ${e.message} - this might be fine in Android 12+", e)
-                // If startForegroundService fails, the service should auto-restart via START_STICKY
-                // when the system allows it
+                Logger.w(TAG, "Failed to start service: ${e.message} - will retry via alarm", e)
+                // Schedule an alarm to retry - AlarmManager broadcasts are allowed to start FGS
+                ServiceKeepAliveAlarm.scheduleAlarm(context, 30.seconds)
             }
         }
 
@@ -162,7 +163,10 @@ class FamilyRulesCoreService : Service() {
         
         createNotificationChannel()
         KeepAliveWorker.install(this, delayDuration = 30.minutes)
-        // Removed: KeepAliveBackgroundLoop - it was causing excessive FGS starts every 60 seconds
+        
+        // Schedule exact alarms to keep service alive even from background on Android 12+
+        // This is critical for parental control functionality
+        ServiceKeepAliveAlarm.scheduleAlarm(this, interval = 5.minutes)
 
         screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
@@ -266,6 +270,9 @@ class FamilyRulesCoreService : Service() {
         serviceStarted = false
         foregroundStarted = false
         Logger.w(TAG, "FamilyRulesCoreService onDestroy() - service stopping")
+        
+        // Cancel the keep-alive alarm
+        ServiceKeepAliveAlarm.cancelAlarm(this)
         
         if (::screenOffReceiver.isInitialized) {
             unregisterReceiver(screenOffReceiver)
