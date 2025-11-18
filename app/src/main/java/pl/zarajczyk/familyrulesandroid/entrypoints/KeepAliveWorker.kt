@@ -51,8 +51,10 @@ class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
         }
         
         fun scheduleImmediateWork(context: Context) {
-            // Schedule one-time immediate work when task is removed
+            // Schedule one-time work with a minimum delay to prevent rapid retry loops
+            // when the service repeatedly fails to start (e.g., Android 12+ FGS restrictions)
             val workRequest = OneTimeWorkRequest.Builder(KeepAliveWorker::class.java)
+                .setInitialDelay(30, TimeUnit.SECONDS)
                 .build()
                 
             WorkManager.getInstance(context).enqueueUniqueWork(
@@ -60,7 +62,7 @@ class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
                 ExistingWorkPolicy.REPLACE,
                 workRequest
             )
-            Log.d(TAG, "Immediate KeepAliveWorker scheduled")
+            Log.d(TAG, "Immediate KeepAliveWorker scheduled with 30s delay")
         }
     }
 }

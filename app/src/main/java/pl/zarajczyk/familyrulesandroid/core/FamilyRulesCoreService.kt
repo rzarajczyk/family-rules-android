@@ -51,7 +51,17 @@ class FamilyRulesCoreService : Service() {
         @Volatile
         private var serviceStarted = false
 
+        private var lastInstallAttemptTime = 0L
+        private const val INSTALL_COOLDOWN_MS = 2000L
+
         fun install(context: Context) {
+            val now = System.currentTimeMillis()
+            if (now - lastInstallAttemptTime < INSTALL_COOLDOWN_MS) {
+                Logger.w(TAG, "Install called too frequently, skipping")
+                return
+            }
+            lastInstallAttemptTime = now
+
             if (!this::notificationManager.isInitialized) {
                 notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             }
@@ -67,7 +77,7 @@ class FamilyRulesCoreService : Service() {
                 context.startForegroundService(serviceIntent)
                 Logger.i(TAG, "Foreground service start requested")
             } catch (e: Exception) {
-                Logger.w(TAG, "Failed to start service: ${e.message} - will retry via alarm", e)
+                Logger.w(TAG, "Failed to start a foreground service: ${e.message} - will retry via alarm (this is fine on Android 12+)")
                 // Schedule an alarm to retry - AlarmManager broadcasts are allowed to start FGS
                 ServiceKeepAliveAlarm.scheduleAlarm(context, 30.seconds)
             }
