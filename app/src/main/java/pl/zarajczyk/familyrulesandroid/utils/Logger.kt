@@ -13,15 +13,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-/**
- * Unified logger that handles both normal application logs and crash logs.
- * All logs are written to daily log files (logs-YYYY-MM-DD.txt).
- * Keeps up to 5 log files.
- */
 object Logger {
     private const val TAG = "Logger"
     private const val LOG_DIR = "logs"
-    private const val MAX_LOG_FILES = 5 // Keep only last 5 log files
+    private const val MAX_LOG_FILES = 3
     
     private var currentLogFile: File? = null
     private var currentDate: String? = null
