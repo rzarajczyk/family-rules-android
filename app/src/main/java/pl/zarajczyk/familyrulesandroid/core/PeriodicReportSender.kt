@@ -13,6 +13,7 @@ import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.adapter.Uptime
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.utils.Logger
+import pl.zarajczyk.familyrulesandroid.utils.millisToHMS
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -115,10 +116,18 @@ class PeriodicReportSender(
             packageUsages = coreService.getTodayPackageUsage()
         )
         val response = familyRulesClient.reportUptime(uptime)
-        Logger.i("ReportService", "Uptime reported to server, received device state: ${response.state}")
+        Logger.i("ReportService", createLogMessage(uptime, response))
 
         // Handle device state changes
         handleDeviceStateChange(response)
+    }
+
+    private fun createLogMessage(uptime: Uptime, response: ActualDeviceState): String {
+        val topApps = uptime.packageUsages.entries.sortedByDescending { it.value }.take(3)
+        return "Uptime reported [" +
+                "screen time: ${uptime.screenTimeMillis.millisToHMS()}; " +
+                "top 3 apps: " + topApps.joinToString(", ") { "${it.key} (${it.value.millisToHMS()})" } +
+                "], received device state: ${response.state}"
     }
 
     private fun handleDeviceStateChange(newState: ActualDeviceState) {

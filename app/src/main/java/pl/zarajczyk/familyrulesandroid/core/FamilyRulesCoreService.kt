@@ -144,14 +144,12 @@ class FamilyRulesCoreService : Service() {
     }
 
     fun resetPeriodicUsageEventsMonitor() {
+        Logger.i(TAG, "Resetting periodic usage events monitor")
         periodicUsageEventsMonitor.reset()
         periodicReportSender.reportUptimeAsync()
         periodicReportSender.sendClientInfoAsync()
     }
-    
-    /**
-     * Ensures the notification is visible. Called by NotificationRestorer.
-     */
+
     internal fun ensureNotificationVisible() {
         updateNotification()
     }
