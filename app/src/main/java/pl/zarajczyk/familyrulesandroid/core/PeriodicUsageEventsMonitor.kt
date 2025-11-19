@@ -56,10 +56,10 @@ class PeriodicUsageEventsMonitor(
     }
 
     private var lastProcessedDay: Instant = Instant.EPOCH
-    private var lastProcessedTimestamp: Long = 0L
+    private var lastCheckedTimestamp: Long = 0L
 
     fun reset() {
-        lastProcessedTimestamp  = 0L
+        lastCheckedTimestamp  = 0L
         processors.forEach {
             it.reset()
         }
@@ -78,12 +78,12 @@ class PeriodicUsageEventsMonitor(
             reset()
         }
 
-        val start = if (lastProcessedTimestamp == 0L) {
+        val start = if (lastCheckedTimestamp == 0L) {
             // First run of the day - start from midnight
             startOfDay.toEpochMilli()
         } else {
-            // Incremental run - start from last processed timestamp
-            lastProcessedTimestamp + 1
+            // Incremental run - start from last checked timestamp
+            lastCheckedTimestamp
         }
 
 //        Log.d(
@@ -109,9 +109,7 @@ class PeriodicUsageEventsMonitor(
             }
         }
 
-        if (events.isNotEmpty()) {
-            lastProcessedTimestamp = events.last().timestamp
-        }
+        lastCheckedTimestamp = end
 
         processors.forEach {
             it.processEventBatch(events, start, end)
