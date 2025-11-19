@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -214,15 +215,20 @@ fun ThisDeviceTab(
     settingsManager: SettingsManager,
     appDb: AppDb
 ) {
-    Column {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
         ScreenTimeCard(screenTime, settingsManager)
-        Spacer(modifier = Modifier.weight(1f))
         
         // Show fallback message if no app usage data is available yet
         if (usageStatsList.isEmpty() && screenTime == 0L) {
             AppUsageCalculationInProgress()
         } else {
-            UsageStatsDisplay(usageStatsList, appDb = appDb)
+            UsageStatsDisplay(
+                usageStatsList = usageStatsList,
+                appDb = appDb,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
