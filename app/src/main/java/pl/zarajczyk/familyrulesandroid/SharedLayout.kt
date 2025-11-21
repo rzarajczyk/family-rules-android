@@ -123,7 +123,7 @@ fun SharedAppLayout(
                             containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR
                         ) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.show_logs)) },
+                                text = { Text(stringResource(R.string.share_logs)) },
                                 onClick = {
                                     showMenu = false
                                     exportLogs(context)
@@ -210,7 +210,7 @@ fun SharedAppLayout(
                         containerColor = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.show_logs)) },
+                            text = { Text(stringResource(R.string.share_logs)) },
                             onClick = {
                                 showMenu = false
                                 exportLogs(context)
@@ -268,7 +268,7 @@ private fun exportLogs(context: android.content.Context) {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         
-        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.show_logs)))
+        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_logs)))
     } else {
         // Share multiple files
         val uris = ArrayList<android.net.Uri>()
@@ -288,7 +288,7 @@ private fun exportLogs(context: android.content.Context) {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         
-        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.show_logs)))
+        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_logs)))
     }
 }
 
