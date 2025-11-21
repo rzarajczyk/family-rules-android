@@ -79,6 +79,8 @@ class PeriodicReportSender(
         while (isActive()) {
             try {
                 if (ScreenStatus.isScreenOn(coreService)) {
+                    Logger.i("PeriodicReportSender", "Ensuring all apps are cached")
+                    familyRulesClient.ensureAllAppsAreCached(coreService.getTodayPackageUsage().keys)
                     Logger.i("PeriodicReportSender", "Sending client info request")
                     familyRulesClient.sendClientInfoRequest()
                 }

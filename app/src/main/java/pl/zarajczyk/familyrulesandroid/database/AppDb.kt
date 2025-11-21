@@ -33,7 +33,7 @@ class AppDb(private val context: Context) {
             val start = System.currentTimeMillis()
             val appInfo = fetchFromSystem(packageName)
             val end = System.currentTimeMillis()
-            Log.i("AppDb", "Fetching app info from system took ${end - start}ms for package $packageName")
+            Logger.i("AppDb", "Fetching app info from system took ${end - start}ms for package $packageName")
             
             // Cache the result
             cacheAppInfo(appInfo)

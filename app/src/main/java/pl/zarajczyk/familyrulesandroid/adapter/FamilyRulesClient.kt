@@ -186,6 +186,12 @@ class FamilyRulesClient(
             }
         }
     }
+
+    suspend fun ensureAllAppsAreCached(packageNames: Set<String>) {
+        packageNames.forEach { packageName ->
+            appDb.getAppNameAndIcon(packageName)
+        }
+    }
 }
 
 enum class DeviceState {
