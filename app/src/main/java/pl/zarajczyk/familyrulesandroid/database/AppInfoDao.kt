@@ -14,12 +14,6 @@ interface AppInfoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAppInfo(appInfo: AppInfo)
 
-    @Update
-    suspend fun updateAppInfo(appInfo: AppInfo)
-
-    @Query("DELETE FROM app_info WHERE packageName = :packageName")
-    suspend fun deleteAppInfo(packageName: String)
-
     @Query("SELECT * FROM app_info")
     suspend fun getAllAppInfo(): List<AppInfo>
 }

@@ -9,6 +9,8 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import android.util.Base64
 import android.util.Log
+import pl.zarajczyk.familyrulesandroid.utils.Logger
+import androidx.core.graphics.createBitmap
 
 class AppDb(private val context: Context) {
     private val database = AppDatabase.getDatabase(context)
@@ -40,7 +42,7 @@ class AppDb(private val context: Context) {
         }
     }
 
-    private suspend fun fetchFromSystem(packageName: String): App {
+    private fun fetchFromSystem(packageName: String): App {
         return try {
             val packageManager = context.packageManager
             val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
@@ -51,6 +53,7 @@ class AppDb(private val context: Context) {
             
             App(appName, packageName, iconBase64)
         } catch (e: PackageManager.NameNotFoundException) {
+            Logger.w("AppDb", "Unable to fetch app info for package $packageName", e)
             App(packageName, packageName, null)
         }
     }
@@ -74,7 +77,7 @@ class AppDb(private val context: Context) {
 
 
     private fun Drawable.toBitmap(width: Int, height: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height)
         val canvas = android.graphics.Canvas(bitmap)
         setBounds(0, 0, width, height)
         draw(canvas)
@@ -84,15 +87,6 @@ class AppDb(private val context: Context) {
     suspend fun getAllAppInfo(): List<AppInfo> {
         return withContext(Dispatchers.IO) {
             appInfoDao.getAllAppInfo()
-        }
-    }
-
-    suspend fun clearCache() {
-        withContext(Dispatchers.IO) {
-            // Clear all app info from database
-            appInfoDao.getAllAppInfo().forEach { appInfo ->
-                appInfoDao.deleteAppInfo(appInfo.packageName)
-            }
         }
     }
 }

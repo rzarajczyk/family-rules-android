@@ -504,11 +504,11 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
 
     // Launch coroutine to fetch app info
     LaunchedEffect(stat.packageName) {
-        try {
-            appInfo = appDb.getAppNameAndIcon(stat.packageName)
+        appInfo = try {
+            appDb.getAppNameAndIcon(stat.packageName)
         } catch (e: Exception) {
             // Handle error - create a fallback app info
-            appInfo = App(stat.packageName, stat.packageName, null)
+            App(stat.packageName, stat.packageName, null)
         } finally {
             isLoading = false
         }
