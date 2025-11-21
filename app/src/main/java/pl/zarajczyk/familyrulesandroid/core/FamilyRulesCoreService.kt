@@ -154,7 +154,7 @@ class FamilyRulesCoreService : Service() {
     }
 
     fun resetPeriodicUsageEventsMonitor() {
-        Logger.i(TAG, "Resetting periodic usage events monitor")
+        Logger.i(TAG, "Resetting periodic usage events monitor, sending report and client info")
         periodicUsageEventsMonitor.reset()
         periodicReportSender.reportUptimeAsync()
         periodicReportSender.sendClientInfoAsync()

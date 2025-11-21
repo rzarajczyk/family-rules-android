@@ -109,6 +109,7 @@ class PeriodicReportSender(
     }
 
     fun sendClientInfoAsync() = scope.launch {
+        familyRulesClient.ensureAllAppsAreCached(coreService.getTodayPackageUsage().keys)
         sendInitialClientInfoRequest()
     }
 
