@@ -43,6 +43,7 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
     
     fun stopMonitoring() {
         isMonitoring = false
+        hideBlockingOverlay()
         Log.i("ForegroundAppMonitor", "Stopped foreground app monitoring")
     }
     
