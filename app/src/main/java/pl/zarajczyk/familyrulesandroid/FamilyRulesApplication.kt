@@ -16,10 +16,8 @@ class FamilyRulesApplication : Application() {
         val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
         
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            // Log the crash with full details
             Logger.e("UncaughtException", "Uncaught exception in thread: ${thread.name}", throwable)
-            Logger.logCrash(throwable, thread)
-            
+
             // Call the default handler to let Android handle the crash normally
             defaultExceptionHandler?.uncaughtException(thread, throwable)
         }

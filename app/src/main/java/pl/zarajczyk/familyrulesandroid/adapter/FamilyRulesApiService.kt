@@ -40,12 +40,7 @@ data class ReportResponseDto(
     val extra: String?
 )
 
-data class MembershipRequest(
-    val appGroupId: String
-)
-
-data class MembershipResponse(
-    val appGroupId: String,
+data class BlockedAppsResponse(
     val apps: List<MembershipAppResponse>
 )
 
@@ -85,8 +80,8 @@ interface FamilyRulesApiService {
     @POST("/api/v2/report")
     suspend fun report(@Body body: ReportRequest): ReportResponseDto
 
-    @POST("/api/v2/group-membership-for-device")
-    suspend fun groupMembershipForDevice(@Body body: MembershipRequest): MembershipResponse
+    @POST("/api/v2/get-blocked-apps")
+    suspend fun getBlockedApps(): BlockedAppsResponse
 
     @POST("/api/v2/groups-usage-report")
     suspend fun getGroupsUsageReport(): AppGroupsUsageReportResponse

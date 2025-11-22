@@ -78,25 +78,6 @@ object Logger {
     }
     
     /**
-     * Log a crash (unhandled exception) with full details
-     */
-    fun logCrash(throwable: Throwable, thread: Thread) {
-        try {
-            lock.write {
-                rotateLogFileIfNeeded()
-                
-                val logFile = currentLogFile ?: return
-                
-                val crashReport = buildCrashReport(throwable, thread)
-                logFile.appendText(crashReport)
-            }
-        } catch (e: Exception) {
-            // Avoid infinite loop - just log to logcat
-            Log.e(TAG, "Failed to log crash", e)
-        }
-    }
-    
-    /**
      * Writes a log entry to the current log file
      */
     private fun writeLog(level: String, tag: String, message: String, throwable: Throwable?) {
@@ -130,66 +111,7 @@ object Logger {
             Log.e(TAG, "Failed to write to log file", e)
         }
     }
-    
-    /**
-     * Builds a detailed crash report
-     */
-    private fun buildCrashReport(throwable: Throwable, thread: Thread): String {
-        val report = StringBuilder()
-        
-        val timestamp = timestampFormat.format(Date())
-        
-        report.append("\n")
-        report.append("=" .repeat(80) + "\n")
-        report.append("CRASH REPORT\n")
-        report.append("=" .repeat(80) + "\n")
-        report.append("Timestamp: $timestamp\n")
-        report.append("\n")
-        
-        // Device information
-        report.append("Device Information:\n")
-        report.append("  Device: ${Build.MANUFACTURER} ${Build.MODEL}\n")
-        report.append("  Android Version: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
-        report.append("  Build: ${Build.DISPLAY}\n")
-        report.append("\n")
-        
-        // Thread information
-        report.append("Thread Information:\n")
-        report.append("  Thread Name: ${thread.name}\n")
-        report.append("  Thread ID: ${thread.id}\n")
-        report.append("\n")
-        
-        // Exception information
-        report.append("Exception Information:\n")
-        report.append("  Exception Type: ${throwable.javaClass.name}\n")
-        report.append("  Message: ${throwable.message ?: "No message"}\n")
-        report.append("\n")
-        
-        // Full stack trace
-        report.append("Stack Trace:\n")
-        val stringWriter = StringWriter()
-        val printWriter = PrintWriter(stringWriter)
-        throwable.printStackTrace(printWriter)
-        report.append(stringWriter.toString())
-        report.append("\n")
-        
-        // Caused by (if any)
-        var cause = throwable.cause
-        while (cause != null) {
-            report.append("Caused by: ${cause.javaClass.name}: ${cause.message}\n")
-            val causeWriter = StringWriter()
-            val causePrintWriter = PrintWriter(causeWriter)
-            cause.printStackTrace(causePrintWriter)
-            report.append(causeWriter.toString())
-            report.append("\n")
-            cause = cause.cause
-        }
-        
-        report.append("=" .repeat(80) + "\n\n")
-        
-        return report.toString()
-    }
-    
+
     /**
      * Rotates the log file if we're on a new date
      */
@@ -331,45 +253,6 @@ object Logger {
             logFiles
         } catch (e: Exception) {
             Log.e(TAG, "Failed to export logs", e)
-            null
-        }
-    }
-    
-    /**
-     * Creates a single concatenated export file containing all logs
-     * This is a fallback if individual file sharing is not possible
-     */
-    fun exportLogsAsSingleFile(context: Context): File? {
-        return try {
-            val logFiles = getLogFiles(context)
-            
-            if (logFiles.isEmpty()) {
-                return null
-            }
-            
-            // Create a temporary file in cache directory for sharing
-            val exportFile = File(context.cacheDir, "family_rules_logs_export.txt")
-            
-            exportFile.bufferedWriter().use { writer ->
-                writer.write("FAMILY RULES - COMPLETE LOGS EXPORT\n")
-                writer.write("Generated: ${timestampFormat.format(Date())}\n")
-                writer.write("Total log files: ${logFiles.size}\n")
-                writer.write("=" .repeat(80) + "\n\n")
-                
-                logFiles.forEachIndexed { index, logFile ->
-                    writer.write("\n")
-                    writer.write("=" .repeat(80) + "\n")
-                    writer.write("LOG FILE ${index + 1} of ${logFiles.size}: ${logFile.name}\n")
-                    writer.write("=" .repeat(80) + "\n")
-                    writer.write(readLogFile(logFile))
-                    writer.write("\n\n")
-                }
-            }
-            
-            Log.d(TAG, "All logs exported to: ${exportFile.absolutePath}")
-            exportFile
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to export logs as single file", e)
             null
         }
     }

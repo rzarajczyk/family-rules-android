@@ -11,6 +11,8 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.database.AppDb
+import pl.zarajczyk.familyrulesandroid.utils.Logger
+import pl.zarajczyk.familyrulesandroid.utils.millisToHMS
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
@@ -40,7 +42,7 @@ class FamilyRulesClient(
             }
             val arguments = when (state) {
                 DeviceState.ACTIVE -> null
-                DeviceState.BLOCK_RESTRICTED_APPS -> setOf("APP_GROUP")
+                DeviceState.BLOCK_RESTRICTED_APPS -> null
             }
             AvailableState(
                 deviceState = state.name,
@@ -91,6 +93,7 @@ class FamilyRulesClient(
     }
 
     suspend fun sendClientInfoRequest() {
+        Logger.i("FamilyRulesClient", "Sending client info request")
         val instanceId = settingsManager.getString("instanceId", "")
         val version = settingsManager.getVersion()
         val knownApps: Map<String, AppData> = appDb
@@ -140,7 +143,9 @@ class FamilyRulesClient(
         return withContext(Dispatchers.IO) {
             try {
                 val response = apiService.report(request)
-                ActualDeviceState.from(response)
+                val state = ActualDeviceState.from(response)
+                Logger.i("FamilyRulesClient", createUptimeLogMessage(uptime, state))
+                state
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
                 ActualDeviceState.ACTIVE
@@ -148,22 +153,29 @@ class FamilyRulesClient(
         }
     }
 
-    suspend fun getAppGroupReport(appGroupId: String): List<String> {
-        val request = MembershipRequest(appGroupId = appGroupId)
 
-        Log.d("FamilyRulesClient", "Fetching app group report for group: $appGroupId")
+    private fun createUptimeLogMessage(uptime: Uptime, response: ActualDeviceState): String {
+        val topApps = uptime.packageUsages.entries.sortedByDescending { it.value }.take(3)
+        return "Uptime reported [" +
+                "screen time: ${uptime.screenTimeMillis.millisToHMS()}; " +
+                "top 3 apps: " + topApps.joinToString(", ") { "${it.key} (${it.value.millisToHMS()})" } +
+                "], received device state: ${response.state}"
+    }
+
+    suspend fun getBlockedApps(): List<String> {
+        Log.d("FamilyRulesClient", "Fetching blocked apps for device")
 
         return withContext(Dispatchers.IO) {
             try {
-                val response = apiService.groupMembershipForDevice(request)
+                val response = apiService.getBlockedApps()
                 val appPackages = response.apps.map { it.appPath }
-                Log.d(
+                Logger.i(
                     "FamilyRulesClient",
-                    "App group report returned ${appPackages.size} apps: $appPackages"
+                    "Fetched ${appPackages.size} blocked apps for device: $appPackages"
                 )
                 appPackages
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to fetch app group report: ${e.message}", e)
+                Log.e("FamilyRulesClient", "Failed to fetch blocked apps: ${e.message}", e)
                 emptyList()
             }
         }
@@ -188,6 +200,7 @@ class FamilyRulesClient(
     }
 
     suspend fun ensureAllAppsAreCached(packageNames: Set<String>) {
+        Logger.i("FamilyRulesClient", "Ensuring all apps are cached")
         packageNames.forEach { packageName ->
             appDb.getAppNameAndIcon(packageName)
         }

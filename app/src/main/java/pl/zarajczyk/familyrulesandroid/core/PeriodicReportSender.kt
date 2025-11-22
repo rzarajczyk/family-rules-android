@@ -1,6 +1,5 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,7 +12,6 @@ import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
 import pl.zarajczyk.familyrulesandroid.adapter.Uptime
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.utils.Logger
-import pl.zarajczyk.familyrulesandroid.utils.millisToHMS
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -79,9 +77,7 @@ class PeriodicReportSender(
         while (isActive()) {
             try {
                 if (ScreenStatus.isScreenOn(coreService)) {
-                    Logger.i("PeriodicReportSender", "Ensuring all apps are cached")
                     familyRulesClient.ensureAllAppsAreCached(coreService.getTodayPackageUsage().keys)
-                    Logger.i("PeriodicReportSender", "Sending client info request")
                     familyRulesClient.sendClientInfoRequest()
                 }
             } catch (e: Exception) {
@@ -119,25 +115,14 @@ class PeriodicReportSender(
             packageUsages = coreService.getTodayPackageUsage()
         )
         val response = familyRulesClient.reportUptime(uptime)
-        Logger.i("ReportService", createLogMessage(uptime, response))
-
-        // Handle device state changes
         handleDeviceStateChange(response)
-    }
-
-    private fun createLogMessage(uptime: Uptime, response: ActualDeviceState): String {
-        val topApps = uptime.packageUsages.entries.sortedByDescending { it.value }.take(3)
-        return "Uptime reported [" +
-                "screen time: ${uptime.screenTimeMillis.millisToHMS()}; " +
-                "top 3 apps: " + topApps.joinToString(", ") { "${it.key} (${it.value.millisToHMS()})" } +
-                "], received device state: ${response.state}"
     }
 
     private fun handleDeviceStateChange(newState: ActualDeviceState) {
         if (currentDeviceState != newState) {
             Logger.i(
                 "PeriodicReportSender",
-                "Device state changed from ${currentDeviceState.state} to ${newState.state}"
+                "Handling device state changed from ${currentDeviceState.state} to ${newState.state}"
             )
 
             when (newState.state) {
@@ -152,20 +137,13 @@ class PeriodicReportSender(
                 DeviceState.BLOCK_RESTRICTED_APPS -> {
                     // Block apps when entering BLOCK_RESTRICTED_APPS state for the first time
                     if (currentDeviceState != newState) {
-                        val appGroupId = newState.extra
-                        if (appGroupId != null) {
-                            Logger.w("PeriodicReportSender", "Blocking apps - fetching group: $appGroupId")
-                            scope.launch {
-                                try {
-                                    val appList = familyRulesClient.getAppGroupReport(appGroupId)
-                                    appBlocker.block(appList)
-                                    Logger.w("PeriodicReportSender", "Blocking ${appList.size} restricted apps")
-                                } catch (e: Exception) {
-                                    Logger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
-                                }
+                        scope.launch {
+                            try {
+                                val appList = familyRulesClient.getBlockedApps()
+                                appBlocker.block(appList)
+                            } catch (e: Exception) {
+                                Logger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
                             }
-                        } else {
-                            Logger.w("PeriodicReportSender", "No appGroupId provided in BLOCK_RESTRICTED_APPS state")
                         }
                     }
                 }
