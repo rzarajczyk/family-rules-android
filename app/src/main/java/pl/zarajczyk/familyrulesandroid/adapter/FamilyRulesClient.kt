@@ -112,8 +112,6 @@ class FamilyRulesClient(
             availableStates = AVAILABLE_STATES
         )
 
-        Log.d("FamilyRulesClient", "Sending client-info request (DTO)")
-
         withContext(Dispatchers.IO) {
             try {
                 val response = apiService.sendClientInfo(request)
@@ -137,8 +135,6 @@ class FamilyRulesClient(
             screenTime = uptime.screenTimeMillis / 1000,
             applications = applications
         )
-
-        Log.d("FamilyRulesClient", "Reporting uptime (DTO)")
 
         return withContext(Dispatchers.IO) {
             try {

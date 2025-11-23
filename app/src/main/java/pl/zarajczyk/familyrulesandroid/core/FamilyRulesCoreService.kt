@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
+import android.graphics.BitmapFactory
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -240,10 +241,39 @@ class FamilyRulesCoreService : Service() {
             DeviceState.BLOCK_RESTRICTED_APPS -> "Monitoring active - apps blocked"
         }
 
+        val iconResource = when (currentState.state) {
+            DeviceState.ACTIVE -> R.drawable.icon
+            DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.icon_blocked
+        }
+
+        val largeIconResource = when (currentState.state) {
+            DeviceState.ACTIVE -> null
+            DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.notification_icon_blocked
+        }
+
+        val largeIcon = largeIconResource?.let { resource ->
+            resources.getDrawable(resource, null).let { drawable ->
+                val bitmap = android.graphics.Bitmap.createBitmap(
+                    drawable.intrinsicWidth,
+                    drawable.intrinsicHeight,
+                    android.graphics.Bitmap.Config.ARGB_8888
+                )
+                val canvas = android.graphics.Canvas(bitmap)
+                drawable.setBounds(0, 0, canvas.width, canvas.height)
+                drawable.draw(canvas)
+                bitmap
+            }
+        }
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Family Rules")
             .setContentText(notificationText)
-            .setSmallIcon(R.drawable.icon)
+            .setSmallIcon(iconResource)
+            .apply {
+                if (largeIcon != null) {
+                    setLargeIcon(largeIcon)
+                }
+            }
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
