@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                         val bgColor = when (deviceState.state) {
                             DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
                             DeviceState.BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
+                            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> FamilyRulesColors.BLOCKING_COLOR
                         }
                         androidx.compose.runtime.SideEffect {
                             WindowCompat.getInsetsController(window, window.decorView).apply {

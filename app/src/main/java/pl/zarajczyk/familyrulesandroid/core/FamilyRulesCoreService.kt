@@ -237,18 +237,21 @@ class FamilyRulesCoreService : Service() {
 
         val currentState = deviceStateManager.getCurrentState()
         val notificationText = when (currentState.state) {
-            DeviceState.ACTIVE -> "Monitoring active"
-            DeviceState.BLOCK_RESTRICTED_APPS -> "Monitoring active - apps blocked"
+            DeviceState.ACTIVE -> getString(R.string.notification_monitoring_active)
+            DeviceState.BLOCK_RESTRICTED_APPS -> getString(R.string.notification_apps_blocked)
+            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> getString(R.string.notification_countdown_active)
         }
 
         val iconResource = when (currentState.state) {
             DeviceState.ACTIVE -> R.drawable.icon
             DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.icon_blocked
+            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> R.drawable.icon_blocked
         }
 
         val largeIconResource = when (currentState.state) {
             DeviceState.ACTIVE -> null
             DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.notification_icon_blocked
+            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> R.drawable.notification_icon_blocked
         }
 
         val largeIcon = largeIconResource?.let { resource ->

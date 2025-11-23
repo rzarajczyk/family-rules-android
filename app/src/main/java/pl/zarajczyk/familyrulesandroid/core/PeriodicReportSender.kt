@@ -128,8 +128,10 @@ class PeriodicReportSender(
             when (newState.state) {
                 DeviceState.ACTIVE -> {
                     // Unblock apps when returning to ACTIVE state
-                    if (currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS) {
+                    if (currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS ||
+                        currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT) {
                         Logger.i("PeriodicReportSender", "Unblocking restricted apps - returning to ACTIVE state")
+                        CountdownOverlayService.hideCountdown(coreService)
                         appBlocker.unblock()
                     }
                 }
@@ -141,6 +143,25 @@ class PeriodicReportSender(
                             try {
                                 val appList = familyRulesClient.getBlockedApps()
                                 appBlocker.block(appList)
+                            } catch (e: Exception) {
+                                Logger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
+                            }
+                        }
+                    }
+                }
+                
+                DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> {
+                    // Start countdown, then block apps when countdown completes
+                    if (currentDeviceState != newState) {
+                        Logger.i("PeriodicReportSender", "Starting countdown before blocking apps")
+                        scope.launch {
+                            try {
+                                val appList = familyRulesClient.getBlockedApps()
+                                // Show countdown overlay - apps will be blocked after countdown
+                                CountdownOverlayService.showCountdown(coreService) {
+                                    Logger.i("PeriodicReportSender", "Countdown complete - blocking apps")
+                                    appBlocker.block(appList)
+                                }
                             } catch (e: Exception) {
                                 Logger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
                             }

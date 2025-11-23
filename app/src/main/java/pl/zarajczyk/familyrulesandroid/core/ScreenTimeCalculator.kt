@@ -31,7 +31,6 @@ class ScreenTimeCalculator : SystemEventProcessor {
         if (screenEvents.isEmpty()) {
             if (isScreenOn)
                 todayScreenTime += end - start
-            Log.d("ScreenTimeCalculator", "Total screen time $todayScreenTime")
             return
         }
 
@@ -50,7 +49,6 @@ class ScreenTimeCalculator : SystemEventProcessor {
             }
 
         todayScreenTime += batchScreenOnTime
-        Log.d("ScreenTimeCalculator", "Total screen time $todayScreenTime")
     }
 
     private fun List<Event>.toScreenEvents(): List<ScreenEvent> =

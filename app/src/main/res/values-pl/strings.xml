@@ -46,6 +46,12 @@
     <string name="app_blocked_title">Ta aplikacja jest zablokowana</string>
     <string name="app_blocked_description">Zamknij tę aplikację i wróć do dozwolonych aplikacji</string>
     
+    <!-- Countdown Overlay -->
+    <string name="countdown_title">Odliczanie do blokady aplikacji</string>
+    <string name="countdown_description">Aplikacje zostaną zablokowane po zakończeniu odliczania</string>
+    <string name="countdown_warning">Dokończ swoje bieżące czynności</string>
+    <string name="countdown_compact_message">Aplikacje zostaną zablokowane</string>
+    
     <!-- Error Messages -->
     <string name="instance_already_exists">Instancja już istnieje.</string>
     <string name="illegal_instance_name">Nieprawidłowa nazwa instancji.</string>
@@ -56,6 +62,11 @@
     
     <!-- Content Descriptions -->
     <string name="family_rules_icon">Ikona FamilyRules</string>
+    
+    <!-- Notifications -->
+    <string name="notification_monitoring_active">Monitorowanie aktywne</string>
+    <string name="notification_apps_blocked">Monitorowanie aktywne - aplikacje zablokowane</string>
+    <string name="notification_countdown_active">Monitorowanie aktywne - odliczanie aktywne</string>
     
     <!-- Menu -->
     <string name="menu">Menu</string>

@@ -38,6 +38,7 @@ import androidx.core.content.FileProvider
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_RESTRICTED_APPS
+import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import pl.zarajczyk.familyrulesandroid.utils.Logger
@@ -69,6 +70,7 @@ fun SharedAppLayout(
         val bgColor = when (deviceState) {
             ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
             BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
+            BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> FamilyRulesColors.BLOCKING_COLOR
         }
         if (isLandscape) {
             // Horizontal layout for landscape orientation

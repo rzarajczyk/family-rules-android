@@ -46,6 +46,12 @@
     <string name="app_blocked_title">This app is blocked</string>
     <string name="app_blocked_description">Please close this app and return to allowed applications</string>
     
+    <!-- Countdown Overlay -->
+    <string name="countdown_title">App Blocking Countdown</string>
+    <string name="countdown_description">Apps will be blocked when the timer reaches zero</string>
+    <string name="countdown_warning">Please finish your current activities</string>
+    <string name="countdown_compact_message">Apps will be blocked</string>
+    
     <!-- Error Messages -->
     <string name="instance_already_exists">Instance already exists.</string>
     <string name="illegal_instance_name">Illegal instance name.</string>
@@ -56,6 +62,11 @@
     
     <!-- Content Descriptions -->
     <string name="family_rules_icon">FamilyRules Icon</string>
+    
+    <!-- Notifications -->
+    <string name="notification_monitoring_active">Monitoring active</string>
+    <string name="notification_apps_blocked">Monitoring active - apps blocked</string>
+    <string name="notification_countdown_active">Monitoring active - countdown active</string>
     
     <!-- Menu -->
     <string name="menu">Menu</string>

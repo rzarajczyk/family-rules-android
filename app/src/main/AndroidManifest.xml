@@ -65,6 +65,12 @@
             android:name=".core.AppBlockingOverlayService"
             android:enabled="true"
             android:exported="false" />
+        
+        <service
+            android:name=".core.CountdownOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+        
         <receiver
             android:name=".entrypoints.BootReceiver"
             android:enabled="true"
