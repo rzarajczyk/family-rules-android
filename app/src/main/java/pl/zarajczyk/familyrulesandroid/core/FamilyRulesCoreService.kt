@@ -181,7 +181,7 @@ class FamilyRulesCoreService : Service() {
         packageUsageCalculator = PackageUsageCalculator()
 
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
-            delayDuration = 5.seconds,
+            delayDuration = 2.seconds,
             processors = listOf(
                 screenTimeCalculator,
                 packageUsageCalculator,
