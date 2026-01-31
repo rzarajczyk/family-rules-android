@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -636,8 +637,14 @@ fun SystemEventsDebugDialog(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val eventLogger = service.getSystemEventLogger()
-    val eventsText = remember(packageName) {
-        eventLogger.formatEventsAsText(packageName)
+    var recalculateTrigger by remember { mutableStateOf(0) }
+    var isRecalculating by remember { mutableStateOf(false) }
+    val eventsText = remember(packageName, recalculateTrigger) {
+        if (isRecalculating) {
+            "Recalculating..."
+        } else {
+            eventLogger.formatEventsAsText(packageName)
+        }
     }
 
     AlertDialog(
@@ -686,13 +693,39 @@ fun SystemEventsDebugDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(eventsText))
-                    onDismiss()
-                }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Copy to Clipboard")
+                Button(
+                    onClick = {
+                        isRecalculating = true
+                        recalculateTrigger++
+                    },
+                    enabled = !isRecalculating
+                ) {
+                    Text("Recalculate")
+                }
+                
+                LaunchedEffect(isRecalculating) {
+                    if (isRecalculating) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            service.resetPeriodicUsageEventsMonitor()
+                        }
+                        isRecalculating = false
+                        recalculateTrigger++
+                    }
+                }
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(eventsText))
+                        onDismiss()
+                    }
+                ) {
+                    Text(
+                        text = "📋",
+                        fontSize = 20.sp
+                    )
+                }
             }
         },
         dismissButton = {
