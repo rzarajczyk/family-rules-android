@@ -15,6 +15,9 @@ class SystemEventLogger : SystemEventProcessor {
     @Volatile
     private var todayEvents = ConcurrentHashMap<String, MutableList<EventLogEntry>>()
     
+    @Volatile
+    private var screenEvents = mutableListOf<EventLogEntry>()
+    
     data class EventLogEntry(
         val timestamp: Long,
         val eventType: Int,
@@ -22,10 +25,12 @@ class SystemEventLogger : SystemEventProcessor {
     )
     
     /**
-     * Get all logged events for a specific package
+     * Get all logged events for a specific package, including screen events
      */
     fun getEventsForPackage(packageName: String): List<EventLogEntry> {
-        return todayEvents[packageName]?.toList() ?: emptyList()
+        val packageEvents = todayEvents[packageName]?.toList() ?: emptyList()
+        // Combine package-specific events with screen events and sort by timestamp
+        return (packageEvents + screenEvents).sortedBy { it.timestamp }
     }
     
     /**
@@ -37,6 +42,7 @@ class SystemEventLogger : SystemEventProcessor {
     
     override fun reset() {
         todayEvents.clear()
+        screenEvents.clear()
     }
     
     override fun processEventBatch(events: List<Event>, start: Long, end: Long) {
@@ -48,7 +54,13 @@ class SystemEventLogger : SystemEventProcessor {
                 eventTypeName = eventTypeName
             )
             
-            todayEvents.getOrPut(event.packageName) { mutableListOf() }.add(logEntry)
+            // Screen events are global, store them separately so they appear for all apps
+            if (event.eventType == UsageEvents.Event.SCREEN_INTERACTIVE || 
+                event.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                screenEvents.add(logEntry)
+            } else {
+                todayEvents.getOrPut(event.packageName) { mutableListOf() }.add(logEntry)
+            }
         }
     }
     
@@ -65,12 +77,19 @@ class SystemEventLogger : SystemEventProcessor {
         val builder = StringBuilder()
         builder.append("System Events for: $packageName\n")
         builder.append("Total Events: ${events.size}\n")
+        builder.append("(includes ${screenEvents.size} screen events)\n")
         builder.append("=" .repeat(50))
         builder.append("\n\n")
         
         events.forEach { entry ->
             val time = dateFormat.format(Date(entry.timestamp))
-            builder.append("$time - ${entry.eventTypeName} (${entry.eventType})\n")
+            val marker = if (entry.eventType == UsageEvents.Event.SCREEN_INTERACTIVE || 
+                             entry.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                "[SCREEN] "
+            } else {
+                ""
+            }
+            builder.append("$time - $marker${entry.eventTypeName} (${entry.eventType})\n")
         }
         
         return builder.toString()
