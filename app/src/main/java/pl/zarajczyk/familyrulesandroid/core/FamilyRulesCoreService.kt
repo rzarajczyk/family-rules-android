@@ -24,6 +24,7 @@ import pl.zarajczyk.familyrulesandroid.entrypoints.ScreenOffReceiver
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import androidx.core.graphics.createBitmap
 
 
 class FamilyRulesCoreService : Service() {
@@ -32,6 +33,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var periodicUsageEventsMonitor: PeriodicUsageEventsMonitor
     private lateinit var screenTimeCalculator: ScreenTimeCalculator
     private lateinit var packageUsageCalculator: PackageUsageCalculator
+    private lateinit var systemEventLogger: SystemEventLogger
     private lateinit var screenOffReceiver: ScreenOffReceiver
 
     private lateinit var periodicReportSender: PeriodicReportSender
@@ -141,6 +143,8 @@ class FamilyRulesCoreService : Service() {
 
     fun getTodayPackageUsage() = packageUsageCalculator.getTodayPackageUsage()
 
+    fun getSystemEventLogger() = systemEventLogger
+
     fun getCurrentDeviceState() = deviceStateManager.getCurrentState()
 
     fun getDeviceStateFlow() = deviceStateManager.currentState
@@ -179,12 +183,14 @@ class FamilyRulesCoreService : Service() {
 
         screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
+        systemEventLogger = SystemEventLogger()
 
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
             delayDuration = 2.seconds,
             processors = listOf(
                 screenTimeCalculator,
                 packageUsageCalculator,
+                systemEventLogger,
             )
         )
 
@@ -256,11 +262,7 @@ class FamilyRulesCoreService : Service() {
 
         val largeIcon = largeIconResource?.let { resource ->
             resources.getDrawable(resource, null).let { drawable ->
-                val bitmap = android.graphics.Bitmap.createBitmap(
-                    drawable.intrinsicWidth,
-                    drawable.intrinsicHeight,
-                    android.graphics.Bitmap.Config.ARGB_8888
-                )
+                val bitmap = createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight)
                 val canvas = android.graphics.Canvas(bitmap)
                 drawable.setBounds(0, 0, canvas.width, canvas.height)
                 drawable.draw(canvas)

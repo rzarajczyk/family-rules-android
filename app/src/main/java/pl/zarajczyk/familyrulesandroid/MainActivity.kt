@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,15 +19,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +47,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -141,7 +150,8 @@ class MainActivity : ComponentActivity() {
                             screenTime = screenTimeState,
                             settingsManager = settingsManager,
                             appDb = appDb,
-                            deviceState = deviceState.state
+                            deviceState = deviceState.state,
+                            service = service
                         )
                     }
                 }
@@ -169,7 +179,8 @@ fun MainScreen(
     screenTime: Long,
     settingsManager: SettingsManager,
     appDb: AppDb,
-    deviceState: DeviceState = DeviceState.ACTIVE
+    deviceState: DeviceState = DeviceState.ACTIVE,
+    service: FamilyRulesCoreService
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf(
@@ -201,7 +212,8 @@ fun MainScreen(
                     usageStatsList = usageStatsList,
                     screenTime = screenTime,
                     settingsManager = settingsManager,
-                    appDb = appDb
+                    appDb = appDb,
+                    service = service
                 )
                 1 -> AllDevicesTab()
             }
@@ -214,7 +226,8 @@ fun ThisDeviceTab(
     usageStatsList: Map<String, Long>,
     screenTime: Long,
     settingsManager: SettingsManager,
-    appDb: AppDb
+    appDb: AppDb,
+    service: FamilyRulesCoreService
 ) {
     Column(
         modifier = Modifier.fillMaxSize()
@@ -228,6 +241,7 @@ fun ThisDeviceTab(
             UsageStatsDisplay(
                 usageStatsList = usageStatsList,
                 appDb = appDb,
+                service = service,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -469,6 +483,7 @@ data class PackageUsage(
 fun UsageStatsDisplay(
     usageStatsList: Map<String, Long>,
     appDb: AppDb,
+    service: FamilyRulesCoreService,
     modifier: Modifier = Modifier
 ) {
     // Sort the usageStatsList by totalTimeInForeground in descending order
@@ -486,13 +501,14 @@ fun UsageStatsDisplay(
             )
     ) {
         items(sortedUsageStatsList) { stat ->
-            AppUsageItem(stat, appDb)
+            AppUsageItem(stat, appDb, service)
         }
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
+private fun AppUsageItem(stat: PackageUsage, appDb: AppDb, service: FamilyRulesCoreService) {
     val totalTimeFormatted = stat.totalTimeInForegroundMillis.millisToHMS()
 
     // State to hold the app info
@@ -502,6 +518,7 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
     var isLoading by remember(stat.packageName) {
         mutableStateOf(true)
     }
+    var showDebugDialog by remember { mutableStateOf(false) }
 
     // Launch coroutine to fetch app info
     LaunchedEffect(stat.packageName) {
@@ -518,7 +535,11 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(all = 8.dp),
+            .padding(all = 8.dp)
+            .combinedClickable(
+                onClick = { /* Regular click - do nothing */ },
+                onLongClick = { showDebugDialog = true }
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isLoading) {
@@ -556,6 +577,16 @@ private fun AppUsageItem(stat: PackageUsage, appDb: AppDb) {
                 color = FamilyRulesColors.TEXT_COLOR
             )
         }
+    }
+    
+    // Show debug dialog when long-press is triggered
+    if (showDebugDialog) {
+        SystemEventsDebugDialog(
+            packageName = stat.packageName,
+            appName = appInfo?.name ?: stat.packageName,
+            service = service,
+            onDismiss = { showDebugDialog = false }
+        )
     }
 }
 
@@ -596,14 +627,144 @@ private fun base64ToBitmap(base64: String): android.graphics.Bitmap? {
     }
 }
 
+@Composable
+fun SystemEventsDebugDialog(
+    packageName: String,
+    appName: String,
+    service: FamilyRulesCoreService,
+    onDismiss: () -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val eventLogger = service.getSystemEventLogger()
+    val eventsText = remember(packageName) {
+        eventLogger.formatEventsAsText(packageName)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Debug: System Events",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = appName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = FamilyRulesColors.TEXT_COLOR
+                )
+                Text(
+                    text = packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .background(
+                            Color.Black.copy(alpha = 0.05f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = eventsText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(eventsText))
+                    onDismiss()
+                }
+            ) {
+                Text("Copy to Clipboard")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 fun UsageStatsDisplayPreview() {
     FamilyRulesAndroidTheme {
-        // Preview doesn't need real AppDb
-        UsageStatsDisplay(
-            emptyMap(),
-            appDb = AppDb(androidx.compose.ui.platform.LocalContext.current)
+        // Preview shows basic UI structure only (no service binding available in preview)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val mockUsageStats = mapOf(
+            "com.android.chrome" to 3600000L,
+            "com.whatsapp" to 1800000L,
+            "com.spotify.music" to 900000L
         )
+        
+        Column(modifier = Modifier.fillMaxSize()) {
+            Text(
+                text = "Preview Mode - Service features disabled",
+                modifier = Modifier.padding(8.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+            
+            // Show just the sorted list structure without service
+            val sortedUsageStatsList = mockUsageStats
+                .map { (packageName, totalTime) -> PackageUsage(packageName, totalTime) }
+                .sortedByDescending { it.totalTimeInForegroundMillis }
+            
+            LazyColumn(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .background(
+                        color = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+            ) {
+                items(sortedUsageStatsList) { stat ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(all = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Color.Gray.copy(alpha = 0.3f), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stat.packageName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontSize = 18.sp,
+                                color = FamilyRulesColors.TEXT_COLOR
+                            )
+                            Text(
+                                text = stat.totalTimeInForegroundMillis.millisToHMS(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FamilyRulesColors.TEXT_COLOR
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
