@@ -27,7 +27,8 @@ data class ClientInfoRequest(
 data class ReportRequest(
     val instanceId: String,
     val screenTime: Long,
-    val applications: Map<String, Long>
+    val applications: Map<String, Long>,
+    val activeApps: Set<String>
 )
 
 // Response DTOs

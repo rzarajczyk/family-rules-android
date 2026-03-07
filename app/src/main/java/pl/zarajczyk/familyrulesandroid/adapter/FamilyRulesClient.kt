@@ -18,7 +18,8 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 
 data class Uptime(
     val screenTimeMillis: Long,
-    val packageUsages: Map<String, Long>
+    val packageUsages: Map<String, Long>,
+    val activeApps: Set<String>
 )
 
 data class AppDetails(
@@ -137,7 +138,8 @@ class FamilyRulesClient(
         val request = ReportRequest(
             instanceId = instanceId,
             screenTime = uptime.screenTimeMillis / 1000,
-            applications = applications
+            applications = applications,
+            activeApps = uptime.activeApps
         )
 
         return withContext(Dispatchers.IO) {

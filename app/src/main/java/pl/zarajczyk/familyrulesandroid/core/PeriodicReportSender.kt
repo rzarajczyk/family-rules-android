@@ -110,9 +110,11 @@ class PeriodicReportSender(
     }
 
     private suspend fun reportUptime() {
+        val foregroundApp = coreService.getForegroundApp()
         val uptime = Uptime(
             screenTimeMillis = coreService.getTodayScreenTime(),
-            packageUsages = coreService.getTodayPackageUsage()
+            packageUsages = coreService.getTodayPackageUsage(),
+            activeApps = if (foregroundApp != null) setOf(foregroundApp) else emptySet()
         )
         val response = familyRulesClient.reportUptime(uptime)
         handleDeviceStateChange(response)
