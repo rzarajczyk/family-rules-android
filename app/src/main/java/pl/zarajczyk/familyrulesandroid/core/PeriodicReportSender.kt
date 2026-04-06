@@ -216,9 +216,8 @@ class PeriodicReportSender(
      */
     private suspend fun refreshBlockedAppsIfChanged() {
         val freshList = familyRulesClient.getBlockedApps() ?: return  // fetch failed; keep current
-        if (freshList.isNotEmpty()) {
-            persistBlockedApps(freshList)
-        }
+        // Persist unconditionally — an empty list is a valid intentional server response.
+        persistBlockedApps(freshList)
         if (freshList.toSet() != cachedBlockedApps.toSet()) {
             Logger.i(TAG, "Blocked app list changed - re-arming (${cachedBlockedApps.size} -> ${freshList.size} apps)")
             cachedBlockedApps = freshList
@@ -236,10 +235,10 @@ class PeriodicReportSender(
     private suspend fun resolveBlockedApps(): List<String> {
         val fetched = familyRulesClient.getBlockedApps()
         return if (fetched != null) {
-            if (fetched.isNotEmpty()) {
-                persistBlockedApps(fetched)
-                cachedBlockedApps = fetched
-            }
+            // Persist unconditionally — an empty list from the server is intentional
+            // and must overwrite any stale non-empty cache (fixes isNotEmpty() guard bug).
+            persistBlockedApps(fetched)
+            cachedBlockedApps = fetched
             fetched
         } else {
             // Fetch failed — use persisted cache as fallback.
