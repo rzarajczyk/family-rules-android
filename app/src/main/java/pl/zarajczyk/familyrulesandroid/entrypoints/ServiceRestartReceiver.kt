@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
+import pl.zarajczyk.familyrulesandroid.core.ServiceKeepAliveAlarm
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * BroadcastReceiver that restarts the FamilyRulesCoreService.
@@ -14,6 +16,9 @@ class ServiceRestartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_RESTART_SERVICE) {
             Log.i(TAG, "ServiceRestartReceiver triggered - restarting service")
+            
+            // Always re-arm the next alarm first, so the chain continues regardless of service state.
+            ServiceKeepAliveAlarm.scheduleAlarm(context, 5.minutes)
             
             // BroadcastReceiver context is allowed to start FGS on Android 12+
             // when triggered by AlarmManager

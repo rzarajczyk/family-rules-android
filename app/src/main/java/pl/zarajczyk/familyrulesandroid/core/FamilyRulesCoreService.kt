@@ -314,9 +314,6 @@ class FamilyRulesCoreService : Service() {
         foregroundStarted = false
         Logger.w(TAG, "FamilyRulesCoreService onDestroy() - service stopping")
         
-        // Cancel the keep-alive alarm
-        ServiceKeepAliveAlarm.cancelAlarm(this)
-        
         if (::screenOffReceiver.isInitialized) {
             unregisterReceiver(screenOffReceiver)
         }

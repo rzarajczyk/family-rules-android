@@ -153,14 +153,15 @@ fun ProtectionSetupContent(
 ) {
     val context = LocalContext.current
     var deviceAdminEnabled by remember { mutableStateOf(deviceAdminManager.isDeviceAdminActive()) }
-    var batteryOptimizationDisabled by remember { mutableStateOf(false) }
+    var batteryOptimizationExempt by remember { mutableStateOf(false) }
     var exactAlarmsEnabled by remember { mutableStateOf(false) }
     var notificationPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationPermissionGranted()) }
     var usageStatsPermissionGranted by remember { mutableStateOf(permissionChecker.isUsageStatsPermissionGranted()) }
     var systemAlertWindowPermissionGranted by remember { mutableStateOf(permissionChecker.isSystemAlertWindowPermissionGranted()) }
     
     LaunchedEffect(Unit) {
-        batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
+        batteryOptimizationExempt = (context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
+            .isIgnoringBatteryOptimizations(context.packageName)
         exactAlarmsEnabled = ServiceKeepAliveAlarm.canScheduleExactAlarms(context)
     }
 
@@ -171,7 +172,7 @@ fun ProtectionSetupContent(
                 usageStatsPermissionGranted &&
                 systemAlertWindowPermissionGranted &&
                 deviceAdminEnabled &&
-                batteryOptimizationDisabled &&
+                batteryOptimizationExempt &&
                 exactAlarmsEnabled
 
             if (allEnabled) break
@@ -190,8 +191,22 @@ fun ProtectionSetupContent(
             if (!deviceAdminEnabled) {
                 deviceAdminEnabled = deviceAdminManager.isDeviceAdminActive()
             }
-            if (!batteryOptimizationDisabled) {
-                batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
+            if (!batteryOptimizationExempt) {
+                batteryOptimizationExempt = (context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
+                    .isIgnoringBatteryOptimizations(context.packageName)
+            }
+            if (!usageStatsPermissionGranted) {
+                usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted()
+            }
+            if (!systemAlertWindowPermissionGranted) {
+                systemAlertWindowPermissionGranted = permissionChecker.isSystemAlertWindowPermissionGranted()
+            }
+            if (!deviceAdminEnabled) {
+                deviceAdminEnabled = deviceAdminManager.isDeviceAdminActive()
+            }
+            if (!batteryOptimizationExempt) {
+                batteryOptimizationExempt = (context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
+                    .isIgnoringBatteryOptimizations(context.packageName)
             }
             if (!exactAlarmsEnabled) {
                 exactAlarmsEnabled = ServiceKeepAliveAlarm.canScheduleExactAlarms(context)
@@ -251,7 +266,7 @@ fun ProtectionSetupContent(
         ProtectionCard(
             title = stringResource(R.string.battery_optimization),
             description = stringResource(R.string.battery_optimization_description),
-            isEnabled = batteryOptimizationDisabled,
+            isEnabled = batteryOptimizationExempt,
             onEnableClick = {
                 val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                     data = Uri.parse("package:${context.packageName}")
@@ -282,7 +297,7 @@ fun ProtectionSetupContent(
             usageStatsPermissionGranted && 
             systemAlertWindowPermissionGranted && 
             deviceAdminEnabled &&
-            batteryOptimizationDisabled &&
+            batteryOptimizationExempt &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || exactAlarmsEnabled)
         
         Button(
@@ -307,7 +322,7 @@ fun ProtectionSetupContent(
             if (!usageStatsPermissionGranted) missingPermissions.add(stringResource(R.string.app_usage_permission))
             if (!systemAlertWindowPermissionGranted) missingPermissions.add(stringResource(R.string.display_over_apps))
             if (!deviceAdminEnabled) missingPermissions.add(stringResource(R.string.device_admin_rights))
-            if (!batteryOptimizationDisabled) missingPermissions.add(stringResource(R.string.battery_optimization))
+            if (!batteryOptimizationExempt) missingPermissions.add(stringResource(R.string.battery_optimization))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAlarmsEnabled) missingPermissions.add(stringResource(R.string.exact_alarms))
             
             Text(
@@ -394,7 +409,3 @@ fun ProtectionCard(
     }
 }
 
-private fun isBatteryOptimizationEnabled(context: android.content.Context): Boolean {
-    val powerManager = context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
-    return powerManager.isIgnoringBatteryOptimizations(context.packageName)
-}

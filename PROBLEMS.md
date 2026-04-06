@@ -391,3 +391,53 @@ If the child or the system kills the countdown service (or if the service crashe
 **Needed change:**
 - decouple the delayed blocking logic from the UI service lifecycle
 - manage the countdown state in the core service or `PeriodicReportSender` directly, and apply blocking unconditionally when the time elapses regardless of whether the UI overlay successfully survived the entire duration
+
+---
+
+## Implementation Order
+
+Problems are grouped into waves. Each wave must be completed before starting the next,
+because later waves depend on earlier ones being correct.
+
+### Wave 1 — Correctness bugs (small, self-contained, high impact)
+
+| # | Problem | Rationale |
+|---|---|---|
+| 1 | **8** — Fix inverted battery-optimization boolean | One-file change. Unblocks correctly configured devices stuck on the setup screen. |
+| 2 | **5** — Fix keep-alive alarm chain | Two-file change. Without a reliably running service, every subsequent fix is undermined. |
+
+### Wave 2 — Core blocking logic hardening
+
+Problems 3 and 7 are prerequisites for each other and must be done together. Problem 4 builds on the same arming machinery.
+
+| # | Problem | Rationale |
+|---|---|---|
+| 3 | **7** — Persist blocked app list across restarts | Prerequisite for Problem 3's fallback cache. |
+| 4 | **3** — Track arming state; retry on failed fetch | Depends on persisted cache from Problem 7. |
+| 5 | **4** — Refresh blocked list while already in blocking state | Depends on the arming/retry loop added in Problem 3. |
+
+### Wave 3 — Network resilience
+
+| # | Problem | Rationale |
+|---|---|---|
+| 6 | **2** — Stop failing open to `ACTIVE` on network error | Safer after arming is solid; removes the most exploitable gap. |
+
+### Wave 4 — Overlay reliability
+
+| # | Problem | Rationale |
+|---|---|---|
+| 7 | **1** — Reset `lastForegroundApp`; re-assert overlay each tick | Direct overlay fix; no hard dependencies but benefits from Wave 2. |
+| 8 | **6** — Make overlay service resilient (`START_STICKY`) | Pairs with Problem 1; Problem 1's re-assertion every second is the primary safety net. |
+
+### Wave 5 — Countdown logic decoupling
+
+| # | Problem | Rationale |
+|---|---|---|
+| 9 | **11** — Decouple countdown timer from service lifecycle | Most invasive refactor; safe to do once overlay and blocking layers are hardened. |
+
+### Wave 6 — Evasion mitigations
+
+| # | Problem | Rationale |
+|---|---|---|
+| 10 | **10** — PiP / split-screen bypass | Most platform-specific and hardest to test; belongs last among confirmed bugs. |
+| 11 | **9** — Samsung battery management guidance | Additive UI change only; placed last to avoid distraction during logic rework. |
