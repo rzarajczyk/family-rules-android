@@ -131,7 +131,7 @@ class FamilyRulesClient(
         }
     }
 
-    suspend fun reportUptime(uptime: Uptime): ActualDeviceState {
+    suspend fun reportUptime(uptime: Uptime): ActualDeviceState? {
         val instanceId = settingsManager.getString("instanceId", "")
 
         val applications: Map<String, Long> = uptime.packageUsages.mapValues { it.value / 1000 }
@@ -150,7 +150,7 @@ class FamilyRulesClient(
                 state
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
-                ActualDeviceState.ACTIVE
+                null
             }
         }
     }

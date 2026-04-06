@@ -128,7 +128,8 @@ class PeriodicReportSender(
             packageUsages = coreService.getTodayPackageUsage(),
             activeApps = if (foregroundApp != null) setOf(foregroundApp) else emptySet()
         )
-        val response = familyRulesClient.reportUptime(uptime)
+        // null means network failure — keep the current local state, do not unblock.
+        val response = familyRulesClient.reportUptime(uptime) ?: return
         handleDeviceStateChange(response)
     }
 

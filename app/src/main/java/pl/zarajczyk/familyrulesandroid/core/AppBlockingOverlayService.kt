@@ -69,7 +69,7 @@ class AppBlockingOverlayService : Service() {
             }
         }
         
-        return START_NOT_STICKY
+        return START_STICKY
     }
     
     private fun showBlockingOverlay(blockedPackageName: String) {

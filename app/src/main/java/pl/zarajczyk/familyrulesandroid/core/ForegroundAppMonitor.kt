@@ -43,23 +43,28 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
     
     fun stopMonitoring() {
         isMonitoring = false
+        lastForegroundApp = null  // reset so the next session starts clean (Problem 1)
         hideBlockingOverlay()
         Log.i("ForegroundAppMonitor", "Stopped foreground app monitoring")
     }
     
     private fun checkForegroundApp() {
-        val currentApp = coreService.getForegroundApp()
-        
-        if (currentApp != null && currentApp != lastForegroundApp) {
+        val currentApp = coreService.getForegroundApp() ?: return
+
+        if (currentApp in packagesToBlock) {
+            // Re-assert the overlay on every tick while a blocked app is foregrounded.
+            // This covers:
+            //   - stale lastForegroundApp across sessions (Problem 1)
+            //   - overlay service death while the blocked app stayed open (Problem 6)
+            if (currentApp != lastForegroundApp) {
+                Log.i("ForegroundAppMonitor", "Blocked app detected: $currentApp")
+            }
+            lastForegroundApp = currentApp
+            showBlockingOverlay(currentApp)
+        } else if (currentApp != lastForegroundApp) {
             Log.d("ForegroundAppMonitor", "Foreground app changed to: $currentApp")
             lastForegroundApp = currentApp
-            
-            if (currentApp in packagesToBlock) {
-                Log.i("ForegroundAppMonitor", "Blocked app detected: $currentApp")
-                showBlockingOverlay(currentApp)
-            } else {
-                hideBlockingOverlay()
-            }
+            hideBlockingOverlay()
         }
     }
 
