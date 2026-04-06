@@ -48,6 +48,8 @@ across separate blocking sessions.
 If YouTube is the blocked app and it matches the stale `lastForegroundApp`, the blocking
 overlay can fail to appear even though blocking is logically active.
 
+Additionally, if the `packagesToBlock` list is updated dynamically while monitoring is already active, and the child is currently using the newly blocked app, the overlay will not appear because `currentApp == lastForegroundApp`.
+
 **Needed change:**
 - reset `lastForegroundApp` when monitoring stops
 - while a blocked app remains in foreground, re-assert the overlay periodically instead of
@@ -274,7 +276,7 @@ list, a restart plus one fetch failure can leave YouTube unblocked.
 **Status:** Open
 **Confidence:** Confirmed
 
-The battery-optimization helper is misnamed and used backwards.
+The battery-optimization helper is misnamed, and its callers negate it incorrectly.
 
 `isBatteryOptimizationEnabled()` currently returns:
 
@@ -282,14 +284,25 @@ The battery-optimization helper is misnamed and used backwards.
 powerManager.isIgnoringBatteryOptimizations(context.packageName)
 ```
 
-But the callers negate that value and store it as `batteryOptimizationDisabled`.
+`isIgnoringBatteryOptimizations` returns `true` when the app **is already exempt** from battery
+optimization (i.e., the requirement is satisfied). The callers then negate that value:
 
-That means the setup screen can report the battery requirement as satisfied when the app is
-actually still subject to battery optimization, and vice versa.
+```kotlin
+batteryOptimizationDisabled = !isBatteryOptimizationEnabled(context)
+```
+
+So `batteryOptimizationDisabled` ends up `true` when the app is **not** exempt — the opposite of
+what the variable name implies. As a result:
+
+- When the app **is** exempt (good state), `batteryOptimizationDisabled` is `false`, and the
+  setup screen shows the card as **not satisfied**, blocking the "Complete Setup" button.
+- When the app **is not** exempt (bad state), `batteryOptimizationDisabled` is `true`, and the
+  setup screen shows the card as **satisfied**.
 
 **Why this matters to YouTube blocking:**
-This increases the chance that the core service will be killed in the background while the setup
-UI falsely suggests the protection is configured correctly.
+A correctly configured device is prevented from completing setup, while a device that is still
+subject to battery optimization can complete setup and appear fully protected. This increases the
+chance that the core service will be killed in the background on a device that passed setup.
 
 **Needed change:**
 - fix the boolean naming and logic so the setup screen reflects the real battery-optimization
@@ -321,3 +334,60 @@ more visible in real-world use.
 **Needed change:**
 - add Samsung-specific setup guidance, but do not confuse that with a proven fix for the core
   logic bugs above
+
+---
+
+## Problem 10 — Picture-in-Picture and Split-screen bypass
+
+**Files:**
+- `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/PackageUsageCalculator.kt`
+- `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/ForegroundAppMonitor.kt`
+
+**Status:** Open
+**Confidence:** Confirmed
+
+`PackageUsageCalculator` tracks `ACTIVITY_RESUMED` events to determine the single `foregroundApp`. 
+
+When an app like YouTube enters Picture-in-Picture (PiP) mode or is pushed to a secondary split-screen window, its activity is moved to the `PAUSED` state. The system then emits an `ACTIVITY_RESUMED` event for whatever app the child interacts with next (e.g. the Launcher or a different app).
+
+Because the new foreground app is not blocked, `ForegroundAppMonitor` calls `hideBlockingOverlay()`.
+
+**Why this matters to YouTube blocking:**
+The child can trigger Picture-in-Picture (by pressing Home while a video is playing) or open split-screen mode, focus another unblocked app, and the blocking overlay will disappear. YouTube will continue playing in PiP or the split window uninterrupted.
+
+**Needed change:**
+- detect visible/paused multi-window and PiP states, not just the single resumed top app
+- enforce blocking overlay or force the blocked app to stop/minimize if it tries to continue rendering in a secondary window
+
+---
+
+## Problem 11 — Countdown interruption bypasses blocking entirely
+
+**Files:**
+- `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/PeriodicReportSender.kt`
+- `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/CountdownOverlayService.kt`
+
+**Status:** Open
+**Confidence:** Confirmed
+
+When transitioning to `BLOCK_RESTRICTED_APPS_WITH_TIMEOUT`, `PeriodicReportSender` defers actual blocking by passing a callback to `CountdownOverlayService`:
+
+```kotlin
+CountdownOverlayService.showCountdown(coreService) {
+    appBlocker.block(appList)
+}
+```
+
+However, `CountdownOverlayService` only invokes this callback if its internal coroutine completes normally (reaches 0 seconds). If the service is destroyed before the countdown finishes (e.g., killed by the system, battery management, or a user action):
+
+1. `onDestroy()` cancels the coroutine and clears the callback without invoking it.
+2. `appBlocker.block(appList)` is never called.
+3. `currentDeviceState` remains `BLOCK_RESTRICTED_APPS_WITH_TIMEOUT`.
+4. Future reports see "no state change" and will not re-attempt to block the apps.
+
+**Why this matters to YouTube blocking:**
+If the child or the system kills the countdown service (or if the service crashes) during the 60-second warning phase, the apps are never blocked, and the system permanently remains in a false "blocking" state until the server changes the rule again. YouTube remains fully usable.
+
+**Needed change:**
+- decouple the delayed blocking logic from the UI service lifecycle
+- manage the countdown state in the core service or `PeriodicReportSender` directly, and apply blocking unconditionally when the time elapses regardless of whether the UI overlay successfully survived the entire duration
