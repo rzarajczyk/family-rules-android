@@ -164,7 +164,7 @@ class FamilyRulesClient(
                 "], received device state: ${response.state}"
     }
 
-    suspend fun getBlockedApps(): List<String> {
+    suspend fun getBlockedApps(): List<String>? {
         Log.d("FamilyRulesClient", "Fetching blocked apps for device")
 
         return withContext(Dispatchers.IO) {
@@ -178,7 +178,7 @@ class FamilyRulesClient(
                 appPackages
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to fetch blocked apps: ${e.message}", e)
-                emptyList()
+                null
             }
         }
     }

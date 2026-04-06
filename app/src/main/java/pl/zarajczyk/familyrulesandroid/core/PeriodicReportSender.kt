@@ -15,16 +15,30 @@ import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+private const val TAG = "PeriodicReportSender"
+private const val KEY_CACHED_BLOCKED_APPS = "cachedBlockedApps"
+
 class PeriodicReportSender(
     private val coreService: FamilyRulesCoreService,
     private val delayDuration: Duration,
     private val clientInfoDuration: Duration,
     private val appBlocker: AppBlocker,
-    private val familyRulesClient: FamilyRulesClient
-
+    private val familyRulesClient: FamilyRulesClient,
+    private val settingsManager: SettingsManager,
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    // Last state acknowledged from the server.
     private var currentDeviceState: ActualDeviceState = ActualDeviceState.ACTIVE
+
+    // True only after appBlocker.block() has been called with a non-empty list.
+    // Reset to false whenever blocking is disarmed or the service restarts.
+    private var blockingArmed: Boolean = false
+
+    // Last known-good blocked app list. Restored from SharedPreferences on startup
+    // so that a restart + failed first fetch still has a fallback (Problem 7).
+    private var cachedBlockedApps: List<String> =
+        settingsManager.getStringSet(KEY_CACHED_BLOCKED_APPS).toList()
 
     companion object {
         fun install(
@@ -34,16 +48,14 @@ class PeriodicReportSender(
             clientInfoDuration: Duration,
         ): PeriodicReportSender {
             val appDb = AppDb(coreService)
+            val settingsManager = SettingsManager(coreService)
             val instance = PeriodicReportSender(
                 coreService = coreService,
                 delayDuration = reportDuration,
                 clientInfoDuration = clientInfoDuration,
                 appBlocker = appBlocker,
-                familyRulesClient = FamilyRulesClient(
-                    SettingsManager(coreService),
-                    appDb
-                )
-
+                familyRulesClient = FamilyRulesClient(settingsManager, appDb),
+                settingsManager = settingsManager,
             )
             instance.start()
             return instance
@@ -69,7 +81,7 @@ class PeriodicReportSender(
         try {
             familyRulesClient.sendClientInfoRequest()
         } catch (e: Exception) {
-            Logger.e("PeriodicReportSender", "Failed to send initial client info: ${e.message}", e)
+            Logger.e(TAG, "Failed to send initial client info: ${e.message}", e)
         }
     }
 
@@ -81,7 +93,7 @@ class PeriodicReportSender(
                     familyRulesClient.sendClientInfoRequest()
                 }
             } catch (e: Exception) {
-                Logger.e("PeriodicReportSender", "Failed to send client info", e)
+                Logger.e(TAG, "Failed to send client info", e)
             }
             delay(clientInfoDuration)
         }
@@ -93,7 +105,7 @@ class PeriodicReportSender(
                 try {
                     reportUptime()
                 } catch (e: Exception) {
-                    Logger.e("PeriodicReportSender", "Failed to send report", e)
+                    Logger.e(TAG, "Failed to send report", e)
                 }
             }
             delay(delayDuration)
@@ -120,63 +132,124 @@ class PeriodicReportSender(
         handleDeviceStateChange(response)
     }
 
-    private fun handleDeviceStateChange(newState: ActualDeviceState) {
-        if (currentDeviceState != newState) {
-            Logger.i(
-                "PeriodicReportSender",
-                "Handling device state changed from ${currentDeviceState.state} to ${newState.state}"
-            )
+    private suspend fun handleDeviceStateChange(newState: ActualDeviceState) {
+        val stateChanged = currentDeviceState != newState
 
-            when (newState.state) {
-                DeviceState.ACTIVE -> {
-                    // Unblock apps when returning to ACTIVE state
-                    if (currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS ||
-                        currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT) {
-                        Logger.i("PeriodicReportSender", "Unblocking restricted apps - returning to ACTIVE state")
-                        CountdownOverlayService.hideCountdown(coreService)
-                        appBlocker.unblock()
-                    }
-                }
+        if (stateChanged) {
+            Logger.i(TAG, "Device state changed from ${currentDeviceState.state} to ${newState.state}")
+        }
 
-                DeviceState.BLOCK_RESTRICTED_APPS -> {
-                    // Block apps when entering BLOCK_RESTRICTED_APPS state for the first time
-                    if (currentDeviceState != newState) {
-                        scope.launch {
-                            try {
-                                val appList = familyRulesClient.getBlockedApps()
-                                appBlocker.block(appList)
-                            } catch (e: Exception) {
-                                Logger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
-                            }
-                        }
-                    }
-                }
-                
-                DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> {
-                    // Start countdown, then block apps when countdown completes
-                    if (currentDeviceState != newState) {
-                        Logger.i("PeriodicReportSender", "Starting countdown before blocking apps")
-                        scope.launch {
-                            try {
-                                val appList = familyRulesClient.getBlockedApps()
-                                // Show countdown overlay - apps will be blocked after countdown
-                                CountdownOverlayService.showCountdown(coreService) {
-                                    Logger.i("PeriodicReportSender", "Countdown complete - blocking apps")
-                                    appBlocker.block(appList)
-                                }
-                            } catch (e: Exception) {
-                                Logger.e("PeriodicReportSender", "Failed to fetch app group: ${e.message}", e)
-                            }
-                        }
-                    }
+        when (newState.state) {
+            DeviceState.ACTIVE -> {
+                if (stateChanged &&
+                    (currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS ||
+                     currentDeviceState.state == DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT)) {
+                    Logger.i(TAG, "Unblocking restricted apps - returning to ACTIVE state")
+                    CountdownOverlayService.hideCountdown(coreService)
+                    appBlocker.unblock()
+                    blockingArmed = false
                 }
             }
 
-            currentDeviceState = newState
+            DeviceState.BLOCK_RESTRICTED_APPS -> {
+                if (stateChanged) {
+                    // Fresh transition into blocking — fetch and arm immediately.
+                    armBlocking()
+                } else if (!blockingArmed) {
+                    // Problem 3: previous arm attempt failed; retry every cycle.
+                    Logger.i(TAG, "Blocking not yet armed - retrying")
+                    armBlocking()
+                } else {
+                    // Problem 4: already armed, but refresh the list in case the server-side
+                    // group changed while the device state name stayed the same.
+                    refreshBlockedAppsIfChanged()
+                }
+            }
 
-            // Notify the core service about the state change
+            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> {
+                if (stateChanged) {
+                    // Fresh transition — show countdown then arm.
+                    Logger.i(TAG, "Starting countdown before blocking apps")
+                    val appList = resolveBlockedApps()
+                    CountdownOverlayService.showCountdown(coreService) {
+                        Logger.i(TAG, "Countdown complete - blocking apps")
+                        appBlocker.block(appList)
+                        blockingArmed = appList.isNotEmpty()
+                    }
+                    // blockingArmed stays false until the countdown callback fires.
+                } else if (!blockingArmed) {
+                    // Problem 3: countdown may have been killed; retry arming directly.
+                    Logger.i(TAG, "Blocking not yet armed after timeout state - retrying arm")
+                    armBlocking()
+                } else {
+                    // Problem 4: refresh list while already in blocking state.
+                    refreshBlockedAppsIfChanged()
+                }
+            }
+        }
+
+        if (stateChanged) {
+            currentDeviceState = newState
             coreService.updateDeviceState(newState)
         }
     }
 
+    /**
+     * Fetch the blocked app list, fall back to cache, then call appBlocker.block().
+     * Updates cachedBlockedApps and blockingArmed.
+     */
+    private suspend fun armBlocking() {
+        val appList = resolveBlockedApps()
+        if (appList.isNotEmpty()) {
+            appBlocker.block(appList)
+            blockingArmed = true
+            Logger.i(TAG, "Blocking armed with ${appList.size} apps")
+        } else {
+            Logger.w(TAG, "Could not arm blocking: no apps available (will retry next cycle)")
+        }
+    }
+
+    /**
+     * Fetch the latest list from the server. If the list has changed, re-arm immediately.
+     * Covers Problem 4: server-side group contents changed while device state stayed the same.
+     */
+    private suspend fun refreshBlockedAppsIfChanged() {
+        val freshList = familyRulesClient.getBlockedApps() ?: return  // fetch failed; keep current
+        if (freshList.isNotEmpty()) {
+            persistBlockedApps(freshList)
+        }
+        if (freshList.toSet() != cachedBlockedApps.toSet()) {
+            Logger.i(TAG, "Blocked app list changed - re-arming (${cachedBlockedApps.size} -> ${freshList.size} apps)")
+            cachedBlockedApps = freshList
+            appBlocker.block(freshList)
+            blockingArmed = freshList.isNotEmpty()
+        }
+    }
+
+    /**
+     * Returns the best available blocked app list:
+     *   1. Fresh fetch from server (also updates cache).
+     *   2. Last known-good cache (Problem 7 fallback).
+     *   3. Empty list — caller must treat this as "arm failed".
+     */
+    private suspend fun resolveBlockedApps(): List<String> {
+        val fetched = familyRulesClient.getBlockedApps()
+        return if (fetched != null) {
+            if (fetched.isNotEmpty()) {
+                persistBlockedApps(fetched)
+                cachedBlockedApps = fetched
+            }
+            fetched
+        } else {
+            // Fetch failed — use persisted cache as fallback.
+            if (cachedBlockedApps.isNotEmpty()) {
+                Logger.w(TAG, "getBlockedApps() failed - using cached list (${cachedBlockedApps.size} apps)")
+            }
+            cachedBlockedApps
+        }
+    }
+
+    private fun persistBlockedApps(apps: List<String>) {
+        settingsManager.setStringSet(KEY_CACHED_BLOCKED_APPS, apps.toSet())
+    }
 }

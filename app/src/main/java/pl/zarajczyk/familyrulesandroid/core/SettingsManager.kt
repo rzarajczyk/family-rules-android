@@ -25,6 +25,14 @@ class SettingsManager(context: Context) {
         preferences.edit { putString(key, value) }
     }
 
+    fun getStringSet(key: String): Set<String> {
+        return preferences.getStringSet(key, emptySet()) ?: emptySet()
+    }
+
+    fun setStringSet(key: String, value: Set<String>) {
+        preferences.edit { putStringSet(key, value) }
+    }
+
     fun areSettingsComplete(): Boolean {
         return getString("serverUrl") != null &&
                 getString("username") != null &&
