@@ -11,25 +11,29 @@ class PackageUsageCalculator : SystemEventProcessor {
     }
 
     fun getForegroundApp(): String? {
-        return foregroundApp
+        return foregroundActivity?.packageName
     }
 
     @Volatile
     private var todayPackageUsage = mutableMapOf<String, Long>()
 
     @Volatile
-    private var foregroundApp: String? = null
+    private var foregroundActivity: ActivityId? = null
 
 
     private enum class State { STARTING, STOPPING }
     private data class PackageLifecycleEvent(
         val state: State,
         val packageName: String,
+        val className: String,
         val timestamp: Long
     )
 
+    private data class ActivityId(val packageName: String, val className: String)
+
     override fun reset() {
         todayPackageUsage = mutableMapOf()
+        foregroundActivity = null
     }
 
     private fun MutableMap<String, Long>.increment(key: String, value: Long) {
@@ -39,20 +43,49 @@ class PackageUsageCalculator : SystemEventProcessor {
     override fun processEventBatch(events: List<Event>, start: Long, end: Long) {
         val packageLifecycleEvents = events.toPackageLifecycleEvents()
 
-        if (packageLifecycleEvents.isEmpty()) {
-            foregroundApp?.let { fg ->
-                todayPackageUsage.increment(fg, end - start)
-//                Log.d("PackageUsageCalculator",  "Incrementing time (no events) for foreground package $fg by ${end - start}")
+        events.forEach { e ->
+            val typeName = when (e.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> "ACTIVITY_RESUMED"
+                UsageEvents.Event.ACTIVITY_PAUSED -> "ACTIVITY_PAUSED"
+                UsageEvents.Event.ACTIVITY_STOPPED -> "ACTIVITY_STOPPED"
+                UsageEvents.Event.FOREGROUND_SERVICE_START -> "FOREGROUND_SERVICE_START"
+                UsageEvents.Event.FOREGROUND_SERVICE_STOP -> "FOREGROUND_SERVICE_STOP"
+                UsageEvents.Event.CONFIGURATION_CHANGE -> "CONFIGURATION_CHANGE"
+                UsageEvents.Event.KEYGUARD_HIDDEN -> "KEYGUARD_HIDDEN"
+                UsageEvents.Event.KEYGUARD_SHOWN -> "KEYGUARD_SHOWN"
+                UsageEvents.Event.SCREEN_INTERACTIVE -> "SCREEN_INTERACTIVE"
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> "SCREEN_NON_INTERACTIVE"
+                UsageEvents.Event.USER_INTERACTION -> "USER_INTERACTION"
+                12 -> "NOTIFICATION_INTERRUPTION"
+                else -> "UNKNOWN(${e.eventType})"
             }
+            Log.d("PackageUsageCalculator", "RawEvent: $typeName ${e.packageName}/${e.className} at ${Instant.ofEpochMilli(e.timestamp)}")
+        }
+
+        if (packageLifecycleEvents.isEmpty()) {
+            foregroundActivity?.let { fg ->
+                Log.d("PackageUsageCalculator", "Foreground app is still: $fg")
+                todayPackageUsage.increment(fg.packageName, end - start)
+            } ?: Log.d("PackageUsageCalculator", "No foreground app on early return")
             return
         }
 
         val lastStartingEvent = packageLifecycleEvents.lastOrNull { it.state == State.STARTING }
         if (lastStartingEvent != null) {
             val correspondingStoppedEventExists = packageLifecycleEvents.any {
-                it.state == State.STOPPING && it.packageName == lastStartingEvent.packageName && it.timestamp > lastStartingEvent.timestamp
+                it.state == State.STOPPING
+                    && it.packageName == lastStartingEvent.packageName
+                    && it.className == lastStartingEvent.className
+                    && it.timestamp > lastStartingEvent.timestamp
             }
-            foregroundApp = if (correspondingStoppedEventExists) null else lastStartingEvent.packageName
+            foregroundActivity = if (correspondingStoppedEventExists) null
+                                  else ActivityId(lastStartingEvent.packageName, lastStartingEvent.className)
+        } else if (packageLifecycleEvents.any {
+                it.state == State.STOPPING
+                    && it.packageName == foregroundActivity?.packageName
+                    && it.className == foregroundActivity?.className
+            }) {
+            foregroundActivity = null
         }
 
         val groupedPackageLifecycleEvents = packageLifecycleEvents
@@ -65,7 +98,7 @@ class PackageUsageCalculator : SystemEventProcessor {
                 if (packageLifecycleEventsPerPackage.first().state == State.STOPPING) {
                     packageLifecycleEventsPerPackage.add(
                         index = 0,
-                        PackageLifecycleEvent(State.STARTING, packageName, start)
+                        PackageLifecycleEvent(State.STARTING, packageName, "", start)
                     )
 //                    if (packageName == "com.android.settings")
 //                        Log.i("PackageUsageCalculator", "Adding initial starting event for package: $packageName")
@@ -73,7 +106,7 @@ class PackageUsageCalculator : SystemEventProcessor {
 
                 if (packageLifecycleEventsPerPackage.last().state == State.STARTING) {
                     packageLifecycleEventsPerPackage.add(
-                        PackageLifecycleEvent(State.STOPPING, packageName, end)
+                        PackageLifecycleEvent(State.STOPPING, packageName, "", end)
                     )
 //                    if (packageName == "com.android.settings")
 //                        Log.i("PackageUsageCalculator", "Adding final stopping event for package: $packageName")
@@ -98,12 +131,12 @@ class PackageUsageCalculator : SystemEventProcessor {
 //                Log.d("PackageUsageCalculator", "Total time for package $packageName: ${todayPackageUsage[packageName]}")
             }
 
-        foregroundApp?.let { fg ->
+        foregroundActivity?.packageName?.let { fg ->
+            Log.d("PackageUsageCalculator", "Foreground app: $fg")
             if (fg !in groupedPackageLifecycleEvents.keys) {
                 todayPackageUsage.increment(fg, end - start)
-//                Log.d("PackageUsageCalculator",  "Incrementing time (despite having events!) for foreground package $fg by ${end - start} // $packageLifecycleEvents")
             }
-        }
+        } ?: Log.d("PackageUsageCalculator", "No foreground app")
     }
 
     private fun List<Event>.toPackageLifecycleEvents(): List<PackageLifecycleEvent> =
@@ -113,18 +146,35 @@ class PackageUsageCalculator : SystemEventProcessor {
                     UsageEvents.Event.ACTIVITY_RESUMED -> PackageLifecycleEvent(
                         State.STARTING,
                         it.packageName,
+                        it.className,
                         it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_PAUSED -> PackageLifecycleEvent(
                         State.STOPPING,
                         it.packageName,
+                        it.className,
                         it.timestamp
                     )
 
                     UsageEvents.Event.ACTIVITY_STOPPED -> PackageLifecycleEvent(
                         State.STOPPING,
                         it.packageName,
+                        it.className,
+                        it.timestamp
+                    )
+
+                    UsageEvents.Event.FOREGROUND_SERVICE_START -> PackageLifecycleEvent(
+                        State.STARTING,
+                        it.packageName,
+                        it.className,
+                        it.timestamp
+                    )
+
+                    UsageEvents.Event.FOREGROUND_SERVICE_STOP -> PackageLifecycleEvent(
+                        State.STOPPING,
+                        it.packageName,
+                        it.className,
                         it.timestamp
                     )
 

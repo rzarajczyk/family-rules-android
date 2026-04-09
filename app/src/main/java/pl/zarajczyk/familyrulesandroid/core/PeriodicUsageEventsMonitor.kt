@@ -23,6 +23,7 @@ interface SystemEventProcessor {
 data class Event(
     val timestamp: Long,
     val packageName: String,
+    val className: String,
     val eventType: Int
 )
 
@@ -104,6 +105,7 @@ class PeriodicUsageEventsMonitor(
                 events.add(Event(
                     timestamp = event.timeStamp,
                     packageName = event.packageName,
+                    className = event.className ?: "",
                     eventType = event.eventType
                 ))
             }
