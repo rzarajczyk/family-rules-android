@@ -33,7 +33,6 @@ class PackageUsageCalculator : SystemEventProcessor {
 
     override fun reset() {
         todayPackageUsage = mutableMapOf()
-        foregroundActivity = null
     }
 
     private fun MutableMap<String, Long>.increment(key: String, value: Long) {
