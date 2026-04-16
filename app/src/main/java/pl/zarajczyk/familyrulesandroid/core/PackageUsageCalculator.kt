@@ -186,9 +186,11 @@ class PackageUsageCalculator : SystemEventProcessor {
             .fold(mutableListOf<PackageLifecycleEvent>()) { acc, event ->
                 if (acc.isEmpty() || acc.last().state != event.state) {
                     acc.add(event)
-                } else {
+                } else if (event.state == State.STARTING) {
+                    // For STARTING: keep last (most recent resume)
                     acc[acc.lastIndex] = event
                 }
+                // For STOPPING: keep first (PAUSED = real end of usage; STOPPED is a delayed system event)
                 acc
             }
 }
