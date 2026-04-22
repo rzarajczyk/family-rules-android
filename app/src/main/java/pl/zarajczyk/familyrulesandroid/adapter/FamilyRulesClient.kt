@@ -204,7 +204,11 @@ class FamilyRulesClient(
     suspend fun ensureAllAppsAreCached(packageNames: Set<String>) {
         Logger.i("FamilyRulesClient", "Ensuring all apps are cached")
         packageNames.forEach { packageName ->
-            appDb.getAppNameAndIcon(packageName)
+            try {
+                appDb.getAppNameAndIcon(packageName)
+            } catch (e: Exception) {
+                Logger.w("FamilyRulesClient", "Failed to cache app info for package $packageName", e)
+            }
         }
     }
 }

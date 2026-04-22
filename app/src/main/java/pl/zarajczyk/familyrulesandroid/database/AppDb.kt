@@ -20,8 +20,14 @@ class AppDb(private val context: Context) {
         return withContext(Dispatchers.IO) {
             // First, try to get from cache
             val cachedAppInfo = appInfoDao.getAppInfo(packageName)
-            
-            if (cachedAppInfo != null) {
+
+            val isPoisoned = cachedAppInfo != null
+                && cachedAppInfo.appName == packageName
+                && cachedAppInfo.iconBase64 == null
+            val poisonExpired = isPoisoned
+                && System.currentTimeMillis() - cachedAppInfo!!.lastUpdated > 3_600_000L
+
+            if (cachedAppInfo != null && (!isPoisoned || !poisonExpired)) {
                 return@withContext App(
                     name = cachedAppInfo.appName,
                     packageName = packageName,
@@ -52,7 +58,7 @@ class AppDb(private val context: Context) {
             val iconBase64 = bitmapToBase64(bitmap)
             
             App(appName, packageName, iconBase64)
-        } catch (e: PackageManager.NameNotFoundException) {
+        } catch (e: Exception) {
             Logger.w("AppDb", "Unable to fetch app info for package $packageName", e)
             App(packageName, packageName, null)
         }
