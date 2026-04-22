@@ -47,10 +47,6 @@ data class BlockedAppsResponse(
 
 data class MembershipAppResponse(
     val appPath: String,
-    val appName: String,
-    val iconBase64Png: String?,
-    val deviceName: String,
-    val deviceId: String,
 )
 
 // Groups Usage Report DTOs
