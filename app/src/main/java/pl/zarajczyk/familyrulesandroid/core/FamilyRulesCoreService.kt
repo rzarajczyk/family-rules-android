@@ -34,6 +34,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var periodicUsageEventsMonitor: PeriodicUsageEventsMonitor
     private lateinit var screenTimeCalculator: ScreenTimeCalculator
     private lateinit var packageUsageCalculator: PackageUsageCalculator
+    private lateinit var packageUsageStatsProvider: PackageUsageStatsProvider
     private lateinit var systemEventLogger: SystemEventLogger
     private lateinit var screenOffReceiver: ScreenOffReceiver
 
@@ -142,7 +143,7 @@ class FamilyRulesCoreService : Service() {
 
     fun getTodayScreenTime() = screenTimeCalculator.getTodayScreenTime()
 
-    fun getTodayPackageUsage() = packageUsageCalculator.getTodayPackageUsage()
+    fun getTodayPackageUsage() = packageUsageStatsProvider.getTodayPackageUsage()
 
     fun getSystemEventLogger() = systemEventLogger
 
@@ -184,6 +185,7 @@ class FamilyRulesCoreService : Service() {
 
         screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
+        packageUsageStatsProvider = PackageUsageStatsProvider(this)
         systemEventLogger = SystemEventLogger()
 
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
