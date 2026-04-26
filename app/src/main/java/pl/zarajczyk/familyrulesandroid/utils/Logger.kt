@@ -7,6 +7,7 @@ import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -237,23 +238,54 @@ object Logger {
     
     /**
      * Exports all log files for sharing.
-     * Attempts to export as individual files if possible, otherwise concatenates them.
+     * Creates enriched temporary copies in the cache dir, each containing the original
+     * log content followed by a full UsageEvents dump for that day.
      * Returns a list of files to share, or null if there are no logs.
      */
     fun exportLogs(context: Context): List<File>? {
         return try {
             val logFiles = getLogFiles(context)
-            
-            if (logFiles.isEmpty()) {
-                return null
+            if (logFiles.isEmpty()) return null
+
+            // Clean up leftover export temp files from previous runs
+            context.cacheDir.listFiles { f -> f.name.startsWith("logs-export-") }
+                ?.forEach { it.delete() }
+
+            logFiles.map { logFile ->
+                val date = dateFromLogFileName(logFile.name)
+                val originalContent = lock.read { logFile.readText() }
+                val eventsSection = buildEventsSection(context, logFile.name, date)
+                val tempFile = File(context.cacheDir, "logs-export-${logFile.name.removePrefix("logs-")}")
+                tempFile.writeText(originalContent + eventsSection)
+                tempFile
             }
-            
-            // Return all individual log files for sharing
-            // Android's share intent supports multiple files
-            logFiles
         } catch (e: Exception) {
             Log.e(TAG, "Failed to export logs", e)
             null
+        }
+    }
+
+    private fun dateFromLogFileName(name: String): LocalDate? {
+        return try {
+            // filename format: logs-YYYY-MM-DD.txt
+            LocalDate.parse(name.removePrefix("logs-").removeSuffix(".txt"))
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun buildEventsSection(context: Context, fileName: String, date: LocalDate?): String {
+        val dateLabel = date?.toString() ?: fileName
+        return buildString {
+            append("\n\n")
+            append("=".repeat(80) + "\n")
+            append("SYSTEM EVENTS ($dateLabel)\n")
+            append("=".repeat(80) + "\n\n")
+            if (date != null) {
+                append(UsageEventsDumper.dumpForDay(context, date))
+            } else {
+                append("(could not determine date from filename)\n")
+            }
         }
     }
 }
