@@ -15,6 +15,7 @@ import androidx.core.graphics.createBitmap
 class AppDb(private val context: Context) {
     private val database = AppDatabase.getDatabase(context)
     private val appInfoDao = database.appInfoDao()
+    private val serverCommandDao = database.serverCommandDao()
 
     suspend fun getAppNameAndIcon(packageName: String): App {
         return withContext(Dispatchers.IO) {
@@ -93,6 +94,61 @@ class AppDb(private val context: Context) {
     suspend fun getAllAppInfo(): List<AppInfo> {
         return withContext(Dispatchers.IO) {
             appInfoDao.getAllAppInfo()
+        }
+    }
+
+    suspend fun insertServerCommandIfAbsent(command: ServerCommand): Boolean {
+        return withContext(Dispatchers.IO) {
+            serverCommandDao.insertIfAbsent(command) != -1L
+        }
+    }
+
+    suspend fun getPendingCommandAcks(): List<ServerCommand> = withContext(Dispatchers.IO) {
+        serverCommandDao.getPendingAcks()
+    }
+
+    suspend fun markCommandAcksConfirmed(commandIds: List<String>, ackConfirmedAtMillis: Long) {
+        withContext(Dispatchers.IO) {
+            serverCommandDao.markAckConfirmed(commandIds, ackConfirmedAtMillis)
+        }
+    }
+
+    suspend fun getCommandsByExecutionState(executionState: ServerCommandExecutionState): List<ServerCommand> = withContext(Dispatchers.IO) {
+        serverCommandDao.getByExecutionState(executionState.name)
+    }
+
+    suspend fun markCommandExecuting(commandId: String) {
+        withContext(Dispatchers.IO) {
+            serverCommandDao.updateExecutionState(commandId, ServerCommandExecutionState.EXECUTING.name)
+        }
+    }
+
+    suspend fun storeCommandResult(
+        commandId: String,
+        resultStatus: String,
+        responseType: String,
+        responsePayloadJson: String,
+        completedAtIso: String,
+    ) {
+        withContext(Dispatchers.IO) {
+            serverCommandDao.storeResult(
+                commandId = commandId,
+                executionState = ServerCommandExecutionState.EXECUTING.name,
+                resultStatus = resultStatus,
+                responseType = responseType,
+                responsePayloadJson = responsePayloadJson,
+                completedAtIso = completedAtIso,
+            )
+        }
+    }
+
+    suspend fun getPendingCommandResultUploads(): List<ServerCommand> = withContext(Dispatchers.IO) {
+        serverCommandDao.getPendingResultUploads()
+    }
+
+    suspend fun markCommandResultUploaded(commandId: String, uploadedAtMillis: Long) {
+        withContext(Dispatchers.IO) {
+            serverCommandDao.markResultUploaded(commandId, uploadedAtMillis, ServerCommandExecutionState.COMPLETED.name)
         }
     }
 }

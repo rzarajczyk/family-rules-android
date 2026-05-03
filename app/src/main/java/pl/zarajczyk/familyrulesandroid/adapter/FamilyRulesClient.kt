@@ -32,6 +32,7 @@ class FamilyRulesClient(
     private val appDb: AppDb
 ) {
     companion object {
+        val SUPPORTED_SERVER_COMMANDS = listOf("SEND_LOGS")
         val AVAILABLE_STATES = DeviceState.entries.map { state ->
             val stateTitle = when (state) {
                 DeviceState.ACTIVE -> "Active"
@@ -114,7 +115,8 @@ class FamilyRulesClient(
             instanceId = instanceId,
             version = version,
             knownApps = knownApps,
-            availableStates = AVAILABLE_STATES
+            availableStates = AVAILABLE_STATES,
+            supportedServerCommands = SUPPORTED_SERVER_COMMANDS,
         )
 
         withContext(Dispatchers.IO) {
@@ -151,6 +153,56 @@ class FamilyRulesClient(
             } catch (e: Exception) {
                 Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
                 null
+            }
+        }
+    }
+
+    suspend fun reportUptimeWithCommands(uptime: Uptime): ReportResponseDto? {
+        val instanceId = settingsManager.getString("instanceId", "")
+
+        val applications: Map<String, Long> = uptime.packageUsages.mapValues { it.value / 1000 }
+        val request = ReportRequest(
+            instanceId = instanceId,
+            screenTime = uptime.screenTimeMillis / 1000,
+            applications = applications,
+            activeApps = uptime.activeApps
+        )
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.report(request)
+                val state = ActualDeviceState.from(response)
+                Logger.i("FamilyRulesClient", createUptimeLogMessage(uptime, state))
+                response
+            } catch (e: Exception) {
+                Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
+                null
+            }
+        }
+    }
+
+    suspend fun acknowledgeCommands(acks: List<CommandAckDto>): Boolean {
+        if (acks.isEmpty()) return true
+        return withContext(Dispatchers.IO) {
+            try {
+                apiService.acknowledgeCommands(CommandAcksRequest(acks))
+                true
+            } catch (e: Exception) {
+                Log.e("FamilyRulesClient", "Failed to acknowledge commands: ${e.message}", e)
+                false
+            }
+        }
+    }
+
+    suspend fun sendCommandResults(results: List<CommandResultDto>): Boolean {
+        if (results.isEmpty()) return true
+        return withContext(Dispatchers.IO) {
+            try {
+                apiService.sendCommandResults(CommandResultsRequest(results))
+                true
+            } catch (e: Exception) {
+                Log.e("FamilyRulesClient", "Failed to send command results: ${e.message}", e)
+                false
             }
         }
     }

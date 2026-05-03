@@ -25,6 +25,7 @@ class PeriodicReportSender(
     private val appBlocker: AppBlocker,
     private val familyRulesClient: FamilyRulesClient,
     private val settingsManager: SettingsManager,
+    private val serverCommandCoordinator: ServerCommandCoordinator,
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -49,13 +50,15 @@ class PeriodicReportSender(
         ): PeriodicReportSender {
             val appDb = AppDb(coreService)
             val settingsManager = SettingsManager(coreService)
+            val familyRulesClient = FamilyRulesClient(settingsManager, appDb)
             val instance = PeriodicReportSender(
                 coreService = coreService,
                 delayDuration = reportDuration,
                 clientInfoDuration = clientInfoDuration,
                 appBlocker = appBlocker,
-                familyRulesClient = FamilyRulesClient(settingsManager, appDb),
+                familyRulesClient = familyRulesClient,
                 settingsManager = settingsManager,
+                serverCommandCoordinator = ServerCommandCoordinator(coreService, appDb, familyRulesClient),
             )
             instance.start()
             return instance
@@ -80,6 +83,7 @@ class PeriodicReportSender(
     private suspend fun sendInitialClientInfoRequest() {
         try {
             familyRulesClient.sendClientInfoRequest()
+            serverCommandCoordinator.retryPendingWork()
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to send initial client info: ${e.message}", e)
         }
@@ -91,6 +95,7 @@ class PeriodicReportSender(
                 if (ScreenStatus.isScreenOn(coreService)) {
                     familyRulesClient.ensureAllAppsAreCached(coreService.getTodayPackageUsage().keys)
                     familyRulesClient.sendClientInfoRequest()
+                    serverCommandCoordinator.retryPendingWork()
                 }
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send client info", e)
@@ -129,8 +134,9 @@ class PeriodicReportSender(
             activeApps = if (foregroundApp != null) setOf(foregroundApp) else emptySet()
         )
         // null means network failure — keep the current local state, do not unblock.
-        val response = familyRulesClient.reportUptime(uptime) ?: return
-        handleDeviceStateChange(response)
+        val response = familyRulesClient.reportUptimeWithCommands(uptime) ?: return
+        serverCommandCoordinator.onCommandsReceived(response.serverCommands)
+        handleDeviceStateChange(ActualDeviceState.from(response))
     }
 
     private suspend fun handleDeviceStateChange(newState: ActualDeviceState) {
