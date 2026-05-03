@@ -36,6 +36,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var packageUsageCalculator: PackageUsageCalculator
     private lateinit var packageUsageStatsProvider: PackageUsageStatsProvider
     private lateinit var systemEventLogger: SystemEventLogger
+    private lateinit var mediaSessionMonitor: MediaSessionMonitor
     private lateinit var screenOffReceiver: ScreenOffReceiver
 
     private lateinit var periodicReportSender: PeriodicReportSender
@@ -187,6 +188,9 @@ class FamilyRulesCoreService : Service() {
         packageUsageCalculator = PackageUsageCalculator()
         packageUsageStatsProvider = PackageUsageStatsProvider(this)
         systemEventLogger = SystemEventLogger()
+        mediaSessionMonitor = MediaSessionMonitor
+        mediaSessionMonitor.install(this)
+        mediaSessionMonitor.start()
 
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
             delayDuration = 2.seconds,
@@ -328,6 +332,10 @@ class FamilyRulesCoreService : Service() {
         
         if (::notificationRestorer.isInitialized) {
             notificationRestorer.stop()
+        }
+
+        if (::mediaSessionMonitor.isInitialized) {
+            mediaSessionMonitor.stop()
         }
     }
     
