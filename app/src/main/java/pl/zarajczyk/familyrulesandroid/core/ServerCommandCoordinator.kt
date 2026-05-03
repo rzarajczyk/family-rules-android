@@ -1,6 +1,7 @@
 package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.Context
+import com.squareup.moshi.JsonAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import pl.zarajczyk.familyrulesandroid.adapter.CommandAckDto
@@ -12,6 +13,8 @@ import pl.zarajczyk.familyrulesandroid.database.ServerCommand
 import pl.zarajczyk.familyrulesandroid.database.ServerCommandExecutionState
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 import java.time.Instant
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 
 private const val TAG = "ServerCommandCoordinator"
 private const val MAX_LOG_PAYLOAD_BYTES = 256 * 1024
@@ -21,6 +24,10 @@ class ServerCommandCoordinator(
     private val appDb: AppDb,
     private val familyRulesClient: FamilyRulesClient,
 ) {
+    private val payloadAdapter: JsonAdapter<Map<String, String>> = Moshi.Builder()
+        .build()
+        .adapter(Types.newParameterizedType(Map::class.java, String::class.java, String::class.java))
+
     suspend fun onCommandsReceived(commands: List<ServerCommandDto>) {
         if (commands.isEmpty()) {
             retryPendingWork()
@@ -82,7 +89,7 @@ class ServerCommandCoordinator(
                 commandId = command.commandId,
                 resultStatus = result.status,
                 responseType = result.responseType,
-                responsePayloadJson = result.responsePayload.entries.joinToString("\n") { "${it.key}=${it.value}" },
+                responsePayloadJson = payloadAdapter.toJson(result.responsePayload),
                 completedAtIso = result.completedAt,
             )
         }
@@ -94,13 +101,7 @@ class ServerCommandCoordinator(
 
         val results = pendingUploads.mapNotNull { command ->
             val payloadJson = command.responsePayloadJson ?: return@mapNotNull null
-            val payload = payloadJson
-                .lineSequence()
-                .filter { it.contains("=") }
-                .associate { line ->
-                    val index = line.indexOf('=')
-                    line.substring(0, index) to line.substring(index + 1)
-                }
+            val payload = payloadAdapter.fromJson(payloadJson) ?: emptyMap()
             CommandResultDto(
                 commandId = command.commandId,
                 commandName = command.commandName,
