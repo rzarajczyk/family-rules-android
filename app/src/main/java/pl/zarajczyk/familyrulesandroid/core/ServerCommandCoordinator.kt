@@ -17,7 +17,6 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 
 private const val TAG = "ServerCommandCoordinator"
-private const val MAX_LOG_PAYLOAD_BYTES = 256 * 1024
 
 class ServerCommandCoordinator(
     private val context: Context,
@@ -127,7 +126,7 @@ class ServerCommandCoordinator(
                 responseType = "SEND_LOGS_V1",
                 responsePayload = mapOf(
                     "logsText" to logText.text,
-                    "truncated" to logText.truncated.toString(),
+                    "truncated" to "false",
                     "collectedAt" to Instant.now().toString(),
                 ),
                 completedAt = Instant.now().toString(),
@@ -145,7 +144,7 @@ class ServerCommandCoordinator(
     private fun collectLogsForUpload(context: Context): LogPayload {
         val files = Logger.exportLogs(context).orEmpty()
         if (files.isEmpty()) {
-            return LogPayload("No logs available", false)
+            return LogPayload("No logs available")
         }
 
         val combined = buildString {
@@ -156,13 +155,7 @@ class ServerCommandCoordinator(
             }
         }
 
-        val bytes = combined.toByteArray(Charsets.UTF_8)
-        if (bytes.size <= MAX_LOG_PAYLOAD_BYTES) {
-            return LogPayload(combined, false)
-        }
-
-        val truncatedBytes = bytes.copyOfRange(bytes.size - MAX_LOG_PAYLOAD_BYTES, bytes.size)
-        return LogPayload(String(truncatedBytes, Charsets.UTF_8), true)
+        return LogPayload(combined)
     }
 }
 
@@ -175,5 +168,4 @@ private data class CommandExecutionResult(
 
 private data class LogPayload(
     val text: String,
-    val truncated: Boolean,
 )
