@@ -85,7 +85,8 @@ class PackageUsageStatsProvider(context: Context) {
             iter.getNextEvent(event)
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED,
-                UsageEvents.Event.ACTIVITY_PAUSED -> {
+                UsageEvents.Event.ACTIVITY_PAUSED,
+                UsageEvents.Event.ACTIVITY_STOPPED -> {
                     out.add(
                         UsageEventTuple(
                             timestamp = event.timeStamp,
@@ -112,7 +113,10 @@ internal data class UsageEventTuple(
  * Pure computation: walks events per package while tracking the set of
  * currently-resumed `className` values. The package is "in foreground" iff
  * the set is non-empty; a session opens on the 0->1 transition and closes
- * on the 1->0 transition. All session boundaries are clipped to
+ * on the 1->0 transition. `ACTIVITY_STOPPED` is treated as a fallback close
+ * signal only when that class is still active, which preserves the preferred
+ * `PAUSED` boundary while fixing streams that omit it entirely. All session
+ * boundaries are clipped to
  * `[startOfDay, now]`.
  */
 internal fun computeTodayPackageUsage(
@@ -123,7 +127,8 @@ internal fun computeTodayPackageUsage(
     val byPackage = events
         .filter {
             it.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
-                it.eventType == UsageEvents.Event.ACTIVITY_PAUSED
+                it.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
+                it.eventType == UsageEvents.Event.ACTIVITY_STOPPED
         }
         .sortedBy { it.timestamp }
         .groupBy { it.packageName }
@@ -138,8 +143,11 @@ internal fun computeTodayPackageUsage(
                 val wasEmpty = active.isEmpty()
                 active.add(e.className)
                 if (wasEmpty) openSince = e.timestamp
-            } else { // ACTIVITY_PAUSED
-                active.remove(e.className)
+            } else {
+                val removed = active.remove(e.className)
+                if (!removed) {
+                    continue
+                }
                 if (active.isEmpty()) {
                     val start = openSince
                     if (start != null) {
