@@ -28,7 +28,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +36,6 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +44,7 @@ import pl.zarajczyk.familyrulesandroid.core.DeviceAdminManager
 import pl.zarajczyk.familyrulesandroid.core.PermissionsChecker
 import pl.zarajczyk.familyrulesandroid.core.ServiceKeepAliveAlarm
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.ui.theme.ApplySystemBars
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 
@@ -71,6 +70,12 @@ class PermissionsSetupActivity : ComponentActivity() {
         }
     }
 
+    private val notificationListenerPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Permission check handled in UI polling loop
+    }
+
     private val usageStatsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
@@ -92,7 +97,7 @@ class PermissionsSetupActivity : ComponentActivity() {
 
         setContent {
             FamilyRulesAndroidTheme {
-                window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
+                ApplySystemBars(FamilyRulesColors.NORMAL_BACKGROUND)
                 SharedAppLayout(settingsManager = settingsManager) {
                     ProtectionSetupContent(
                         deviceAdminManager = deviceAdminManager,
@@ -110,6 +115,10 @@ class PermissionsSetupActivity : ComponentActivity() {
                                     notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                                 }
                             }
+                        },
+                        onNotificationListenerPermissionRequest = {
+                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                            notificationListenerPermissionLauncher.launch(intent)
                         },
                         onUsageStatsPermissionRequest = {
                             val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
@@ -147,6 +156,7 @@ fun ProtectionSetupContent(
     deviceAdminManager: DeviceAdminManager,
     permissionChecker: PermissionsChecker,
     onNotificationPermissionRequest: () -> Unit,
+    onNotificationListenerPermissionRequest: () -> Unit,
     onUsageStatsPermissionRequest: () -> Unit,
     onSystemAlertWindowPermissionRequest: () -> Unit,
     onSetupComplete: () -> Unit
@@ -156,6 +166,7 @@ fun ProtectionSetupContent(
     var batteryOptimizationExempt by remember { mutableStateOf(false) }
     var exactAlarmsEnabled by remember { mutableStateOf(false) }
     var notificationPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationPermissionGranted()) }
+    var notificationListenerPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationListenerPermissionGranted()) }
     var usageStatsPermissionGranted by remember { mutableStateOf(permissionChecker.isUsageStatsPermissionGranted()) }
     var systemAlertWindowPermissionGranted by remember { mutableStateOf(permissionChecker.isSystemAlertWindowPermissionGranted()) }
     
@@ -169,6 +180,7 @@ fun ProtectionSetupContent(
     LaunchedEffect(Unit) {
         while (true) {
             val allEnabled = notificationPermissionGranted &&
+                notificationListenerPermissionGranted &&
                 usageStatsPermissionGranted &&
                 systemAlertWindowPermissionGranted &&
                 deviceAdminEnabled &&
@@ -181,6 +193,9 @@ fun ProtectionSetupContent(
 
             if (!notificationPermissionGranted) {
                 notificationPermissionGranted = permissionChecker.isNotificationPermissionGranted()
+            }
+            if (!notificationListenerPermissionGranted) {
+                notificationListenerPermissionGranted = permissionChecker.isNotificationListenerPermissionGranted()
             }
             if (!usageStatsPermissionGranted) {
                 usageStatsPermissionGranted = permissionChecker.isUsageStatsPermissionGranted()
@@ -234,7 +249,15 @@ fun ProtectionSetupContent(
             isEnabled = notificationPermissionGranted,
             onEnableClick = onNotificationPermissionRequest
         )
-        
+
+        // Notification Listener Permission
+        ProtectionCard(
+            title = stringResource(R.string.notification_listener_permission),
+            description = stringResource(R.string.notification_listener_permission_description),
+            isEnabled = notificationListenerPermissionGranted,
+            onEnableClick = onNotificationListenerPermissionRequest
+        )
+
         // App Usage Permission
         ProtectionCard(
             title = stringResource(R.string.app_usage_permission),
@@ -294,6 +317,7 @@ fun ProtectionSetupContent(
         
         // Setup Complete Button
         val allPermissionsGranted = notificationPermissionGranted && 
+            notificationListenerPermissionGranted &&
             usageStatsPermissionGranted && 
             systemAlertWindowPermissionGranted && 
             deviceAdminEnabled &&
@@ -319,6 +343,7 @@ fun ProtectionSetupContent(
         if (!allPermissionsGranted) {
             val missingPermissions = mutableListOf<String>()
             if (!notificationPermissionGranted) missingPermissions.add(stringResource(R.string.notification_permission))
+            if (!notificationListenerPermissionGranted) missingPermissions.add(stringResource(R.string.notification_listener_permission))
             if (!usageStatsPermissionGranted) missingPermissions.add(stringResource(R.string.app_usage_permission))
             if (!systemAlertWindowPermissionGranted) missingPermissions.add(stringResource(R.string.display_over_apps))
             if (!deviceAdminEnabled) missingPermissions.add(stringResource(R.string.device_admin_rights))
@@ -408,4 +433,3 @@ fun ProtectionCard(
         }
     }
 }
-

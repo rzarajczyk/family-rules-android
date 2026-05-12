@@ -35,12 +35,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.IconButton
-import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
+import pl.zarajczyk.familyrulesandroid.ui.theme.ApplySystemBars
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import java.net.HttpURLConnection
@@ -55,7 +55,8 @@ class InitialSetupActivity : ComponentActivity() {
 
         setContent {
             FamilyRulesAndroidTheme {
-                window.statusBarColor = FamilyRulesColors.NORMAL_BACKGROUND.toArgb()
+                ApplySystemBars(FamilyRulesColors.NORMAL_BACKGROUND)
+
                 InitialSetupScreen(
                     settingsManager = settingsManager,
                     onRegistrationCompleted = {
@@ -223,7 +224,7 @@ fun SetupForm(
             .fillMaxSize()
             .padding(16.dp)
             .background(
-                color = Color.White,
+                color = FamilyRulesColors.SECONDARY_BACKGROUND_COLOR,
                 shape = RoundedCornerShape(16.dp)
             )
             .padding(16.dp)

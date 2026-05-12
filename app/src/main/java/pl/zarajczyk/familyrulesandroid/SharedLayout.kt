@@ -6,11 +6,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -61,23 +63,26 @@ fun SharedAppLayout(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
+    val bgColor = when (deviceState) {
+        ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
+        BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
+        BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> FamilyRulesColors.BLOCKING_COLOR
+    }
     
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
+            .background(bgColor),
+        containerColor = bgColor,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
-        val bgColor = when (deviceState) {
-            ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
-            BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
-            BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> FamilyRulesColors.BLOCKING_COLOR
-        }
         if (isLandscape) {
             // Horizontal layout for landscape orientation
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(bgColor)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(innerPadding)
             ) {
                 // Left side - Icon and label with menu
@@ -162,6 +167,7 @@ fun SharedAppLayout(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(bgColor)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(innerPadding)
             ) {
                 Column(

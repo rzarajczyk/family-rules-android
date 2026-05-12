@@ -46,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -54,11 +53,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
-import androidx.core.view.WindowCompat
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.core.*
 import pl.zarajczyk.familyrulesandroid.database.App
 import pl.zarajczyk.familyrulesandroid.database.AppDb
+import pl.zarajczyk.familyrulesandroid.ui.theme.ApplySystemBars
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesAndroidTheme
 import pl.zarajczyk.familyrulesandroid.utils.millisToHMS
 import kotlinx.coroutines.delay
@@ -77,12 +76,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Set status bar color to match background
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-        }
-        window.statusBarColor = getColor(R.color.background_color)
 
         settingsManager = SettingsManager(this)
         appDb = AppDb(this)
@@ -119,18 +112,12 @@ class MainActivity : ComponentActivity() {
                     FamilyRulesAndroidTheme {
                         // Use the reactive state flow for device state
                         val deviceState by service.getDeviceStateFlow().collectAsState(initial = service.getCurrentDeviceState())
-                        // Keep status bar color in sync with SharedAppLayout background color
                         val bgColor = when (deviceState.state) {
                             DeviceState.ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
                             DeviceState.BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
                             DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> FamilyRulesColors.BLOCKING_COLOR
                         }
-                        androidx.compose.runtime.SideEffect {
-                            WindowCompat.getInsetsController(window, window.decorView).apply {
-                                isAppearanceLightStatusBars = true
-                            }
-                            window.statusBarColor = bgColor.toArgb()
-                        }
+                        ApplySystemBars(bgColor)
 
                         // Track usage/screenTime and poll until calculated
                         var usageStatsListState by remember { mutableStateOf(service.getTodayPackageUsage()) }

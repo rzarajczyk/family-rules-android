@@ -3,6 +3,7 @@ package pl.zarajczyk.familyrulesandroid.core
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +12,13 @@ import android.provider.Settings
 import androidx.core.net.toUri
 
 class PermissionsChecker(private val activity: Activity) {
+
+    fun isNotificationListenerPermissionGranted(): Boolean {
+        val flat = Settings.Secure.getString(activity.contentResolver, "enabled_notification_listeners")
+            ?: return false
+        val componentName = ComponentName(activity, FamilyRulesNotificationListenerService::class.java)
+        return flat.split(":").any { it == componentName.flattenToString() }
+    }
 
     fun isAllPermissionsGranted(): Boolean {
         val exactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

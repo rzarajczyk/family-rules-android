@@ -115,6 +115,9 @@ interface FamilyRulesApiService {
     @POST("/api/v2/get-blocked-apps")
     suspend fun getBlockedApps(): BlockedAppsResponse
 
+    @POST("/api/v2/get-blocked-playback-apps")
+    suspend fun getBlockedPlaybackApps(): BlockedAppsResponse
+
     @POST("/api/v2/groups-usage-report")
     suspend fun getGroupsUsageReport(): AppGroupsUsageReportResponse
 

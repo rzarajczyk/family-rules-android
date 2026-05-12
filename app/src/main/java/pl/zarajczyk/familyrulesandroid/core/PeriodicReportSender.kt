@@ -17,6 +17,7 @@ import kotlin.time.Duration.Companion.minutes
 
 private const val TAG = "PeriodicReportSender"
 private const val KEY_CACHED_BLOCKED_APPS = "cachedBlockedApps"
+private const val KEY_CACHED_BLOCKED_PLAYBACK_APPS = "cachedBlockedPlaybackApps"
 
 class PeriodicReportSender(
     private val coreService: FamilyRulesCoreService,
@@ -40,6 +41,10 @@ class PeriodicReportSender(
     // so that a restart + failed first fetch still has a fallback (Problem 7).
     private var cachedBlockedApps: List<String> =
         settingsManager.getStringSet(KEY_CACHED_BLOCKED_APPS).toList()
+
+    // Last known-good blocked playback app list. Mirrors cachedBlockedApps pattern.
+    private var cachedBlockedPlaybackApps: List<String> =
+        settingsManager.getStringSet(KEY_CACHED_BLOCKED_PLAYBACK_APPS).toList()
 
     companion object {
         fun install(
@@ -156,6 +161,8 @@ class PeriodicReportSender(
                     appBlocker.unblock()
                     blockingArmed = false
                 }
+                // Disable playback blocking when device becomes active.
+                MediaSessionMonitor.updatePlaybackBlocking(active = false, packages = emptySet())
             }
 
             DeviceState.BLOCK_RESTRICTED_APPS -> {
@@ -171,6 +178,8 @@ class PeriodicReportSender(
                     // group changed while the device state name stayed the same.
                     refreshBlockedAppsIfChanged()
                 }
+                // Refresh playback blocking list each tick.
+                refreshPlaybackBlocking(active = true)
             }
 
             DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> {
@@ -182,15 +191,21 @@ class PeriodicReportSender(
                         Logger.i(TAG, "Countdown complete - blocking apps")
                         appBlocker.block(appList)
                         blockingArmed = appList.isNotEmpty()
+                        // Enable playback blocking only after countdown completes.
+                        scope.launch { refreshPlaybackBlocking(active = true) }
                     }
                     // blockingArmed stays false until the countdown callback fires.
+                    // Keep playback blocking disabled during countdown.
+                    MediaSessionMonitor.updatePlaybackBlocking(active = false, packages = emptySet())
                 } else if (!blockingArmed) {
                     // Problem 3: countdown may have been killed; retry arming directly.
                     Logger.i(TAG, "Blocking not yet armed after timeout state - retrying arm")
                     armBlocking()
+                    refreshPlaybackBlocking(active = true)
                 } else {
                     // Problem 4: refresh list while already in blocking state.
                     refreshBlockedAppsIfChanged()
+                    refreshPlaybackBlocking(active = true)
                 }
             }
         }
@@ -199,6 +214,9 @@ class PeriodicReportSender(
             currentDeviceState = newState
             coreService.updateDeviceState(newState)
         }
+
+        // Always enforce playback blocking at the end of each cycle.
+        MediaSessionMonitor.enforcePlaybackBlocking()
     }
 
     /**
@@ -257,5 +275,23 @@ class PeriodicReportSender(
 
     private fun persistBlockedApps(apps: List<String>) {
         settingsManager.setStringSet(KEY_CACHED_BLOCKED_APPS, apps.toSet())
+    }
+
+    /**
+     * Fetch the blocked-playback-apps list from the server (or fall back to cache) and
+     * tell MediaSessionMonitor whether to enforce playback blocking.
+     */
+    private suspend fun refreshPlaybackBlocking(active: Boolean) {
+        val fetched = familyRulesClient.getBlockedPlaybackApps()
+        if (fetched != null) {
+            settingsManager.setStringSet(KEY_CACHED_BLOCKED_PLAYBACK_APPS, fetched.toSet())
+            cachedBlockedPlaybackApps = fetched
+        } else if (cachedBlockedPlaybackApps.isNotEmpty()) {
+            Logger.w(TAG, "getBlockedPlaybackApps() failed - using cached list (${cachedBlockedPlaybackApps.size} apps)")
+        }
+        MediaSessionMonitor.updatePlaybackBlocking(
+            active = active && cachedBlockedPlaybackApps.isNotEmpty(),
+            packages = cachedBlockedPlaybackApps.toSet()
+        )
     }
 }

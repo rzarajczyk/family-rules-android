@@ -10,6 +10,9 @@
     <string name="password_show">👁️</string>
     <string name="password_hide">🙈</string>
     
+    <string name="notification_listener_permission">Notification listener access</string>
+    <string name="notification_listener_permission_description">Required to detect and pause media playback when apps are blocked</string>
+
     <!-- Protection Setup Activity -->
     <string name="protection_setup_description">To complete the app setup, please grant the following permissions:</string>
     <string name="notification_permission">Notification permission</string>

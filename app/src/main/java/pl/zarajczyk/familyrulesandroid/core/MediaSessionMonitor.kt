@@ -31,12 +31,60 @@ object MediaSessionMonitor {
     @Volatile
     private var listenerRegistered = false
 
+    /** Package names whose playback should be paused when [playbackBlockingActive] is true. */
+    @Volatile
+    private var blockedPlaybackPackages: Set<String> = emptySet()
+
+    /** Whether playback blocking is currently active. */
+    @Volatile
+    private var playbackBlockingActive: Boolean = false
+
     private val callbackHandler = Handler(Looper.getMainLooper())
     private val callbacks = ConcurrentHashMap<String, MediaController.Callback>()
 
     private val activeSessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         logSessionsSnapshot("active-sessions-changed", controllers.orEmpty())
         registerCallbacks(controllers.orEmpty())
+    }
+
+    /**
+     * Update the set of packages whose playback must be blocked and whether blocking is active.
+     * Called by PeriodicReportSender whenever the device state or blocked-playback-apps list changes.
+     */
+    fun updatePlaybackBlocking(active: Boolean, packages: Set<String>) {
+        playbackBlockingActive = active
+        blockedPlaybackPackages = packages
+        Logger.i(TAG, "Playback blocking updated: active=$active, packages=$packages")
+    }
+
+    /**
+     * Pause all active media sessions belonging to [blockedPlaybackPackages] when
+     * [playbackBlockingActive] is true.  Called once per report tick from PeriodicReportSender.
+     */
+    fun enforcePlaybackBlocking() {
+        if (!playbackBlockingActive) return
+        if (!initialized) return
+
+        val manager = sessionManager ?: return
+        val component = listenerComponent ?: return
+        val blocked = blockedPlaybackPackages
+        if (blocked.isEmpty()) return
+
+        try {
+            val controllers = manager.getActiveSessions(component).orEmpty()
+            for (controller in controllers) {
+                if (controller.packageName !in blocked) continue
+                val state = controller.playbackState?.state
+                if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
+                    Logger.i(TAG, "Pausing playback for ${controller.packageName}")
+                    controller.transportControls?.pause()
+                }
+            }
+        } catch (e: SecurityException) {
+            Logger.w(TAG, "Cannot enforce playback blocking - notification access missing", e)
+        } catch (e: Exception) {
+            Logger.w(TAG, "Failed to enforce playback blocking", e)
+        }
     }
 
     fun install(context: Context) {

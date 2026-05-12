@@ -235,6 +235,25 @@ class FamilyRulesClient(
         }
     }
 
+    suspend fun getBlockedPlaybackApps(): List<String>? {
+        Log.d("FamilyRulesClient", "Fetching blocked playback apps for device")
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.getBlockedPlaybackApps()
+                val appPackages = response.apps.map { it.appPath }
+                Logger.i(
+                    "FamilyRulesClient",
+                    "Fetched ${appPackages.size} blocked playback apps for device: $appPackages"
+                )
+                appPackages
+            } catch (e: Exception) {
+                Log.e("FamilyRulesClient", "Failed to fetch blocked playback apps: ${e.message}", e)
+                null
+            }
+        }
+    }
+
     suspend fun getGroupsUsageReport(): AppGroupsUsageReportResponse? {
         Log.d("FamilyRulesClient", "Fetching groups usage report")
 
