@@ -256,18 +256,18 @@ class FamilyRulesCoreService : Service() {
         }
 
         val iconResource = when (currentState.state) {
+            DeviceState.ACTIVE -> R.drawable.ic_notification_small
+            DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.ic_notification_small_blocked
+            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> R.drawable.ic_notification_small_blocked
+        }
+
+        val largeIconResource = when (currentState.state) {
             DeviceState.ACTIVE -> R.drawable.icon
             DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.icon_blocked
             DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> R.drawable.icon_blocked
         }
 
-        val largeIconResource = when (currentState.state) {
-            DeviceState.ACTIVE -> null
-            DeviceState.BLOCK_RESTRICTED_APPS -> R.drawable.notification_icon_blocked
-            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> R.drawable.notification_icon_blocked
-        }
-
-        val largeIcon = largeIconResource?.let { resource ->
+        val largeIcon = largeIconResource.let { resource ->
             resources.getDrawable(resource, null).let { drawable ->
                 val bitmap = createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight)
                 val canvas = android.graphics.Canvas(bitmap)
@@ -281,11 +281,7 @@ class FamilyRulesCoreService : Service() {
             .setContentTitle("Family Rules")
             .setContentText(notificationText)
             .setSmallIcon(iconResource)
-            .apply {
-                if (largeIcon != null) {
-                    setLargeIcon(largeIcon)
-                }
-            }
+            .setLargeIcon(largeIcon)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
