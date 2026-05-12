@@ -138,10 +138,14 @@ class PeriodicReportSender(
             packageUsages = coreService.getTodayPackageUsage(),
             activeApps = if (foregroundApp != null) setOf(foregroundApp) else emptySet()
         )
-        // null means network failure — keep the current local state, do not unblock.
-        val response = familyRulesClient.reportUptimeWithCommands(uptime) ?: return
-        serverCommandCoordinator.onCommandsReceived(response.serverCommands)
-        handleDeviceStateChange(ActualDeviceState.from(response))
+        try {
+            // null means network failure — keep the current local state, do not unblock.
+            val response = familyRulesClient.reportUptimeWithCommands(uptime) ?: return
+            serverCommandCoordinator.onCommandsReceived(response.serverCommands)
+            handleDeviceStateChange(ActualDeviceState.from(response))
+        } finally {
+            MediaSessionMonitor.enforcePlaybackBlocking()
+        }
     }
 
     private suspend fun handleDeviceStateChange(newState: ActualDeviceState) {
@@ -162,24 +166,31 @@ class PeriodicReportSender(
                     blockingArmed = false
                 }
                 // Disable playback blocking when device becomes active.
-                MediaSessionMonitor.updatePlaybackBlocking(active = false, packages = emptySet())
+                MediaSessionMonitor.updatePlaybackBlocking(enabled = false, blockedPackages = emptySet())
             }
 
             DeviceState.BLOCK_RESTRICTED_APPS -> {
                 if (stateChanged) {
                     // Fresh transition into blocking — fetch and arm immediately.
                     armBlocking()
+                    MediaSessionMonitor.updatePlaybackBlocking(
+                        enabled = true,
+                        blockedPackages = resolveBlockedPlaybackApps().toSet()
+                    )
                 } else if (!blockingArmed) {
                     // Problem 3: previous arm attempt failed; retry every cycle.
                     Logger.i(TAG, "Blocking not yet armed - retrying")
                     armBlocking()
+                    MediaSessionMonitor.updatePlaybackBlocking(
+                        enabled = true,
+                        blockedPackages = resolveBlockedPlaybackApps().toSet()
+                    )
                 } else {
                     // Problem 4: already armed, but refresh the list in case the server-side
                     // group changed while the device state name stayed the same.
                     refreshBlockedAppsIfChanged()
+                    refreshBlockedPlaybackAppsIfChanged()
                 }
-                // Refresh playback blocking list each tick.
-                refreshPlaybackBlocking(active = true)
             }
 
             DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> {
@@ -192,20 +203,29 @@ class PeriodicReportSender(
                         appBlocker.block(appList)
                         blockingArmed = appList.isNotEmpty()
                         // Enable playback blocking only after countdown completes.
-                        scope.launch { refreshPlaybackBlocking(active = true) }
+                        scope.launch {
+                            MediaSessionMonitor.updatePlaybackBlocking(
+                                enabled = true,
+                                blockedPackages = resolveBlockedPlaybackApps().toSet()
+                            )
+                            MediaSessionMonitor.enforcePlaybackBlocking()
+                        }
                     }
                     // blockingArmed stays false until the countdown callback fires.
                     // Keep playback blocking disabled during countdown.
-                    MediaSessionMonitor.updatePlaybackBlocking(active = false, packages = emptySet())
+                    MediaSessionMonitor.updatePlaybackBlocking(enabled = false, blockedPackages = emptySet())
                 } else if (!blockingArmed) {
                     // Problem 3: countdown may have been killed; retry arming directly.
                     Logger.i(TAG, "Blocking not yet armed after timeout state - retrying arm")
                     armBlocking()
-                    refreshPlaybackBlocking(active = true)
+                    MediaSessionMonitor.updatePlaybackBlocking(
+                        enabled = true,
+                        blockedPackages = resolveBlockedPlaybackApps().toSet()
+                    )
                 } else {
                     // Problem 4: refresh list while already in blocking state.
                     refreshBlockedAppsIfChanged()
-                    refreshPlaybackBlocking(active = true)
+                    refreshBlockedPlaybackAppsIfChanged()
                 }
             }
         }
@@ -215,8 +235,6 @@ class PeriodicReportSender(
             coreService.updateDeviceState(newState)
         }
 
-        // Always enforce playback blocking at the end of each cycle.
-        MediaSessionMonitor.enforcePlaybackBlocking()
     }
 
     /**
@@ -278,20 +296,50 @@ class PeriodicReportSender(
     }
 
     /**
-     * Fetch the blocked-playback-apps list from the server (or fall back to cache) and
-     * tell MediaSessionMonitor whether to enforce playback blocking.
+     * Returns the best available blocked playback app list:
+     *   1. Fresh fetch from server (also updates cache).
+     *   2. Last known-good cache.
+     *   3. Empty list — caller must treat this as "no playback blocking targets available".
      */
-    private suspend fun refreshPlaybackBlocking(active: Boolean) {
+    private suspend fun resolveBlockedPlaybackApps(): List<String> {
         val fetched = familyRulesClient.getBlockedPlaybackApps()
-        if (fetched != null) {
-            settingsManager.setStringSet(KEY_CACHED_BLOCKED_PLAYBACK_APPS, fetched.toSet())
+        return if (fetched != null) {
+            persistBlockedPlaybackApps(fetched)
             cachedBlockedPlaybackApps = fetched
-        } else if (cachedBlockedPlaybackApps.isNotEmpty()) {
-            Logger.w(TAG, "getBlockedPlaybackApps() failed - using cached list (${cachedBlockedPlaybackApps.size} apps)")
+            fetched
+        } else {
+            if (cachedBlockedPlaybackApps.isNotEmpty()) {
+                Logger.w(
+                    TAG,
+                    "getBlockedPlaybackApps() failed - using cached list (${cachedBlockedPlaybackApps.size} apps)"
+                )
+            }
+            cachedBlockedPlaybackApps
         }
-        MediaSessionMonitor.updatePlaybackBlocking(
-            active = active && cachedBlockedPlaybackApps.isNotEmpty(),
-            packages = cachedBlockedPlaybackApps.toSet()
-        )
     }
+
+    /**
+     * Fetch the latest blocked playback list. If the list changed, update playback blocking
+     * immediately while keeping enforcement enabled.
+     */
+    private suspend fun refreshBlockedPlaybackAppsIfChanged() {
+        val fetched = familyRulesClient.getBlockedPlaybackApps() ?: return
+        persistBlockedPlaybackApps(fetched)
+        if (fetched.toSet() != cachedBlockedPlaybackApps.toSet()) {
+            Logger.i(
+                TAG,
+                "Blocked playback app list changed - refreshing (${cachedBlockedPlaybackApps.size} -> ${fetched.size} apps)"
+            )
+            cachedBlockedPlaybackApps = fetched
+            MediaSessionMonitor.updatePlaybackBlocking(
+                enabled = true,
+                blockedPackages = fetched.toSet()
+            )
+        }
+    }
+
+    private fun persistBlockedPlaybackApps(apps: List<String>) {
+        settingsManager.setStringSet(KEY_CACHED_BLOCKED_PLAYBACK_APPS, apps.toSet())
+    }
+
 }

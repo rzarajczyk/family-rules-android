@@ -28,6 +28,7 @@ class PermissionsChecker(private val activity: Activity) {
         }
         
         return isUsageStatsPermissionGranted() && 
+               isNotificationListenerPermissionGranted() &&
                isNotificationPermissionGranted() && 
                isSystemAlertWindowPermissionGranted() &&
                exactAlarmGranted

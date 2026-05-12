@@ -10,6 +10,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Parcelable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 import java.util.concurrent.ConcurrentHashMap
 
@@ -42,6 +49,13 @@ object MediaSessionMonitor {
     private val callbackHandler = Handler(Looper.getMainLooper())
     private val callbacks = ConcurrentHashMap<String, MediaController.Callback>()
 
+    private val enforcementScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    @Volatile
+    private var enforcementLoopJob: Job? = null
+
+    private const val ENFORCEMENT_POLL_INTERVAL_MS = 5_000L
+
     private val activeSessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         logSessionsSnapshot("active-sessions-changed", controllers.orEmpty())
         registerCallbacks(controllers.orEmpty())
@@ -51,10 +65,32 @@ object MediaSessionMonitor {
      * Update the set of packages whose playback must be blocked and whether blocking is active.
      * Called by PeriodicReportSender whenever the device state or blocked-playback-apps list changes.
      */
-    fun updatePlaybackBlocking(active: Boolean, packages: Set<String>) {
-        playbackBlockingActive = active
-        blockedPlaybackPackages = packages
-        Logger.i(TAG, "Playback blocking updated: active=$active, packages=$packages")
+    fun updatePlaybackBlocking(enabled: Boolean, blockedPackages: Set<String>) {
+        playbackBlockingActive = enabled
+        blockedPlaybackPackages = blockedPackages
+        Logger.i(TAG, "Playback blocking updated: enabled=$enabled, blockedPackages=$blockedPackages")
+        if (enabled) {
+            startEnforcementLoop()
+        } else {
+            stopEnforcementLoop()
+        }
+    }
+
+    private fun startEnforcementLoop() {
+        if (enforcementLoopJob?.isActive == true) return
+        enforcementLoopJob = enforcementScope.launch {
+            Logger.i(TAG, "Enforcement loop started (interval=${ENFORCEMENT_POLL_INTERVAL_MS}ms)")
+            while (isActive && playbackBlockingActive) {
+                enforcePlaybackBlocking()
+                delay(ENFORCEMENT_POLL_INTERVAL_MS)
+            }
+            Logger.i(TAG, "Enforcement loop stopped")
+        }
+    }
+
+    private fun stopEnforcementLoop() {
+        enforcementLoopJob?.cancel()
+        enforcementLoopJob = null
     }
 
     /**
@@ -124,6 +160,7 @@ object MediaSessionMonitor {
     }
 
     fun stop() {
+        stopEnforcementLoop()
         val manager = sessionManager
         if (manager != null) {
             try {
@@ -171,6 +208,20 @@ object MediaSessionMonitor {
         }
     }
 
+    private fun pauseIfBlocked(controller: MediaController) {
+        if (!playbackBlockingActive) return
+        if (controller.packageName !in blockedPlaybackPackages) return
+        val state = controller.playbackState?.state
+        if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
+            Logger.i(TAG, "Callback: pausing playback for ${controller.packageName}")
+            try {
+                controller.transportControls?.pause()
+            } catch (e: Exception) {
+                Logger.w(TAG, "Failed to pause ${controller.packageName} from callback", e)
+            }
+        }
+    }
+
     private fun registerCallbacks(controllers: List<MediaController>) {
         val activeTokens = controllers.map { it.sessionToken.toString() }.toSet()
 
@@ -192,6 +243,7 @@ object MediaSessionMonitor {
             val callback = object : MediaController.Callback() {
                 override fun onPlaybackStateChanged(state: PlaybackState?) {
                     logControllerEvent("playback-state-changed", controller, state = state)
+                    pauseIfBlocked(controller)
                 }
 
                 override fun onMetadataChanged(metadata: MediaMetadata?) {
