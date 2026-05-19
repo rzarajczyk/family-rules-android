@@ -19,7 +19,8 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 data class Uptime(
     val screenTimeMillis: Long,
     val packageUsages: Map<String, Long>,
-    val activeApps: Set<String>
+    val activeApps: Set<String>,
+    val mediaPlayingApps: Set<String> = emptySet(),
 )
 
 data class AppDetails(
@@ -133,30 +134,6 @@ class FamilyRulesClient(
         }
     }
 
-    suspend fun reportUptime(uptime: Uptime): ActualDeviceState? {
-        val instanceId = settingsManager.getString("instanceId", "")
-
-        val applications: Map<String, Long> = uptime.packageUsages.mapValues { it.value / 1000 }
-        val request = ReportRequest(
-            instanceId = instanceId,
-            screenTime = uptime.screenTimeMillis / 1000,
-            applications = applications,
-            activeApps = uptime.activeApps
-        )
-
-        return withContext(Dispatchers.IO) {
-            try {
-                val response = apiService.report(request)
-                val state = ActualDeviceState.from(response)
-                Logger.i("FamilyRulesClient", createUptimeLogMessage(uptime, state))
-                state
-            } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
-                null
-            }
-        }
-    }
-
     suspend fun reportUptimeWithCommands(uptime: Uptime): ReportResponseDto? {
         val instanceId = settingsManager.getString("instanceId", "")
 
@@ -165,7 +142,8 @@ class FamilyRulesClient(
             instanceId = instanceId,
             screenTime = uptime.screenTimeMillis / 1000,
             applications = applications,
-            activeApps = uptime.activeApps
+            activeApps = uptime.activeApps,
+            mediaPlayingApps = uptime.mediaPlayingApps,
         )
 
         return withContext(Dispatchers.IO) {

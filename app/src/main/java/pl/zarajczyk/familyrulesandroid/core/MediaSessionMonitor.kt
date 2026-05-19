@@ -47,7 +47,7 @@ object MediaSessionMonitor {
     private var playbackBlockingActive: Boolean = false
 
     private val callbackHandler = Handler(Looper.getMainLooper())
-    private val callbacks = ConcurrentHashMap<String, MediaController.Callback>()
+    private val callbacks = ConcurrentHashMap<String, Pair<MediaController, MediaController.Callback>>()
 
     private val enforcementScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -123,6 +123,30 @@ object MediaSessionMonitor {
         }
     }
 
+    fun getCurrentlyPlayingPackages(): Set<String> {
+        if (!initialized) return emptySet()
+
+        val manager = sessionManager ?: return emptySet()
+        val component = listenerComponent ?: return emptySet()
+
+        return try {
+            manager.getActiveSessions(component)
+                .orEmpty()
+                .filter { controller ->
+                    val state = controller.playbackState?.state
+                    state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
+                }
+                .map { it.packageName }
+                .toSet()
+        } catch (e: SecurityException) {
+            Logger.w(TAG, "Cannot query media playing packages - notification access missing", e)
+            emptySet()
+        } catch (e: Exception) {
+            Logger.w(TAG, "Failed to query media playing packages", e)
+            emptySet()
+        }
+    }
+
     fun install(context: Context) {
         appContext = context.applicationContext
         sessionManager = context.getSystemService(MediaSessionManager::class.java)
@@ -171,7 +195,7 @@ object MediaSessionMonitor {
             }
         }
         callbacks.entries.forEach { entry ->
-            unregisterCallback(entry.key, entry.value)
+            unregisterCallback(entry.key, entry.value.first, entry.value.second)
         }
         callbacks.clear()
     }
@@ -225,9 +249,9 @@ object MediaSessionMonitor {
     private fun registerCallbacks(controllers: List<MediaController>) {
         val activeTokens = controllers.map { it.sessionToken.toString() }.toSet()
 
-        callbacks.entries.removeIf { (token, callback) ->
+        callbacks.entries.removeIf { (token, pair) ->
             if (token !in activeTokens) {
-                unregisterCallback(token, callback)
+                unregisterCallback(token, pair.first, pair.second)
                 true
             } else {
                 false
@@ -260,14 +284,14 @@ object MediaSessionMonitor {
 
                 override fun onSessionDestroyed() {
                     Logger.i(TAG, "Media session destroyed: ${describeController(controller)}")
-                    unregisterCallback(token, this)
+                    unregisterCallback(token, controller, this)
                     callbacks.remove(token)
                 }
             }
 
             try {
                 controller.registerCallback(callback, callbackHandler)
-                callbacks[token] = callback
+                callbacks[token] = Pair(controller, callback)
                 logControllerEvent("callback-registered", controller)
             } catch (e: SecurityException) {
                 Logger.w(TAG, "Failed to register callback for ${controller.packageName}", e)
@@ -277,17 +301,9 @@ object MediaSessionMonitor {
         }
     }
 
-    private fun unregisterCallback(token: String, callback: MediaController.Callback) {
-        val controller = try {
-            sessionManager?.getActiveSessions(listenerComponent)?.orEmpty()?.firstOrNull {
-                it.sessionToken.toString() == token
-            }
-        } catch (_: Exception) {
-            null
-        }
-
+    private fun unregisterCallback(token: String, controller: MediaController, callback: MediaController.Callback) {
         try {
-            controller?.unregisterCallback(callback)
+            controller.unregisterCallback(callback)
         } catch (e: Exception) {
             Logger.w(TAG, "Failed to unregister callback for token=$token", e)
         }
