@@ -16,6 +16,7 @@ data class ServerCommand(
     val resultStatus: String? = null,
     val responseType: String? = null,
     val responsePayloadJson: String? = null,
+    val responsePayloadFilePath: String? = null,
     val completedAtIso: String? = null,
     val resultUploadedAtMillis: Long? = null,
 )

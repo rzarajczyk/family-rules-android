@@ -11,7 +11,9 @@ import pl.zarajczyk.familyrulesandroid.adapter.ServerCommandDto
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.database.ServerCommand
 import pl.zarajczyk.familyrulesandroid.database.ServerCommandExecutionState
+import pl.zarajczyk.familyrulesandroid.database.ServerCommandMeta
 import pl.zarajczyk.familyrulesandroid.utils.Logger
+import java.io.File
 import java.time.Instant
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -54,6 +56,7 @@ class ServerCommandCoordinator(
     }
 
     suspend fun retryPendingWork() {
+        appDb.cleanUpStalePayloadFiles()
         acknowledgePendingCommands()
         executePendingCommands()
         uploadPendingResults()
@@ -88,7 +91,8 @@ class ServerCommandCoordinator(
                 commandId = command.commandId,
                 resultStatus = result.status,
                 responseType = result.responseType,
-                responsePayloadJson = payloadAdapter.toJson(result.responsePayload),
+                responsePayloadJson = result.responsePayloadJson,
+                responsePayloadFilePath = result.responsePayloadFilePath,
                 completedAtIso = result.completedAt,
             )
         }
@@ -99,8 +103,7 @@ class ServerCommandCoordinator(
         if (pendingUploads.isEmpty()) return
 
         val results = pendingUploads.mapNotNull { command ->
-            val payloadJson = command.responsePayloadJson ?: return@mapNotNull null
-            val payload = payloadAdapter.fromJson(payloadJson) ?: emptyMap()
+            val payload = resolvePayload(command) ?: return@mapNotNull null
             CommandResultDto(
                 commandId = command.commandId,
                 commandName = command.commandName,
@@ -113,31 +116,113 @@ class ServerCommandCoordinator(
 
         if (familyRulesClient.sendCommandResults(results)) {
             val now = System.currentTimeMillis()
-            pendingUploads.forEach { appDb.markCommandResultUploaded(it.commandId, now) }
+            pendingUploads.forEach { command ->
+                appDb.markCommandResultUploaded(command.commandId, now)
+                // Delete the payload file now that it has been successfully uploaded
+                command.responsePayloadFilePath?.let { path ->
+                    try {
+                        val deleted = File(path).delete()
+                        if (deleted) {
+                            Logger.i(TAG, "Deleted payload file after upload: $path")
+                        }
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "Failed to delete payload file $path", e)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the response payload map for a command.
+     *
+     * Priority:
+     * 1. If [ServerCommand.responsePayloadFilePath] is set, read the payload text from that file
+     *    and reconstruct the map (file-backed path for large payloads like SEND_LOGS).
+     * 2. Fall back to parsing [ServerCommand.responsePayloadJson] inline (legacy / small payloads).
+     */
+    private suspend fun resolvePayload(command: ServerCommand): Map<String, String>? {
+        return withContext(Dispatchers.IO) {
+            val filePath = command.responsePayloadFilePath
+            if (filePath != null) {
+                try {
+                    val file = File(filePath)
+                    if (!file.exists()) {
+                        Logger.w(TAG, "Payload file missing for command ${command.commandId}: $filePath")
+                        return@withContext null
+                    }
+                    val logsText = file.readText()
+                    mapOf(
+                        "logsText" to logsText,
+                        "truncated" to "false",
+                        "collectedAt" to (command.completedAtIso ?: Instant.now().toString()),
+                    )
+                } catch (e: Exception) {
+                    Logger.e(TAG, "Failed to read payload file $filePath for command ${command.commandId}", e)
+                    null
+                }
+            } else {
+                val payloadJson = command.responsePayloadJson ?: return@withContext null
+                payloadAdapter.fromJson(payloadJson) ?: emptyMap()
+            }
         }
     }
 
     private suspend fun executeSendLogs(commandId: String): CommandExecutionResult {
         return withContext(Dispatchers.IO) {
             val logText = collectLogsForUpload(context)
+            val completedAt = Instant.now().toString()
             Logger.i(TAG, "Collected logs for command $commandId (${logText.text.length} chars)")
-            CommandExecutionResult(
-                status = "SUCCEEDED",
-                responseType = "SEND_LOGS_V1",
-                responsePayload = mapOf(
-                    "logsText" to logText.text,
-                    "truncated" to "false",
-                    "collectedAt" to Instant.now().toString(),
-                ),
-                completedAt = Instant.now().toString(),
-            )
+
+            // Write the (potentially very large) log payload to a file in noBackupFilesDir
+            // to avoid SQLiteBlobTooBigException when storing in the database row.
+            val payloadFile = writePayloadFile(commandId, logText.text)
+            if (payloadFile != null) {
+                Logger.i(TAG, "Wrote log payload to file ${payloadFile.path} for command $commandId")
+                CommandExecutionResult(
+                    status = "SUCCEEDED",
+                    responseType = "SEND_LOGS_V1",
+                    responsePayloadJson = null,
+                    responsePayloadFilePath = payloadFile.absolutePath,
+                    completedAt = completedAt,
+                )
+            } else {
+                // Fallback: store inline (may be large, but better than losing the data)
+                Logger.w(TAG, "Could not write payload file for command $commandId; storing inline")
+                CommandExecutionResult(
+                    status = "SUCCEEDED",
+                    responseType = "SEND_LOGS_V1",
+                    responsePayloadJson = payloadAdapter.toJson(
+                        mapOf(
+                            "logsText" to logText.text,
+                            "truncated" to "false",
+                            "collectedAt" to completedAt,
+                        )
+                    ),
+                    responsePayloadFilePath = null,
+                    completedAt = completedAt,
+                )
+            }
+        }
+    }
+
+    private fun writePayloadFile(commandId: String, content: String): File? {
+        return try {
+            val dir = appDb.payloadDir()
+            val file = File(dir, "$commandId.txt")
+            file.writeText(content)
+            file
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to write payload file for command $commandId", e)
+            null
         }
     }
 
     private fun unsupportedCommand(commandName: String) = CommandExecutionResult(
         status = "FAILED",
         responseType = "UNSUPPORTED_COMMAND_V1",
-        responsePayload = mapOf("receivedCommandName" to commandName),
+        responsePayloadJson = payloadAdapter.toJson(mapOf("receivedCommandName" to commandName)),
+        responsePayloadFilePath = null,
         completedAt = Instant.now().toString(),
     )
 
@@ -162,7 +247,8 @@ class ServerCommandCoordinator(
 private data class CommandExecutionResult(
     val status: String,
     val responseType: String,
-    val responsePayload: Map<String, String>,
+    val responsePayloadJson: String?,
+    val responsePayloadFilePath: String?,
     val completedAt: String,
 )
 

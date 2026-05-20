@@ -11,6 +11,10 @@ import android.util.Base64
 import android.util.Log
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 import androidx.core.graphics.createBitmap
+import java.io.File
+
+private const val TAG = "AppDb"
+private const val PAYLOAD_TTL_MS = 72 * 60 * 60 * 1000L // 72 hours
 
 class AppDb(private val context: Context) {
     private val database = AppDatabase.getDatabase(context)
@@ -103,8 +107,9 @@ class AppDb(private val context: Context) {
         }
     }
 
-    suspend fun getPendingCommandAcks(): List<ServerCommand> = withContext(Dispatchers.IO) {
-        serverCommandDao.getPendingAcks()
+    /** Returns lightweight metadata rows — safe even when payload columns are large. */
+    suspend fun getPendingCommandAcks(): List<ServerCommandMeta> = withContext(Dispatchers.IO) {
+        serverCommandDao.getPendingAcksMeta()
     }
 
     suspend fun markCommandAcksConfirmed(commandIds: List<String>, ackConfirmedAtMillis: Long) {
@@ -113,8 +118,9 @@ class AppDb(private val context: Context) {
         }
     }
 
-    suspend fun getCommandsByExecutionState(executionState: ServerCommandExecutionState): List<ServerCommand> = withContext(Dispatchers.IO) {
-        serverCommandDao.getByExecutionState(executionState.name)
+    /** Returns lightweight metadata rows — safe even when payload columns are large. */
+    suspend fun getCommandsByExecutionState(executionState: ServerCommandExecutionState): List<ServerCommandMeta> = withContext(Dispatchers.IO) {
+        serverCommandDao.getByExecutionStateMeta(executionState.name)
     }
 
     suspend fun markCommandExecuting(commandId: String) {
@@ -127,7 +133,8 @@ class AppDb(private val context: Context) {
         commandId: String,
         resultStatus: String,
         responseType: String,
-        responsePayloadJson: String,
+        responsePayloadJson: String?,
+        responsePayloadFilePath: String?,
         completedAtIso: String,
     ) {
         withContext(Dispatchers.IO) {
@@ -137,6 +144,7 @@ class AppDb(private val context: Context) {
                 resultStatus = resultStatus,
                 responseType = responseType,
                 responsePayloadJson = responsePayloadJson,
+                responsePayloadFilePath = responsePayloadFilePath,
                 completedAtIso = completedAtIso,
             )
         }
@@ -150,6 +158,35 @@ class AppDb(private val context: Context) {
         withContext(Dispatchers.IO) {
             serverCommandDao.markResultUploaded(commandId, uploadedAtMillis, ServerCommandExecutionState.COMPLETED.name)
         }
+    }
+
+    /**
+     * Deletes payload files from [payloadDir] that are older than [PAYLOAD_TTL_MS] (72 hours).
+     * Call this on service startup to prevent stale files accumulating after crashes.
+     */
+    fun cleanUpStalePayloadFiles() {
+        try {
+            val dir = payloadDir()
+            if (!dir.exists()) return
+            val cutoff = System.currentTimeMillis() - PAYLOAD_TTL_MS
+            var deleted = 0
+            dir.listFiles()?.forEach { file ->
+                if (file.lastModified() < cutoff) {
+                    if (file.delete()) deleted++
+                }
+            }
+            if (deleted > 0) {
+                Logger.i(TAG, "Deleted $deleted stale command payload file(s) from ${dir.path}")
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "Failed to clean up stale payload files", e)
+        }
+    }
+
+    fun payloadDir(): File {
+        val dir = File(context.noBackupFilesDir, "command-payloads")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
     }
 }
 

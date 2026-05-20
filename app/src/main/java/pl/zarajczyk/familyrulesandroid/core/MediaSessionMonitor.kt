@@ -388,28 +388,17 @@ object MediaSessionMonitor {
         }
     }
 
-    private fun describeMetadata(metadata: MediaMetadata?): String {
-        if (metadata == null) {
-            return "<null>"
-        }
-
-        val keys = metadata.keySet().sorted()
-        if (keys.isEmpty()) {
-            return "{}"
-        }
-        return keys.joinToString(prefix = "{", postfix = "}") { key ->
-            val textValue = metadata.getText(key)
-            val longValue = metadata.getLong(key)
-            val ratingValue = metadata.getRating(key)
-            val bitmapValue = metadata.getBitmap(key)
-            val value = when {
-                textValue != null -> textValue.toString()
-                ratingValue != null -> ratingValue.toString()
-                bitmapValue != null -> "Bitmap(${bitmapValue.width}x${bitmapValue.height})"
-                else -> longValue.toString()
-            }
-            "$key=$value"
-        }
+     private fun describeMetadata(metadata: MediaMetadata?): String {
+        if (metadata == null) return "<null>"
+        // Only read keys with known types to avoid W/Bundle ClassCastException spam.
+        // This is diagnostic logging only — unknown/custom keys are intentionally omitted.
+        val parts = mutableListOf<String>()
+        runCatching { metadata.getText(MediaMetadata.METADATA_KEY_TITLE)?.let { parts += "title=$it" } }
+        runCatching { metadata.getText(MediaMetadata.METADATA_KEY_ARTIST)?.let { parts += "artist=$it" } }
+        runCatching { metadata.getText(MediaMetadata.METADATA_KEY_ALBUM)?.let { parts += "album=$it" } }
+        runCatching { metadata.getLong(MediaMetadata.METADATA_KEY_DURATION).takeIf { it > 0 }?.let { parts += "duration=$it" } }
+        runCatching { metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)?.let { parts += "albumArt=Bitmap(${it.width}x${it.height})" } }
+        return if (parts.isEmpty()) "{}" else parts.joinToString(prefix = "{", postfix = "}")
     }
 
     private fun describeBundle(bundle: Bundle?): String {
