@@ -137,7 +137,15 @@ class FamilyRulesClient(
     suspend fun reportUptimeWithCommands(uptime: Uptime): ReportResponseDto? {
         val instanceId = settingsManager.getString("instanceId", "")
 
-        val applications: Map<String, Long> = uptime.packageUsages.mapValues { it.value / 1000 }
+        // Ensure every media-playing app appears in applications even if it has no foreground usage
+        // today (e.g. a background audio player). The server needs the entry to show the "playing
+        // now" indicator; usage is reported as 0 in that case.
+        val applications: Map<String, Long> = buildMap {
+            putAll(uptime.packageUsages.mapValues { it.value / 1000 })
+            for (pkg in uptime.mediaPlayingApps) {
+                putIfAbsent(pkg, 0L)
+            }
+        }
         val request = ReportRequest(
             instanceId = instanceId,
             screenTime = uptime.screenTimeMillis / 1000,

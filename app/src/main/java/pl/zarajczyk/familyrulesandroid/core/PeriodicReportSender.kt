@@ -133,11 +133,19 @@ class PeriodicReportSender(
 
     private suspend fun reportUptime() {
         val foregroundApp = coreService.getForegroundApp()
+        // Refresh the active-sessions list right before querying playback state so that
+        // the callback registry is always up-to-date regardless of whether the
+        // OnActiveSessionsChangedListener fired recently.
+        MediaSessionMonitor.refreshActiveSessions("pre-report")
+        val mediaPlayingApps = MediaSessionMonitor.getCurrentlyPlayingPackages()
+        // Cache app info for media-playing apps so they appear in ClientInfo knownApps even if
+        // they have no foreground usage time today (e.g. background audio players).
+        familyRulesClient.ensureAllAppsAreCached(mediaPlayingApps)
         val uptime = Uptime(
             screenTimeMillis = coreService.getTodayScreenTime(),
             packageUsages = coreService.getTodayPackageUsage(),
             activeApps = if (foregroundApp != null) setOf(foregroundApp) else emptySet(),
-            mediaPlayingApps = MediaSessionMonitor.getCurrentlyPlayingPackages(),
+            mediaPlayingApps = mediaPlayingApps,
         )
         try {
             // null means network failure — keep the current local state, do not unblock.

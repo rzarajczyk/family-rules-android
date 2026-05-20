@@ -38,6 +38,10 @@ object MediaSessionMonitor {
     @Volatile
     private var listenerRegistered = false
 
+    /** True while the NotificationListenerService is connected. Media queries are only reliable then. */
+    @Volatile
+    private var notificationListenerConnected = false
+
     /** Package names whose playback should be paused when [playbackBlockingActive] is true. */
     @Volatile
     private var blockedPlaybackPackages: Set<String> = emptySet()
@@ -125,6 +129,9 @@ object MediaSessionMonitor {
 
     fun getCurrentlyPlayingPackages(): Set<String> {
         if (!initialized) return emptySet()
+        if (!notificationListenerConnected) {
+            Logger.w(TAG, "getCurrentlyPlayingPackages called while NotificationListenerService is disconnected — result may be empty/stale")
+        }
 
         val manager = sessionManager ?: return emptySet()
         val component = listenerComponent ?: return emptySet()
@@ -201,6 +208,7 @@ object MediaSessionMonitor {
     }
 
     fun onNotificationListenerConnected(service: FamilyRulesNotificationListenerService) {
+        notificationListenerConnected = true
         if (!initialized) {
             install(service)
         }
@@ -208,6 +216,7 @@ object MediaSessionMonitor {
     }
 
     fun onNotificationListenerDisconnected(service: FamilyRulesNotificationListenerService) {
+        notificationListenerConnected = false
         if (appContext === service.applicationContext) {
             stop()
         }
