@@ -2,10 +2,14 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -28,6 +32,17 @@ object MediaSessionMonitor {
 
     @Volatile
     private var appContext: Context? = null
+
+    @Volatile
+    private var audioManager: AudioManager? = null
+
+    /** AudioFocusRequest held while playback blocking is active (API 26+). */
+    @Volatile
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    /** Whether we currently hold audio focus. */
+    @Volatile
+    private var audioFocusHeld: Boolean = false
 
     @Volatile
     private var sessionManager: MediaSessionManager? = null
@@ -58,7 +73,7 @@ object MediaSessionMonitor {
     @Volatile
     private var enforcementLoopJob: Job? = null
 
-    private const val ENFORCEMENT_POLL_INTERVAL_MS = 5_000L
+    private const val ENFORCEMENT_POLL_INTERVAL_MS = 1_000L
 
     private val activeSessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         logSessionsSnapshot("active-sessions-changed", controllers.orEmpty())
@@ -74,9 +89,11 @@ object MediaSessionMonitor {
         blockedPlaybackPackages = blockedPackages
         Logger.i(TAG, "Playback blocking updated: enabled=$enabled, blockedPackages=$blockedPackages")
         if (enabled) {
+            requestAudioFocus()
             startEnforcementLoop()
         } else {
             stopEnforcementLoop()
+            abandonAudioFocus()
         }
     }
 
@@ -95,6 +112,56 @@ object MediaSessionMonitor {
     private fun stopEnforcementLoop() {
         enforcementLoopJob?.cancel()
         enforcementLoopJob = null
+    }
+
+    /**
+     * Request AUDIOFOCUS_GAIN_TRANSIENT so the OS signals all media apps (including YouTube)
+     * to pause.  This is more reliable than transportControls.pause() which apps can ignore.
+     * Held until playback blocking is disabled.
+     */
+    private fun requestAudioFocus() {
+        if (audioFocusHeld) return
+        val am = audioManager ?: return
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setWillPauseWhenDucked(true)
+                .setOnAudioFocusChangeListener { focusChange ->
+                    Logger.i(TAG, "Audio focus change while blocking active: $focusChange")
+                    // Re-request if we unexpectedly lost focus while blocking is still active.
+                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS && playbackBlockingActive) {
+                        audioFocusHeld = false
+                        requestAudioFocus()
+                    }
+                }
+                .build()
+                .also { audioFocusRequest = it }
+            am.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        }
+        audioFocusHeld = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        Logger.i(TAG, "Audio focus request result: $result (held=$audioFocusHeld)")
+    }
+
+    private fun abandonAudioFocus() {
+        if (!audioFocusHeld) return
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(null)
+        }
+        audioFocusHeld = false
+        Logger.i(TAG, "Audio focus abandoned")
     }
 
     /**
@@ -156,6 +223,7 @@ object MediaSessionMonitor {
 
     fun install(context: Context) {
         appContext = context.applicationContext
+        audioManager = context.getSystemService(AudioManager::class.java)
         sessionManager = context.getSystemService(MediaSessionManager::class.java)
         listenerComponent = ComponentName(context, FamilyRulesNotificationListenerService::class.java)
         initialized = true
@@ -213,6 +281,12 @@ object MediaSessionMonitor {
             install(service)
         }
         start()
+        // Re-arm the enforcement loop if playback blocking was active before the disconnect.
+        // stop() cancels the loop on disconnect; start() does not restart it.
+        if (playbackBlockingActive) {
+            Logger.i(TAG, "NotificationListener reconnected while playback blocking is active - restarting enforcement loop")
+            startEnforcementLoop()
+        }
     }
 
     fun onNotificationListenerDisconnected(service: FamilyRulesNotificationListenerService) {

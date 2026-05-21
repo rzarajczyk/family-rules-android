@@ -340,11 +340,14 @@ class PeriodicReportSender(
                 "Blocked playback app list changed - refreshing (${cachedBlockedPlaybackApps.size} -> ${fetched.size} apps)"
             )
             cachedBlockedPlaybackApps = fetched
-            MediaSessionMonitor.updatePlaybackBlocking(
-                enabled = true,
-                blockedPackages = fetched.toSet()
-            )
         }
+        // Always call updatePlaybackBlocking — even when the list is unchanged — so that a dead
+        // enforcement loop (e.g. killed by a NotificationListenerService disconnect/reconnect cycle)
+        // is restarted without waiting for a list change.
+        MediaSessionMonitor.updatePlaybackBlocking(
+            enabled = true,
+            blockedPackages = cachedBlockedPlaybackApps.toSet()
+        )
     }
 
     private fun persistBlockedPlaybackApps(apps: List<String>) {
