@@ -8,7 +8,6 @@ import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.os.IBinder
 import android.provider.Settings
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -24,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 
 /**
  * Service that shows a countdown overlay (60 seconds to 0) before blocking apps
@@ -63,7 +63,7 @@ class CountdownOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        Log.d(TAG, "CountdownOverlayService created")
+        Logger.d(TAG, "CountdownOverlayService created")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -85,13 +85,13 @@ class CountdownOverlayService : Service() {
     
     private fun showCountdownOverlay() {
         if (isOverlayShowing) {
-            Log.d(TAG, "Countdown overlay already showing")
+            Logger.d(TAG, "Countdown overlay already showing")
             return
         }
         
         // Check if we have permission to draw overlays
         if (!Settings.canDrawOverlays(this)) {
-            Log.e(TAG, "SYSTEM_ALERT_WINDOW permission not granted")
+            Logger.e(TAG, "SYSTEM_ALERT_WINDOW permission not granted")
             return
         }
         
@@ -115,13 +115,13 @@ class CountdownOverlayService : Service() {
             windowManager?.addView(overlayView, layoutParams)
             isOverlayShowing = true
             
-            Log.i(TAG, "Countdown overlay shown")
+            Logger.i(TAG, "Countdown overlay shown")
             
             // Start countdown
             startCountdown()
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to show countdown overlay: ${e.message}", e)
+            Logger.e(TAG, "Failed to show countdown overlay: ${e.message}", e)
         }
     }
     
@@ -202,7 +202,7 @@ class CountdownOverlayService : Service() {
             
             if (isActive && secondsLeft == 0) {
                 countdownTextView?.text = formatTime(0)
-                Log.i(TAG, "Countdown complete")
+                Logger.i(TAG, "Countdown complete")
                 
                 // Hide the overlay
                 hideCountdownOverlay()
@@ -230,7 +230,7 @@ class CountdownOverlayService : Service() {
     
     private fun hideCountdownOverlay() {
         if (!isOverlayShowing) {
-            Log.d(TAG, "Countdown overlay not showing")
+            Logger.d(TAG, "Countdown overlay not showing")
             return
         }
         
@@ -245,17 +245,17 @@ class CountdownOverlayService : Service() {
             countdownTextView = null
             isOverlayShowing = false
             
-            Log.i(TAG, "Countdown overlay hidden")
+            Logger.i(TAG, "Countdown overlay hidden")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to hide countdown overlay: ${e.message}", e)
+            Logger.e(TAG, "Failed to hide countdown overlay: ${e.message}", e)
         }
     }
     
     override fun onDestroy() {
         super.onDestroy()
         hideCountdownOverlay()
-        Log.d(TAG, "CountdownOverlayService destroyed")
+        Logger.d(TAG, "CountdownOverlayService destroyed")
     }
     
     override fun onBind(intent: Intent?): IBinder? {

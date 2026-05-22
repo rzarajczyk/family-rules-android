@@ -1,7 +1,6 @@
 package pl.zarajczyk.familyrulesandroid.adapter
 
 import android.util.Base64
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
@@ -124,12 +123,12 @@ class FamilyRulesClient(
             try {
                 val response = apiService.sendClientInfo(request)
                 val restrictedApps = response.restrictedApps ?: emptyMap()
-                Log.d(
+                Logger.d(
                     "FamilyRulesClient",
                     "Client-info returned restricted apps: ${restrictedApps.keys}"
                 )
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to send client-info request: ${e.message}", e)
             }
         }
     }
@@ -161,7 +160,7 @@ class FamilyRulesClient(
                 Logger.i("FamilyRulesClient", createUptimeLogMessage(uptime, state))
                 response
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to send report request: ${e.message}", e)
                 null
             }
         }
@@ -174,7 +173,7 @@ class FamilyRulesClient(
                 apiService.acknowledgeCommands(CommandAcksRequest(acks))
                 true
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to acknowledge commands: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to acknowledge commands: ${e.message}", e)
                 false
             }
         }
@@ -187,7 +186,7 @@ class FamilyRulesClient(
                 apiService.sendCommandResults(CommandResultsRequest(results))
                 true
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to send command results: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to send command results: ${e.message}", e)
                 false
             }
         }
@@ -203,7 +202,7 @@ class FamilyRulesClient(
     }
 
     suspend fun getBlockedApps(): List<String>? {
-        Log.d("FamilyRulesClient", "Fetching blocked apps for device")
+        Logger.d("FamilyRulesClient", "Fetching blocked apps for device")
 
         return withContext(Dispatchers.IO) {
             try {
@@ -215,14 +214,14 @@ class FamilyRulesClient(
                 )
                 appPackages
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to fetch blocked apps: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to fetch blocked apps: ${e.message}", e)
                 null
             }
         }
     }
 
     suspend fun getBlockedPlaybackApps(): List<String>? {
-        Log.d("FamilyRulesClient", "Fetching blocked playback apps for device")
+        Logger.d("FamilyRulesClient", "Fetching blocked playback apps for device")
 
         return withContext(Dispatchers.IO) {
             try {
@@ -234,25 +233,25 @@ class FamilyRulesClient(
                 )
                 appPackages
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to fetch blocked playback apps: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to fetch blocked playback apps: ${e.message}", e)
                 null
             }
         }
     }
 
     suspend fun getGroupsUsageReport(): AppGroupsUsageReportResponse? {
-        Log.d("FamilyRulesClient", "Fetching groups usage report")
+        Logger.d("FamilyRulesClient", "Fetching groups usage report")
 
         return withContext(Dispatchers.IO) {
             try {
                 val response = apiService.getGroupsUsageReport()
-                Log.d(
+                Logger.d(
                     "FamilyRulesClient",
                     "Groups usage report returned ${response.appGroups.size} groups"
                 )
                 response
             } catch (e: Exception) {
-                Log.e("FamilyRulesClient", "Failed to fetch groups usage report: ${e.message}", e)
+                Logger.e("FamilyRulesClient", "Failed to fetch groups usage report: ${e.message}", e)
                 null
             }
         }

@@ -2,7 +2,6 @@ package pl.zarajczyk.familyrulesandroid.entrypoints
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -11,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 
@@ -21,7 +21,7 @@ class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
         // This is a backup check - primary keep-alive is via AlarmManager
         // which is more reliable on Android 12+
         if (!FamilyRulesCoreService.isServiceRunning(context)) {
-            Log.w(TAG, "Service stopped - requesting restart")
+            Logger.w(TAG, "Service stopped - requesting restart")
             FamilyRulesCoreService.install(context)
         }
         
@@ -47,7 +47,7 @@ class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
                 ExistingPeriodicWorkPolicy.KEEP,
                 workRequest
             )
-            Log.d(TAG, "KeepAliveWorker scheduled with unique work policy")
+            Logger.d(TAG, "KeepAliveWorker scheduled with unique work policy")
         }
         
         fun scheduleImmediateWork(context: Context) {
@@ -62,7 +62,7 @@ class KeepAliveWorker(private val context: Context, params: WorkerParameters) :
                 ExistingWorkPolicy.REPLACE,
                 workRequest
             )
-            Log.d(TAG, "Immediate KeepAliveWorker scheduled with 30s delay")
+            Logger.d(TAG, "Immediate KeepAliveWorker scheduled with 30s delay")
         }
     }
 }

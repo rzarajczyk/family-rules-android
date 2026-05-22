@@ -2,7 +2,6 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.app.NotificationManager
 import android.content.Context
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,7 +41,7 @@ class NotificationRestorer private constructor(
         notificationManager = coreService.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
         monitoringJob = scope.launch {
-            Log.d(TAG, "Notification monitoring started (checking every ${checkInterval.inWholeSeconds}s)")
+            Logger.d(TAG, "Notification monitoring started (checking every ${checkInterval.inWholeSeconds}s)")
             
             while (isActive) {
                 delay(checkInterval)
@@ -50,7 +49,7 @@ class NotificationRestorer private constructor(
                 try {
                     checkAndRestoreNotification()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error checking notification: ${e.message}", e)
+                    Logger.e(TAG, "Error checking notification: ${e.message}", e)
                 }
             }
         }
@@ -69,6 +68,6 @@ class NotificationRestorer private constructor(
 
     fun stop() {
         monitoringJob?.cancel()
-        Log.d(TAG, "Notification monitoring stopped")
+        Logger.d(TAG, "Notification monitoring stopped")
     }
 }

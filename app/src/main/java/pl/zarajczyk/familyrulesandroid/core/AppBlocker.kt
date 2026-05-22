@@ -1,6 +1,6 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.util.Log
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 
 class AppBlocker(coreService: FamilyRulesCoreService) {
 
@@ -14,7 +14,7 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
      */
     fun block(packages: List<String>) {
         packagesToBlock = packages
-        Log.i("AppBlocker", "Starting to block apps: $packagesToBlock")
+        Logger.i("AppBlocker", "Starting to block apps: $packagesToBlock")
         packagesToBlock.forEach { packageName ->
             blockedAppsState.add(packageName)
         }
@@ -22,14 +22,14 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
         // Start monitoring foreground apps
         startForegroundAppMonitoring()
         
-        Log.i("AppBlocker", "Completed blocking apps: $packagesToBlock")
+        Logger.i("AppBlocker", "Completed blocking apps: $packagesToBlock")
     }
     
     /**
      * Unblock all apps in the blockedApps list
      */
     fun unblock() {
-        Log.i("AppBlocker", "Starting to unblock apps: $packagesToBlock")
+        Logger.i("AppBlocker", "Starting to unblock apps: $packagesToBlock")
         packagesToBlock.forEach { packageName ->
             blockedAppsState.remove(packageName)
         }
@@ -37,7 +37,7 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
         // Stop monitoring foreground apps
         stopForegroundAppMonitoring()
         
-        Log.i("AppBlocker", "Completed unblocking apps: $packagesToBlock")
+        Logger.i("AppBlocker", "Completed unblocking apps: $packagesToBlock")
     }
 
     /**
@@ -51,7 +51,7 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
      */
     private fun startForegroundAppMonitoring() {
         foregroundAppMonitor.startMonitoring(packagesToBlock)
-        Log.i("AppBlocker", "Started foreground app monitoring")
+        Logger.i("AppBlocker", "Started foreground app monitoring")
     }
     
     /**
@@ -59,6 +59,6 @@ class AppBlocker(coreService: FamilyRulesCoreService) {
      */
     private fun stopForegroundAppMonitoring() {
         foregroundAppMonitor.stopMonitoring()
-        Log.i("AppBlocker", "Stopped foreground app monitoring")
+        Logger.i("AppBlocker", "Stopped foreground app monitoring")
     }
 }

@@ -9,7 +9,6 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -18,6 +17,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import pl.zarajczyk.familyrulesandroid.R
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import androidx.core.graphics.toColorInt
 
 /**
@@ -51,7 +51,7 @@ class AppBlockingOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        Log.d(TAG, "AppBlockingOverlayService created")
+        Logger.d(TAG, "AppBlockingOverlayService created")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -74,13 +74,13 @@ class AppBlockingOverlayService : Service() {
     
     private fun showBlockingOverlay(blockedPackageName: String) {
         if (isOverlayShowing) {
-            Log.d(TAG, "Overlay already showing")
+            Logger.d(TAG, "Overlay already showing")
             return
         }
         
         // Check if we have permission to draw overlays
         if (!Settings.canDrawOverlays(this)) {
-            Log.e(TAG, "SYSTEM_ALERT_WINDOW permission not granted")
+            Logger.e(TAG, "SYSTEM_ALERT_WINDOW permission not granted")
             return
         }
         
@@ -103,10 +103,10 @@ class AppBlockingOverlayService : Service() {
             windowManager?.addView(overlayView, layoutParams)
             isOverlayShowing = true
             
-            Log.i(TAG, "Blocking overlay shown for: $blockedPackageName")
+            Logger.i(TAG, "Blocking overlay shown for: $blockedPackageName")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to show blocking overlay: ${e.message}", e)
+            Logger.e(TAG, "Failed to show blocking overlay: ${e.message}", e)
         }
     }
     
@@ -197,7 +197,7 @@ class AppBlockingOverlayService : Service() {
         
         // Add click listener to prevent interaction
         container.setOnClickListener {
-            Log.d(TAG, "User tried to interact with blocked app")
+            Logger.d(TAG, "User tried to interact with blocked app")
         }
         
         return container
@@ -213,7 +213,7 @@ class AppBlockingOverlayService : Service() {
     
     private fun hideBlockingOverlay() {
         if (!isOverlayShowing) {
-            Log.d(TAG, "Overlay not showing")
+            Logger.d(TAG, "Overlay not showing")
             return
         }
         
@@ -224,17 +224,17 @@ class AppBlockingOverlayService : Service() {
             overlayView = null
             isOverlayShowing = false
             
-            Log.i(TAG, "Blocking overlay hidden")
+            Logger.i(TAG, "Blocking overlay hidden")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to hide blocking overlay: ${e.message}", e)
+            Logger.e(TAG, "Failed to hide blocking overlay: ${e.message}", e)
         }
     }
     
     override fun onDestroy() {
         super.onDestroy()
         hideBlockingOverlay()
-        Log.d(TAG, "AppBlockingOverlayService destroyed")
+        Logger.d(TAG, "AppBlockingOverlayService destroyed")
     }
     
     override fun onBind(intent: Intent?): IBinder? {

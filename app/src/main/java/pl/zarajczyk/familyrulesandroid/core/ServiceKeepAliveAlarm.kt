@@ -5,8 +5,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import pl.zarajczyk.familyrulesandroid.entrypoints.ServiceRestartReceiver
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlin.time.Duration
 
 /**
@@ -27,7 +27,7 @@ object ServiceKeepAliveAlarm {
         // Check if we have permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
-                Log.w(TAG, "Cannot schedule exact alarms - permission not granted")
+                Logger.w(TAG, "Cannot schedule exact alarms - permission not granted")
                 return
             }
         }
@@ -53,9 +53,9 @@ object ServiceKeepAliveAlarm {
                 triggerAtMillis,
                 pendingIntent
             )
-            Log.i(TAG, "Exact alarm scheduled for ${interval.inWholeSeconds} seconds from now")
+            Logger.i(TAG, "Exact alarm scheduled for ${interval.inWholeSeconds} seconds from now")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to schedule exact alarm: ${e.message}", e)
+            Logger.e(TAG, "Failed to schedule exact alarm: ${e.message}", e)
         }
     }
     
@@ -78,7 +78,7 @@ object ServiceKeepAliveAlarm {
         
         alarmManager.cancel(pendingIntent)
         pendingIntent.cancel()
-        Log.i(TAG, "Keep-alive alarm cancelled")
+        Logger.i(TAG, "Keep-alive alarm cancelled")
     }
     
     /**

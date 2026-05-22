@@ -1,7 +1,7 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -21,12 +21,12 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
     fun startMonitoring(packagesToBlock: List<String>) {
         this.packagesToBlock = packagesToBlock
         if (isMonitoring) {
-            Log.d("ForegroundAppMonitor", "Already monitoring")
+            Logger.d("ForegroundAppMonitor", "Already monitoring")
             return
         }
         
         isMonitoring = true
-        Log.i("ForegroundAppMonitor", "Starting foreground app monitoring")
+        Logger.i("ForegroundAppMonitor", "Starting foreground app monitoring")
         
         scope.launch {
             while (isActive && isMonitoring) {
@@ -34,7 +34,7 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
                     checkForegroundApp()
                     delay(1.seconds) // Check every second
                 } catch (e: Exception) {
-                    Log.e("ForegroundAppMonitor", "Error monitoring foreground app: ${e.message}", e)
+                    Logger.e("ForegroundAppMonitor", "Error monitoring foreground app: ${e.message}", e)
                     delay(5.seconds) // Wait longer on error
                 }
             }
@@ -45,7 +45,7 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
         isMonitoring = false
         lastForegroundApp = null  // reset so the next session starts clean (Problem 1)
         hideBlockingOverlay()
-        Log.i("ForegroundAppMonitor", "Stopped foreground app monitoring")
+        Logger.i("ForegroundAppMonitor", "Stopped foreground app monitoring")
     }
     
     private fun checkForegroundApp() {
@@ -57,24 +57,24 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
             //   - stale lastForegroundApp across sessions (Problem 1)
             //   - overlay service death while the blocked app stayed open (Problem 6)
             if (currentApp != lastForegroundApp) {
-                Log.i("ForegroundAppMonitor", "Blocked app detected: $currentApp")
+                Logger.i("ForegroundAppMonitor", "Blocked app detected: $currentApp")
             }
             lastForegroundApp = currentApp
             showBlockingOverlay(currentApp)
         } else if (currentApp != lastForegroundApp) {
-            Log.d("ForegroundAppMonitor", "Foreground app changed to: $currentApp")
+            Logger.d("ForegroundAppMonitor", "Foreground app changed to: $currentApp")
             lastForegroundApp = currentApp
             hideBlockingOverlay()
         }
     }
 
     private fun showBlockingOverlay(packageName: String) {
-        Log.i("ForegroundAppMonitor", "Showing blocking overlay for: $packageName")
+        Logger.i("ForegroundAppMonitor", "Showing blocking overlay for: $packageName")
         AppBlockingOverlayService.showOverlay(coreService, packageName)
     }
     
     private fun hideBlockingOverlay() {
-        Log.d("ForegroundAppMonitor", "Hiding blocking overlay")
+        Logger.d("ForegroundAppMonitor", "Hiding blocking overlay")
         AppBlockingOverlayService.hideOverlay(coreService)
     }
 }

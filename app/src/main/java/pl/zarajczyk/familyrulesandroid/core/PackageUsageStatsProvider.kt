@@ -3,7 +3,7 @@ package pl.zarajczyk.familyrulesandroid.core
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
-import android.util.Log
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -68,7 +68,7 @@ class PackageUsageStatsProvider(context: Context) {
             val events = readEvents(startOfDay - LOOKBACK_MS, now)
             computeTodayPackageUsage(events, startOfDay, now)
         } catch (t: Throwable) {
-            Log.w(TAG, "queryEvents failed: ${t.message}", t)
+            Logger.w(TAG, "queryEvents failed: ${t.message}", t)
             cachedResult // serve last-known good on transient failure
         }
 

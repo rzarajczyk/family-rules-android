@@ -3,9 +3,9 @@ package pl.zarajczyk.familyrulesandroid.entrypoints
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.ServiceKeepAliveAlarm
+import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -15,7 +15,7 @@ import kotlin.time.Duration.Companion.minutes
 class ServiceRestartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_RESTART_SERVICE) {
-            Log.i(TAG, "ServiceRestartReceiver triggered - restarting service")
+            Logger.i(TAG, "ServiceRestartReceiver triggered - restarting service")
             
             // Always re-arm the next alarm first, so the chain continues regardless of service state.
             ServiceKeepAliveAlarm.scheduleAlarm(context, 5.minutes)
@@ -24,9 +24,9 @@ class ServiceRestartReceiver : BroadcastReceiver() {
             // when triggered by AlarmManager
             if (!FamilyRulesCoreService.isServiceRunning(context)) {
                 FamilyRulesCoreService.install(context)
-                Log.i(TAG, "Service was not running - start requested")
+                Logger.i(TAG, "Service was not running - start requested")
             } else {
-                Log.d(TAG, "Service is already running")
+                Logger.d(TAG, "Service is already running")
             }
         }
     }
