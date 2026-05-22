@@ -259,7 +259,7 @@ class FamilyRulesClient(
     }
 
     suspend fun ensureAllAppsAreCached(packageNames: Set<String>) {
-        Logger.i("FamilyRulesClient", "Ensuring all apps are cached")
+        Logger.d("FamilyRulesClient", "Ensuring all apps are cached")
         packageNames.forEach { packageName ->
             try {
                 appDb.getAppNameAndIcon(packageName)

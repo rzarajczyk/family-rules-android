@@ -362,11 +362,11 @@ object MediaSessionMonitor {
                 }
 
                 override fun onQueueTitleChanged(title: CharSequence?) {
-                    logControllerEvent("queue-title-changed", controller, queueTitle = title)
+                    logControllerEvent("queue-title-changed", controller)
                 }
 
                 override fun onSessionDestroyed() {
-                    Logger.i(TAG, "Media session destroyed: ${describeController(controller)}")
+                    Logger.i(TAG, "Media session destroyed: ${controller.packageName}")
                     unregisterCallback(token, controller, this)
                     callbacks.remove(token)
                 }
@@ -393,10 +393,7 @@ object MediaSessionMonitor {
     }
 
     private fun logSessionsSnapshot(reason: String, controllers: List<MediaController>) {
-        Logger.i(TAG, "Active sessions snapshot [$reason]: count=${controllers.size}")
-        if (controllers.isEmpty()) {
-            return
-        }
+        Logger.d(TAG, "Active sessions snapshot [$reason]: count=${controllers.size}")
         controllers.forEach { controller ->
             logControllerEvent("snapshot-$reason", controller)
         }
@@ -407,72 +404,35 @@ object MediaSessionMonitor {
         controller: MediaController,
         state: PlaybackState? = controller.playbackState,
         metadata: MediaMetadata? = controller.metadata,
-        extras: Bundle? = controller.extras,
-        queueTitle: CharSequence? = controller.queueTitle,
+        extras: Bundle? = controller.extras
     ) {
         Logger.i(
             TAG,
             buildString {
                 append("Media session [$reason]: ")
-                append(describeController(controller))
-                append("; playbackState=")
+                append(controller.packageName)
+                append(" is ")
                 append(describePlaybackState(state))
-                append("; queueTitle=")
-                append(queueTitle ?: "<null>")
-                append("; metadata=")
                 append(describeMetadata(metadata))
-                append("; extras=")
-                append(describeBundle(extras))
             }
         )
-    }
-
-    private fun describeController(controller: MediaController): String {
-        return buildString {
-            append("package=")
-            append(controller.packageName)
-            append(", token=")
-            append(controller.sessionToken)
-        }
     }
 
     private fun describePlaybackState(state: PlaybackState?): String {
         if (state == null) {
             return "<null>"
         }
-        return buildString {
-            append(playbackStateName(state.state))
-            append("(")
-            append(state.state)
-            append(")")
-            append(", position=")
-            append(state.position)
-            append(", speed=")
-            append(state.playbackSpeed)
-            append(", actions=")
-            append(state.actions)
-            append(", buffered=")
-            append(state.bufferedPosition)
-            append(", updated=")
-            append(state.lastPositionUpdateTime)
-            append(", error=")
-            append(state.errorMessage ?: "<null>")
-            append(", extras=")
-            append(describeBundle(state.extras))
-        }
+        return playbackStateName(state.state)
     }
 
      private fun describeMetadata(metadata: MediaMetadata?): String {
-        if (metadata == null) return "<null>"
-        // Only read keys with known types to avoid W/Bundle ClassCastException spam.
-        // This is diagnostic logging only — unknown/custom keys are intentionally omitted.
-        val parts = mutableListOf<String>()
-        runCatching { metadata.getText(MediaMetadata.METADATA_KEY_TITLE)?.let { parts += "title=$it" } }
-        runCatching { metadata.getText(MediaMetadata.METADATA_KEY_ARTIST)?.let { parts += "artist=$it" } }
-        runCatching { metadata.getText(MediaMetadata.METADATA_KEY_ALBUM)?.let { parts += "album=$it" } }
-        runCatching { metadata.getLong(MediaMetadata.METADATA_KEY_DURATION).takeIf { it > 0 }?.let { parts += "duration=$it" } }
-        runCatching { metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)?.let { parts += "albumArt=Bitmap(${it.width}x${it.height})" } }
-        return if (parts.isEmpty()) "{}" else parts.joinToString(prefix = "{", postfix = "}")
+         return buildString {
+             append(" [title: ")
+             append(metadata?.getText(MediaMetadata.METADATA_KEY_TITLE) ?: "<unknown>")
+             append("][artist: ")
+             append(metadata?.getText(MediaMetadata.METADATA_KEY_ARTIST) ?: "<unknown>")
+             append("]")
+         }
     }
 
     private fun describeBundle(bundle: Bundle?): String {
@@ -520,7 +480,7 @@ object MediaSessionMonitor {
             PlaybackState.STATE_SKIPPING_TO_PREVIOUS -> "SKIP_PREVIOUS"
             PlaybackState.STATE_SKIPPING_TO_NEXT -> "SKIP_NEXT"
             PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> "SKIP_QUEUE_ITEM"
-            else -> "UNKNOWN"
+            else -> "UNKNOWN ($state)"
         }
     }
 }
