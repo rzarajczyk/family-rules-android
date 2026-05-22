@@ -96,11 +96,24 @@ class PackageUsageStatsProvider(context: Context) {
                         )
                     )
                 }
+                DEVICE_SHUTDOWN -> {
+                    // No packageName for shutdown events; use empty string as sentinel.
+                    out.add(
+                        UsageEventTuple(
+                            timestamp = event.timeStamp,
+                            packageName = "",
+                            className = "",
+                            eventType = DEVICE_SHUTDOWN,
+                        )
+                    )
+                }
             }
         }
         return out
     }
 }
+
+private const val DEVICE_SHUTDOWN = 26 // UsageEvents.Event.DEVICE_SHUTDOWN (API 28+)
 
 internal data class UsageEventTuple(
     val timestamp: Long,
@@ -124,11 +137,33 @@ internal fun computeTodayPackageUsage(
     startOfDay: Long,
     now: Long,
 ): Map<String, Long> {
-    val byPackage = events
+    val packageNames = events
         .filter {
             it.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
                 it.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
                 it.eventType == UsageEvents.Event.ACTIVITY_STOPPED
+        }
+        .map { it.packageName }
+        .distinct()
+
+    val byPackage = events
+        .flatMap { event ->
+            // DEVICE_SHUTDOWN is a global event, but we must use it as a signal for all apps
+            if (event.eventType == DEVICE_SHUTDOWN) {
+                // Replicate the shutdown into every known package stream.
+                // className is not read by the DEVICE_SHUTDOWN branch in the loop below.
+                packageNames.map { packageName ->
+                    event.copy(packageName = packageName)
+                }
+            } else {
+                listOf(event)
+            }
+        }
+        .filter {
+            it.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
+                it.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
+                it.eventType == UsageEvents.Event.ACTIVITY_STOPPED ||
+                it.eventType == DEVICE_SHUTDOWN
         }
         .sortedBy { it.timestamp }
         .groupBy { it.packageName }
@@ -138,7 +173,19 @@ internal fun computeTodayPackageUsage(
         val active = mutableSetOf<String>()
         var openSince: Long? = null
         var total = 0L
+
         for (e in evs) {
+            if (e.eventType == DEVICE_SHUTDOWN) {
+                val start = openSince
+                if (start != null) {
+                    val s = maxOf(start, startOfDay)
+                    if (e.timestamp > s) total += e.timestamp - s
+                    openSince = null
+                }
+                active.clear()
+                continue
+            }
+
             if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 val wasEmpty = active.isEmpty()
                 active.add(e.className)
@@ -158,6 +205,7 @@ internal fun computeTodayPackageUsage(
                 }
             }
         }
+
         val stillOpen = openSince
         if (stillOpen != null) {
             val s = maxOf(stillOpen, startOfDay)

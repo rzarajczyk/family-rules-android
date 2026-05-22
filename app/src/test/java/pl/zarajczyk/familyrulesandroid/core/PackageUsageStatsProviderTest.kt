@@ -12,6 +12,10 @@ import java.time.ZoneId
 
 class PackageUsageStatsProviderTest {
 
+    companion object {
+        private const val DEVICE_SHUTDOWN = 26
+    }
+
     private val startOfDay = 1_700_000_000_000L
     private val now = startOfDay + 12L * 60L * 60L * 1_000L // midday
 
@@ -26,6 +30,9 @@ class PackageUsageStatsProviderTest {
 
     private fun other(t: Long, pkg: String, type: Int) =
         UsageEventTuple(t, pkg, "$pkg.Other", type)
+
+    private fun shutdown(t: Long) =
+        UsageEventTuple(t, "", "", DEVICE_SHUTDOWN)
 
     private fun ts(dateTime: String): Long =
         LocalDateTime.parse(dateTime)
@@ -276,5 +283,62 @@ class PackageUsageStatsProviderTest {
         )
         val result = computeTodayPackageUsage(events, startOfDay, now)
         assertEquals(mapOf("a" to (t3 - t0)), result)
+    }
+
+    @Test
+    fun `shutdown closes open session and later resume starts fresh session`() {
+        val events = listOf(
+            resume(startOfDay + 1_000, "a"),
+            shutdown(startOfDay + 6_000),
+            resume(startOfDay + 10_000, "a"),
+            pause(startOfDay + 13_000, "a"),
+        )
+
+        val result = computeTodayPackageUsage(events, startOfDay, now)
+
+        assertEquals(mapOf("a" to 8_000L), result)
+    }
+
+    @Test
+    fun `multiple shutdowns close each open session independently`() {
+        val events = listOf(
+            resume(startOfDay + 1_000, "a"),
+            shutdown(startOfDay + 4_000),
+            resume(startOfDay + 6_000, "a"),
+            shutdown(startOfDay + 9_000),
+            resume(startOfDay + 11_000, "a"),
+            pause(startOfDay + 13_000, "a"),
+        )
+
+        val result = computeTodayPackageUsage(events, startOfDay, now)
+
+        assertEquals(mapOf("a" to 8_000L), result)
+    }
+
+    @Test
+    fun `shutdown before first event today does not suppress later sessions`() {
+        val events = listOf(
+            shutdown(startOfDay - 1_000),
+            resume(startOfDay + 1_000, "a"),
+            pause(startOfDay + 6_000, "a"),
+        )
+
+        val result = computeTodayPackageUsage(events, startOfDay, now)
+
+        assertEquals(mapOf("a" to 5_000L), result)
+    }
+
+    @Test
+    fun `cross-midnight session is clipped to shutdown before reboot session`() {
+        val events = listOf(
+            resume(startOfDay - 60L * 60L * 1_000L, "a"),
+            shutdown(startOfDay + 15L * 60L * 1_000L),
+            resume(startOfDay + 20L * 60L * 1_000L, "a"),
+            pause(startOfDay + 25L * 60L * 1_000L, "a"),
+        )
+
+        val result = computeTodayPackageUsage(events, startOfDay, now)
+
+        assertEquals(mapOf("a" to 20L * 60L * 1_000L), result)
     }
 }

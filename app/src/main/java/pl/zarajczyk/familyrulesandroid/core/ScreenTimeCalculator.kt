@@ -1,11 +1,11 @@
 package pl.zarajczyk.familyrulesandroid.core
 
-import android.app.usage.UsageEvents
 import android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE
 import android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE
-import android.util.Log
 import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_OFF
 import pl.zarajczyk.familyrulesandroid.core.ScreenTimeCalculator.ScreenState.TURNING_ON
+
+private const val DEVICE_SHUTDOWN = 26 // UsageEvents.Event.DEVICE_SHUTDOWN (API 28+)
 
 class ScreenTimeCalculator : SystemEventProcessor {
     fun getTodayScreenTime(): Long {
@@ -56,6 +56,7 @@ class ScreenTimeCalculator : SystemEventProcessor {
             when (it.eventType) {
                 SCREEN_INTERACTIVE -> ScreenEvent(TURNING_ON, it.timestamp)
                 SCREEN_NON_INTERACTIVE -> ScreenEvent(TURNING_OFF, it.timestamp)
+                DEVICE_SHUTDOWN -> ScreenEvent(TURNING_OFF, it.timestamp)
                 else -> null
             }
         }.fold(mutableListOf()) { acc, event ->
