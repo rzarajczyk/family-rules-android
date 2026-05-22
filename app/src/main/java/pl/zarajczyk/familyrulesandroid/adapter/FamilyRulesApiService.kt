@@ -106,8 +106,6 @@ data class AppUsageReportResponse(
     val uptimeSeconds: Long
 )
 
-data class EmptyRequest(val dummy: Unit? = null)
-
 interface FamilyRulesApiService {
     @POST("/api/v2/client-info")
     suspend fun sendClientInfo(@Body body: ClientInfoRequest): ClientInfoResponseDto
@@ -116,13 +114,13 @@ interface FamilyRulesApiService {
     suspend fun report(@Body body: ReportRequest): ReportResponseDto
 
     @POST("/api/v2/get-blocked-apps")
-    suspend fun getBlockedApps(@Body body: EmptyRequest = EmptyRequest()): BlockedAppsResponse
+    suspend fun getBlockedApps(): BlockedAppsResponse
 
     @POST("/api/v2/get-blocked-playback-apps")
-    suspend fun getBlockedPlaybackApps(@Body body: EmptyRequest = EmptyRequest()): BlockedAppsResponse
+    suspend fun getBlockedPlaybackApps(): BlockedAppsResponse
 
     @POST("/api/v2/groups-usage-report")
-    suspend fun getGroupsUsageReport(@Body body: EmptyRequest = EmptyRequest()): AppGroupsUsageReportResponse
+    suspend fun getGroupsUsageReport(): AppGroupsUsageReportResponse
 
     @POST("/api/v2/command-acks")
     suspend fun acknowledgeCommands(@Body body: CommandAcksRequest): StatusResponseDto
