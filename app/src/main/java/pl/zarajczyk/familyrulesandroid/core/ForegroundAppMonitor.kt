@@ -58,12 +58,14 @@ class ForegroundAppMonitor(private val coreService: FamilyRulesCoreService) {
             //   - overlay service death while the blocked app stayed open (Problem 6)
             if (currentApp != lastForegroundApp) {
                 Logger.i("ForegroundAppMonitor", "Blocked app detected: $currentApp")
+                lastForegroundApp = currentApp
+                MediaSessionMonitor.onForegroundAppChanged(currentApp)
             }
-            lastForegroundApp = currentApp
             showBlockingOverlay(currentApp)
         } else if (currentApp != lastForegroundApp) {
             Logger.d("ForegroundAppMonitor", "Foreground app changed to: $currentApp")
             lastForegroundApp = currentApp
+            MediaSessionMonitor.onForegroundAppChanged(currentApp)
             hideBlockingOverlay()
         }
     }

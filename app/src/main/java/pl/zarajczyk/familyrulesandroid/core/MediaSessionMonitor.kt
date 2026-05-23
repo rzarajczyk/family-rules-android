@@ -93,6 +93,24 @@ object MediaSessionMonitor {
         }
     }
 
+    /**
+     * Called by [ForegroundAppMonitor] whenever the foreground app changes.
+     * Requests audio focus if the new foreground app is in the blocked list and blocking is active;
+     * abandons audio focus otherwise, so non-blocked apps can reclaim it.
+     */
+    fun onForegroundAppChanged(packageName: String) {
+        if (!playbackBlockingActive) return
+        if (packageName in blockedPlaybackPackages) {
+            Logger.i(TAG, "Blocked app foregrounded ($packageName) — acquiring audio focus")
+            requestAudioFocusForBlocking()
+        } else {
+            if (audioFocusHeld) {
+                Logger.i(TAG, "Non-blocked app foregrounded ($packageName) — releasing audio focus")
+                abandonAudioFocus()
+            }
+        }
+    }
+
     private fun startEnforcementLoop() {
         if (enforcementLoopJob?.isActive == true) return
         enforcementLoopJob = enforcementScope.launch {
