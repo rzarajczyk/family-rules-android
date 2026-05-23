@@ -2,6 +2,9 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -58,6 +61,12 @@ object MediaSessionMonitor {
     @Volatile
     private var enforcementLoopJob: Job? = null
 
+    @Volatile
+    private var audioFocusHeld = false
+
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+
     private const val ENFORCEMENT_POLL_INTERVAL_MS = 1_000L
 
     private val activeSessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
@@ -99,6 +108,40 @@ object MediaSessionMonitor {
     private fun stopEnforcementLoop() {
         enforcementLoopJob?.cancel()
         enforcementLoopJob = null
+        abandonAudioFocus()
+    }
+
+    private fun requestAudioFocusForBlocking() {
+        if (audioFocusHeld) return
+        val am = audioManager ?: return
+        val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            .setAcceptsDelayedFocusGain(false)
+            .setOnAudioFocusChangeListener {}
+            .build()
+        val result = am.requestAudioFocus(req)
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            audioFocusRequest = req
+            audioFocusHeld = true
+            Logger.i(TAG, "Audio focus acquired for playback blocking")
+        } else {
+            Logger.w(TAG, "Audio focus request denied (result=$result)")
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        if (!audioFocusHeld) return
+        val am = audioManager ?: return
+        val req = audioFocusRequest ?: return
+        am.abandonAudioFocusRequest(req)
+        audioFocusHeld = false
+        audioFocusRequest = null
+        Logger.i(TAG, "Audio focus abandoned")
     }
 
     /**
@@ -123,6 +166,7 @@ object MediaSessionMonitor {
             }
             for (controller in blockedControllers) {
                 Logger.i(TAG, "Pausing playback for ${controller.packageName}")
+                requestAudioFocusForBlocking()
                 controller.transportControls?.pause()
             }
         } catch (e: SecurityException) {
@@ -162,6 +206,7 @@ object MediaSessionMonitor {
     fun install(context: Context) {
         appContext = context.applicationContext
         sessionManager = context.getSystemService(MediaSessionManager::class.java)
+        audioManager = context.getSystemService(AudioManager::class.java)
         listenerComponent = ComponentName(context, FamilyRulesNotificationListenerService::class.java)
         initialized = true
         Logger.i(TAG, "Installed media session monitor")
@@ -259,6 +304,7 @@ object MediaSessionMonitor {
         if (isPlaybackActive(state)) {
             Logger.i(TAG, "Callback: pausing playback for ${controller.packageName}")
             try {
+                requestAudioFocusForBlocking()
                 controller.transportControls?.pause()
             } catch (e: Exception) {
                 Logger.w(TAG, "Failed to pause ${controller.packageName} from callback", e)
