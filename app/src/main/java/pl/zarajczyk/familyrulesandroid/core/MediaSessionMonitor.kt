@@ -64,6 +64,11 @@ object MediaSessionMonitor {
     @Volatile
     private var audioFocusHeld = false
 
+    /** Last foreground package reported via [onForegroundAppChanged]. Used to fire an immediate
+     *  focus request when playback blocking is enabled while the blocked app is already open. */
+    @Volatile
+    private var lastKnownForegroundApp: String? = null
+
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
 
@@ -88,6 +93,14 @@ object MediaSessionMonitor {
         )
         if (effectiveEnabled) {
             startEnforcementLoop()
+            // If a blocked app is already in the foreground when blocking activates,
+            // no foreground transition will fire — trigger focus acquisition immediately.
+            // Only do this when the current foreground app is actually blocked;
+            // do not touch focus if a non-blocked app is active.
+            val current = lastKnownForegroundApp
+            if (current != null && current in blockedPackages) {
+                onForegroundAppChanged(current)
+            }
         } else {
             stopEnforcementLoop()
         }
@@ -99,6 +112,7 @@ object MediaSessionMonitor {
      * abandons audio focus otherwise, so non-blocked apps can reclaim it.
      */
     fun onForegroundAppChanged(packageName: String) {
+        lastKnownForegroundApp = packageName
         if (!playbackBlockingActive) return
         if (packageName in blockedPlaybackPackages) {
             Logger.i(TAG, "Blocked app foregrounded ($packageName) — acquiring audio focus")
@@ -132,7 +146,7 @@ object MediaSessionMonitor {
     private fun requestAudioFocusForBlocking() {
         if (audioFocusHeld) return
         val am = audioManager ?: return
-        val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
