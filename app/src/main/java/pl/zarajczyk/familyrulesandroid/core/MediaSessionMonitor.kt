@@ -2,14 +2,10 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.ComponentName
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -32,17 +28,6 @@ object MediaSessionMonitor {
 
     @Volatile
     private var appContext: Context? = null
-
-    @Volatile
-    private var audioManager: AudioManager? = null
-
-    /** AudioFocusRequest held while playback blocking is active (API 26+). */
-    @Volatile
-    private var audioFocusRequest: AudioFocusRequest? = null
-
-    /** Whether we currently hold audio focus. */
-    @Volatile
-    private var audioFocusHeld: Boolean = false
 
     @Volatile
     private var sessionManager: MediaSessionManager? = null
@@ -85,15 +70,17 @@ object MediaSessionMonitor {
      * Called by PeriodicReportSender whenever the device state or blocked-playback-apps list changes.
      */
     fun updatePlaybackBlocking(enabled: Boolean, blockedPackages: Set<String>) {
-        playbackBlockingActive = enabled
+        val effectiveEnabled = enabled && blockedPackages.isNotEmpty()
+        playbackBlockingActive = effectiveEnabled
         blockedPlaybackPackages = blockedPackages
-        Logger.i(TAG, "Playback blocking updated: enabled=$enabled, blockedPackages=$blockedPackages")
-        if (enabled) {
-            requestAudioFocus()
+        Logger.i(
+            TAG,
+            "Playback blocking updated: enabled=$enabled, effectiveEnabled=$effectiveEnabled, blockedPackages=$blockedPackages"
+        )
+        if (effectiveEnabled) {
             startEnforcementLoop()
         } else {
             stopEnforcementLoop()
-            abandonAudioFocus()
         }
     }
 
@@ -115,58 +102,10 @@ object MediaSessionMonitor {
     }
 
     /**
-     * Request AUDIOFOCUS_GAIN_TRANSIENT so the OS signals all media apps (including YouTube)
-     * to pause.  This is more reliable than transportControls.pause() which apps can ignore.
-     * Held until playback blocking is disabled.
-     */
-    private fun requestAudioFocus() {
-        if (audioFocusHeld) return
-        val am = audioManager ?: return
-        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                .setWillPauseWhenDucked(true)
-                .setOnAudioFocusChangeListener { focusChange ->
-                    Logger.i(TAG, "Audio focus change while blocking active: $focusChange")
-                    // Re-request if we unexpectedly lost focus while blocking is still active.
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS && playbackBlockingActive) {
-                        audioFocusHeld = false
-                        requestAudioFocus()
-                    }
-                }
-                .build()
-                .also { audioFocusRequest = it }
-            am.requestAudioFocus(request)
-        } else {
-            @Suppress("DEPRECATION")
-            am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-        }
-        audioFocusHeld = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-        Logger.i(TAG, "Audio focus request result: $result (held=$audioFocusHeld)")
-    }
-
-    private fun abandonAudioFocus() {
-        if (!audioFocusHeld) return
-        val am = audioManager ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            am.abandonAudioFocus(null)
-        }
-        audioFocusHeld = false
-        Logger.i(TAG, "Audio focus abandoned")
-    }
-
-    /**
      * Pause all active media sessions belonging to [blockedPlaybackPackages] when
-     * [playbackBlockingActive] is true.  Called once per report tick from PeriodicReportSender.
+     * [playbackBlockingActive] is true. Called once per report tick from PeriodicReportSender
+     * and on every playback-state callback. Only packages explicitly present in the blocked
+     * list are paused; all other apps are left untouched.
      */
     fun enforcePlaybackBlocking() {
         if (!playbackBlockingActive) return
@@ -179,13 +118,12 @@ object MediaSessionMonitor {
 
         try {
             val controllers = manager.getActiveSessions(component).orEmpty()
-            for (controller in controllers) {
-                if (controller.packageName !in blocked) continue
-                val state = controller.playbackState?.state
-                if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
-                    Logger.i(TAG, "Pausing playback for ${controller.packageName}")
-                    controller.transportControls?.pause()
-                }
+            val blockedControllers = controllers.filter { controller ->
+                controller.packageName in blocked && isPlaybackActive(controller.playbackState?.state)
+            }
+            for (controller in blockedControllers) {
+                Logger.i(TAG, "Pausing playback for ${controller.packageName}")
+                controller.transportControls?.pause()
             }
         } catch (e: SecurityException) {
             Logger.w(TAG, "Cannot enforce playback blocking - notification access missing", e)
@@ -223,7 +161,6 @@ object MediaSessionMonitor {
 
     fun install(context: Context) {
         appContext = context.applicationContext
-        audioManager = context.getSystemService(AudioManager::class.java)
         sessionManager = context.getSystemService(MediaSessionManager::class.java)
         listenerComponent = ComponentName(context, FamilyRulesNotificationListenerService::class.java)
         initialized = true
@@ -319,7 +256,7 @@ object MediaSessionMonitor {
         if (!playbackBlockingActive) return
         if (controller.packageName !in blockedPlaybackPackages) return
         val state = controller.playbackState?.state
-        if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
+        if (isPlaybackActive(state)) {
             Logger.i(TAG, "Callback: pausing playback for ${controller.packageName}")
             try {
                 controller.transportControls?.pause()
@@ -382,6 +319,10 @@ object MediaSessionMonitor {
                 Logger.w(TAG, "Unexpected failure registering callback for ${controller.packageName}", e)
             }
         }
+    }
+
+    private fun isPlaybackActive(state: Int?): Boolean {
+        return state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
     }
 
     private fun unregisterCallback(token: String, controller: MediaController, callback: MediaController.Callback) {
