@@ -51,6 +51,14 @@ object MediaSessionMonitor {
     @Volatile
     private var blockedPlaybackPackages: Set<String> = emptySet()
 
+    /**
+     * Apps that do not expose a MediaSession but play audio via AudioManager.
+     * For these, USAGE_MEDIA audio is attributed to the app when it is foregrounded.
+     * Hardcoded to avoid false positives: only apps known to not publish a MediaSession
+     * should be listed here.
+     */
+    private val audioManagerTrackedPackages: Set<String> = setOf("com.whatsapp")
+
     /** Whether playback blocking is currently active. */
     @Volatile
     private var playbackBlockingActive: Boolean = false
@@ -306,7 +314,10 @@ object MediaSessionMonitor {
         val am = audioManager ?: return emptySet()
         return try {
             val configs = am.activePlaybackConfigurations
-            val mediaConfigs = configs.filter { it.audioAttributes.usage == AudioAttributes.USAGE_MEDIA }
+            val mediaConfigs = configs.filter {
+                it.audioAttributes.usage == AudioAttributes.USAGE_MEDIA &&
+                it.audioAttributes.contentType != AudioAttributes.CONTENT_TYPE_SONIFICATION
+            }
             Logger.d(TAG, "activePlaybackConfigurations: total=${configs.size}, USAGE_MEDIA=${mediaConfigs.size}")
             if (mediaConfigs.isEmpty()) return emptySet()
 
@@ -317,9 +328,9 @@ object MediaSessionMonitor {
             val foreground = queryCurrentForegroundApp()
                 ?: coreService?.getForegroundApp()
                 ?: lastKnownForegroundApp
-            Logger.d(TAG, "USAGE_MEDIA audio active, foreground=$foreground (coreService=${coreService != null}), blocked=$blockedPlaybackPackages")
-            if (foreground != null && foreground in blockedPlaybackPackages) {
-                Logger.i(TAG, "Attributing USAGE_MEDIA playback to foregrounded blocked app: $foreground")
+            Logger.d(TAG, "USAGE_MEDIA audio active, foreground=$foreground (coreService=${coreService != null}), tracked=$audioManagerTrackedPackages")
+            if (foreground != null && foreground in audioManagerTrackedPackages) {
+                Logger.i(TAG, "Attributing USAGE_MEDIA playback to foregrounded tracked app: $foreground")
                 return setOf(foreground)
             }
             emptySet()
