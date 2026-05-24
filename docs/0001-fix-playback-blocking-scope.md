@@ -111,49 +111,33 @@ The hardcoded allowlist avoids false positives: e.g. if YouTube is foregrounded 
 
 `FamilyRulesCoreService.getForegroundApp()` depends on `PackageUsageCalculator`, which processes events delivered by `PeriodicUsageEventsMonitor` incrementally. On the test emulator, this pipeline returns 0 events consistently — `ACTIVITY_RESUMED` events exist in `dumpsys usagestats` but are not returned by the incremental query (likely an emulator quirk; not reproduced on physical devices). This means `getForegroundApp()` always returns `null` on the emulator.
 
-A dedicated `queryCurrentForegroundApp()` was added to `MediaSessionMonitor` that bypasses the pipeline entirely by calling `UsageStatsManager.queryEvents()` directly over a short window (originally 10 s, later widened to 60 s — see Attempt 6). This reliably returns the last `ACTIVITY_RESUMED` package.
+A dedicated `queryCurrentForegroundApp()` was added to `MediaSessionMonitor` that bypasses the pipeline entirely by calling `UsageStatsManager.queryEvents()` directly over a 10 s window. This reliably returns the last `ACTIVITY_RESUMED` package.
 
-#### Implementation
+#### Attribution heuristic (first version)
 
-Two parallel detection paths, merged into a single result set:
+`getActiveAudioPlaybackPackages()` implements the correlation:
 
-| Path | Detects | Mechanism |
-|---|---|---|
-| `MediaSessionPlayback` | Apps with `MediaSession` (YouTube, YT Music, Spotify, etc.) | `MediaSessionManager.getActiveSessions()` |
-| `AudioPlaybackDetector` | Foregrounded tracked app playing `USAGE_MEDIA` audio | `AudioManager.getActivePlaybackConfigurations()` + foreground correlation |
+1. Filter `AudioManager.getActivePlaybackConfigurations()` to `USAGE_MEDIA` entries.
+2. If none are active → return empty set.
+3. Query current foreground app via `queryCurrentForegroundApp()` → `coreService.getForegroundApp()` → `lastKnownForegroundApp` (cascade).
+4. If the foreground app is in `blockedPlaybackPackages` → return `setOf(foreground)`.
+5. Otherwise → return empty set.
 
-The merged set is used in:
-- **`getCurrentlyPlayingPackages()`** — feeds the "now playing" report sent to the server, so WhatsApp playing now appears in server-side usage data automatically.
-- **`enforcePlaybackBlocking()`** — two enforcement paths:
-  - MediaSession apps: `transportControls.pause()` + audio focus + overlay
-  - AudioPlayback-only apps (e.g. WhatsApp): audio focus + overlay + Home press (no transport control available)
+**Outcome: false positives.** The check `foreground in blockedPlaybackPackages` means any `USAGE_MEDIA` audio — including WhatsApp UI beeps when switching conversations — triggers enforcement as long as WhatsApp is foregrounded and is in the blocked list. The overlay and countdown fire on every conversation tap. Root cause: the `blockedPlaybackPackages` guard was intended to limit blast radius, but it still attributes any audio to WhatsApp just because it is foregrounded.
 
-#### Window-focus overlay (`MediaPlaybackBlockingOverlayService`)
+#### Window-focus overlay
 
-WhatsApp inline video only pauses when it loses window focus. A new overlay service was added to exploit this:
+WhatsApp inline video only pauses when it loses window focus. The overlay was added to exploit this — `TYPE_APPLICATION_OVERLAY` without `FLAG_NOT_FOCUSABLE` steals window focus from the app beneath it. Small top banner, auto-dismisses after 5 s, tappable.
 
-- `TYPE_APPLICATION_OVERLAY`, does **not** set `FLAG_NOT_FOCUSABLE` — steals window focus from the app beneath it.
-- Small top-of-screen banner ("Media playback blocked"), semi-transparent, non-intrusive.
-- Auto-dismisses after 10 seconds via `Handler.postDelayed`.
-- Idempotent: calling `show()` while already visible resets the dismiss timer rather than stacking a second overlay.
-- Tappable to dismiss early.
-- `START_NOT_STICKY` — does not restart on kill; the enforcement loop will re-show it on the next tick if blocking is still active.
+**Outcome: overlay works but WhatsApp video resumes when overlay dismisses.** When the overlay auto-dismisses, WhatsApp regains window focus and resumes playback immediately. The next enforcement tick shows the overlay again — a 5-second on / 1-second off cycle. Not truly blocking.
 
-**Outcome: overlay works but WhatsApp video resumes when overlay dismisses.** The window-focus steal does cause WhatsApp to pause. However, when the overlay auto-dismisses after 10 s, WhatsApp is back in the foreground and resumes playback immediately. The next enforcement tick shows the overlay again, creating a 10-second on / 1-second off cycle — visible and annoying, but not truly blocking.
-
-Additionally, the overlay `FLAG_NOT_TOUCH_MODAL` was intentionally kept so that touches outside the banner pass through to the underlying app — but this also means the user can interact with WhatsApp while the overlay is up, minimizing the pausing window.
-
-### Attempt 6 — `pressHome()` as primary stop mechanism (current)
+### Attempt 6 — `pressHome()` as primary stop mechanism
 
 #### Root cause of overlay-cycle failure
 
-The overlay approach relied on the assumption that window-focus loss would keep WhatsApp paused for the full 10-second dismiss delay. In practice WhatsApp's Chromium-based video player resumes the moment it regains focus — which happens as soon as the overlay auto-dismisses (or if the user taps outside the banner).
-
-The only way to truly stop playback for an extended period is to remove WhatsApp from the foreground entirely, so that it cannot reclaim focus regardless of the overlay state.
+The only way to truly stop WhatsApp playback for an extended period is to remove it from the foreground entirely, so it cannot reclaim window focus.
 
 #### `pressHome()` implementation
-
-Added `pressHome()` to `MediaSessionMonitor`. When a blocked app is detected playing via the `AudioPlayback` path (or the `MediaSession` path, for consistency):
 
 ```kotlin
 val homeIntent = Intent(Intent.ACTION_MAIN).apply {
@@ -163,71 +147,68 @@ val homeIntent = Intent(Intent.ACTION_MAIN).apply {
 ctx.startActivity(homeIntent)
 ```
 
-Firing `ACTION_MAIN / CATEGORY_HOME` sends the blocked app to the background by switching to the home screen. This:
-- Removes the blocked app from foreground → its Chromium/WebView player stops receiving media playback events and pauses.
-- Causes `ACTIVITY_RESUMED` for the launcher to appear in the `UsageStatsManager` event log.
-- Is irreversible from the app's side — WhatsApp cannot re-foreground itself without user interaction.
+Added to both `enforcePlaybackBlocking()` (polling loop) and `pauseIfBlocked()` (MediaSession callback). Called immediately when blocked playback is detected — no countdown.
 
-`pressHome()` is called from both `enforcePlaybackBlocking()` (polling loop, fires every 1 s) and `pauseIfBlocked()` (MediaSession callback path).
+**Outcome: works for WhatsApp but bad UX for YouTube.** YouTube also got `pressHome()` via the MediaSession callback path. YouTube has `transportControls.pause()` which stops playback in-place — minimizing it to home is unnecessarily disruptive. The user cannot browse YouTube while the blocking is active. Additionally: `pauseIfBlocked()` fires on the `onPlaybackStateChanged` callback, which is the reliable path; `enforcePlaybackBlocking()` only fires `pressHome()` during the brief window when the polling tick coincides with active playback — so it was unreliable when called from the loop but worked well from the callback.
 
-#### Audio focus denial — root cause identified
+### Attempt 7 — Split MediaSession vs. AudioPlayback enforcement UX
 
-After adding `foregroundServiceType="specialUse|mediaPlayback"` and the `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permission, audio focus requests still returned `AUDIOFOCUS_REQUEST_FAILED` (result=0). Inspection of `MediaFocusControl` logcat showed our app's request never reaching the system audio focus manager — the request was being silently dropped before it got that far.
+#### Observation
 
-Root cause: WhatsApp's Chromium/WebView player acquires and holds audio focus permanently while the video player is open. The system's `AudioPolicy` denies concurrent `AUDIOFOCUS_GAIN` requests from lower-priority apps when a persistent focus holder is present. Since WhatsApp (a user-facing app) holds focus, our background service's request is refused.
+MediaSession apps (YouTube) can be paused in-place — `transportControls.pause()` is sufficient. The user can keep the app open and browse freely. `pressHome()` is unnecessary and disruptive.
 
-`AUDIOFOCUS_GAIN_TRANSIENT` requests were also refused, meaning there is no standard focus type that can pre-empt a user-app holding permanent focus from a background service.
+AudioManager-only apps (WhatsApp) cannot be paused remotely. `pressHome()` is the only stop mechanism.
 
-**Conclusion:** audio focus cannot be used to stop WhatsApp. `pressHome()` is the only reliable mechanism.
+#### Change
 
-#### Audio focus still held for MediaSession apps
+- **MediaSession path** (`pauseIfBlocked` + `enforcePlaybackBlocking` MediaSession branch): `pause()` + audio focus + plain overlay (5 s auto-dismiss). No `pressHome()`.
+- **AudioPlayback path** (`enforcePlaybackBlocking` AudioPlayback branch): audio focus + plain overlay + `pressHome()`. Immediate, no countdown.
 
-Audio focus requests (`AUDIOFOCUS_GAIN`) are still attempted for MediaSession-based apps (YouTube, Spotify, etc.) because those apps' media players do implement `AudioFocusChangeListener` and pause correctly on focus loss. The request may still be denied if WhatsApp is already holding focus, but for the typical use case (blocking YouTube while YouTube is playing and WhatsApp is not) it works correctly.
+**Outcome: correct for YouTube; WhatsApp still bad UX.** When WhatsApp is restored to foreground, video auto-resumes immediately, triggering instant `pressHome()` again. The app is unusable — every time the user opens it they are kicked back to home within 1 s. There is no window to use the app for non-video purposes.
 
-- **Plain** ([show]): auto-dismisses after 5 s. No countdown. Used for MediaSession-based apps
-  (e.g. YouTube) where `transportControls.pause()` already stops playback — the overlay is purely
-  informational.
-- **Countdown** ([showWithCountdown]): displays a live N→0 countdown badge on the right side of
-  the banner. When the counter reaches zero the supplied `onExpired` callback is invoked on the
-  main thread and the overlay hides. Used for AudioManager-only apps (e.g. WhatsApp) where the
-  caller needs to `pressHome()` after giving the user a brief warning window.
+### Attempt 8 — 5-second countdown before `pressHome()` for WhatsApp
 
-Enforcement behavior per detection path:
+#### Rationale
 
-| Detection path | Apps | On blocked playback detected |
-|---|---|---|
-| MediaSession | YouTube, YT Music, Spotify, … | `transportControls.pause()` + audio focus + **plain overlay** (5 s, auto-dismiss) |
-| AudioPlayback (AudioManager) | WhatsApp, … | audio focus + **countdown overlay** (5 s) → `pressHome()` on zero |
+Give the user a visible warning and a chance to pause the video themselves before being sent home. If they pause during the countdown the overlay dismisses silently — no home press. If they do not pause, `pressHome()` fires at zero.
 
-Rationale: MediaSession apps can be paused in-place via transport controls. The user can keep the
-app open and interact with it (browse, etc.) — playback simply stays paused. No need to eject
-them from the foreground. The plain overlay is a non-disruptive notification that playback is
-blocked.
+#### `audioManagerTrackedPackages` — hardcoded allowlist
 
-AudioManager-only apps (WhatsApp) cannot be paused remotely — the only stop mechanism is removing
-them from the foreground via `pressHome()`. The countdown overlay gives the user a 5-second
-visible warning before the home-press fires, making the behavior feel less abrupt and explaining
-why the app is being minimized.
+The attribution check `foreground in blockedPlaybackPackages` was replaced with `foreground in audioManagerTrackedPackages` where `audioManagerTrackedPackages = setOf("com.whatsapp")`. This decouples audio detection from the server-driven blocked list: only apps explicitly known to use AudioManager without MediaSession are eligible for this path, preventing false attribution to other foregrounded blocked apps.
 
-#### `foregroundServiceType` and `FOREGROUND_SERVICE_MEDIA_PLAYBACK`
+#### First countdown implementation — always shows "5"
 
-Added to `AndroidManifest.xml` after audio focus was first denied, in case the denial was due to missing media playback service declaration. This did not fix the audio focus denial (see root cause above), but it is still correct to keep — it is required on Android 14+ to call `requestAudioFocus` from a foreground service with media intent.
+The overlay countdown was implemented in `MediaPlaybackBlockingOverlayService`. The 1-second enforcement loop in `MediaSessionMonitor` calls `showWithCountdown()` on every tick. The first implementation of `showCountdownOverlay()` called `cancelAllPending()` unconditionally at the top, which tore down the existing overlay and restarted from 5 every second.
 
-```xml
-android:foregroundServiceType="specialUse|mediaPlayback"
+**Fix:** added `countdownActive` flag. `showCountdownOverlay()` returns immediately if `countdownActive == true`, so the running countdown is never restarted by the loop.
+
+#### Overlay keeps appearing even when WhatsApp is not playing
+
+After fixing the countdown restart, the overlay still appeared every time WhatsApp was opened — even with no video playing. Root cause identified via `dumpsys audio`:
+
+```
+AudioPlaybackConfiguration ... type:android.media.MediaPlayer u/pid:10133/1613
+  attr: usage=USAGE_MEDIA content=CONTENT_TYPE_SONIFICATION
 ```
 
-```xml
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+WhatsApp's UI sounds (beeps on conversation switch, tap feedback) declare `usage=USAGE_MEDIA` but `content=CONTENT_TYPE_SONIFICATION`. The original filter `usage == USAGE_MEDIA` matched these, so any UI interaction in WhatsApp while it was foregrounded triggered the countdown.
+
+**Fix:** tightened the filter to exclude `CONTENT_TYPE_SONIFICATION`:
+
+```kotlin
+configs.filter {
+    it.audioAttributes.usage == AudioAttributes.USAGE_MEDIA &&
+    it.audioAttributes.contentType != AudioAttributes.CONTENT_TYPE_SONIFICATION
+}
 ```
 
-#### `queryCurrentForegroundApp()` window widened to 60 s
+Actual video playback uses `CONTENT_TYPE_MOVIE` or `CONTENT_TYPE_MUSIC` and still passes the filter.
 
-After `pressHome()` is fired, WhatsApp goes to background. The next uptime report fires some seconds later. At that point, the last `ACTIVITY_RESUMED` event in the 10-second window is for the launcher, not WhatsApp. The server then sees the launcher (or no app) as the foreground app — not WhatsApp — so WhatsApp does not appear as "online" even though the user was interacting with it moments before.
+#### `isStillPlaying` check per countdown tick
 
-The query window was widened to 60 s (later raised further — see Reporting section) to bridge this gap. The tradeoff: if the user has genuinely switched away from WhatsApp for more than 60 s, we may still attribute it as foreground. Acceptable for a parental-control use case; the risk of false blocking is nil (only reporting is affected).
+Each second during the countdown, `isStillPlaying()` is re-evaluated by calling `getActiveAudioPlaybackPackages()`. If it returns empty (user paused the video), the countdown cancels and the overlay dismisses silently without `pressHome()`.
 
-**Current outcome:** `pressHome()` reliably stops WhatsApp video within 1–2 enforcement ticks (1–2 s). The overlay shows simultaneously as a user-visible notification. Non-blocked apps are unaffected. YT/YT Music work correctly via the MediaSession path.
+**Outcome (current):** WhatsApp video detected only when genuinely playing (non-sonification `USAGE_MEDIA` audio). Countdown shows 5→0; user can cancel by pausing; `pressHome()` fires only if they do not pause. YouTube unaffected — paused in-place via transport controls, plain overlay, stays in foreground.
 
 ### Reporting bug: `activeApps` empty set vs. null
 
@@ -304,45 +285,43 @@ A separate symptom: WhatsApp screen time is stuck at the same value across multi
 ## Files Changed
 
 - `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/MediaSessionMonitor.kt`
-  - Added `getActiveAudioPlaybackPackages()` — detects `USAGE_MEDIA` audio via `AudioManager.getActivePlaybackConfigurations()`; correlates with foregrounded `audioManagerTrackedPackages` app; no reflection (reflection approach abandoned after discovering `getClientUid()` always returns -1)
-  - Added `queryCurrentForegroundApp()` — direct `UsageStatsManager.queryEvents()` over 60 s window; bypasses incremental event pipeline
+  - `getActiveAudioPlaybackPackages()` — detects `USAGE_MEDIA && contentType != SONIFICATION` audio; correlates with foregrounded `audioManagerTrackedPackages` app (`{com.whatsapp}`)
+  - `queryCurrentForegroundApp()` — direct `UsageStatsManager.queryEvents()` over 10 s window; bypasses incremental event pipeline
   - `getCurrentlyPlayingPackages()` — merged MediaSession + AudioPlayback results
-  - `enforcePlaybackBlocking()` — MediaSession path: `transportControls.pause()` + audio focus + **plain overlay** (no `pressHome`); AudioPlayback path: audio focus + **countdown overlay** → `pressHome()` on zero
-  - `pauseIfBlocked()` — callback path: `transportControls.pause()` + audio focus + **plain overlay** (no `pressHome`)
-  - Added `showPlaybackBlockedOverlayWithCountdown()` — calls `MediaPlaybackBlockingOverlayService.showWithCountdown()` with a `pressHome` callback
-  - Added `pressHome()` — fires `ACTION_MAIN / CATEGORY_HOME`; now called only from the countdown callback, not directly from enforcement paths
-  - Added `requestAudioFocusForBlocking()` — idempotent `AUDIOFOCUS_GAIN`; may be denied if another app holds focus
-  - Added `abandonAudioFocus()` — called from `stopEnforcementLoop()` and `onForegroundAppChanged()`
-  - Added `onForegroundAppChanged()` — acquires/releases focus on foreground transition; caches `lastKnownForegroundApp`
+  - `enforcePlaybackBlocking()` — MediaSession path: `transportControls.pause()` + audio focus + plain overlay; AudioPlayback path: audio focus + countdown overlay → `pressHome()` at zero (cancelled if user pauses first)
+  - `pauseIfBlocked()` — MediaSession callback path: `transportControls.pause()` + audio focus + plain overlay
+  - `showPlaybackBlockedOverlay()` — calls `MediaPlaybackBlockingOverlayService.show()`
+  - `showPlaybackBlockedOverlayWithCountdown()` — calls `MediaPlaybackBlockingOverlayService.showWithCountdown()` with `isStillPlaying` check and `pressHome` as `onExpired`
+  - `pressHome()` — fires `ACTION_MAIN / CATEGORY_HOME`; called only from countdown `onExpired` callback
+  - `requestAudioFocusForBlocking()` — idempotent `AUDIOFOCUS_GAIN`; may be denied if WhatsApp holds focus
+  - `abandonAudioFocus()` — called from `stopEnforcementLoop()` and `onForegroundAppChanged()`
+  - `onForegroundAppChanged()` — acquires/releases focus on foreground transition; caches `lastKnownForegroundApp`
   - `updatePlaybackBlocking()` — `effectiveEnabled = enabled && blockedPackages.isNotEmpty()`; fires immediate focus request if blocked app already foregrounded
-  - `install()` — stores `coreService`, `audioManager`, `usageStatsManager`; `coreService` set only when context is `FamilyRulesCoreService`
-  - `audioManagerTrackedPackages` — hardcoded set `{com.whatsapp}`; used as allowlist to avoid false-positive USAGE_MEDIA attribution
+  - `audioManagerTrackedPackages` — hardcoded `{com.whatsapp}`; gates AudioPlayback attribution
 
 - `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/MediaPlaybackBlockingOverlayService.kt` *(new)*
-  - Full-width dark-red top banner (`#E6B71C1C`), 48 dp icon, "FamilyRules" subtitle, "Odtwarzanie zablokowane" message
-  - **Plain mode** (`show()`): auto-dismisses after 5 s; idempotent show resets timer; tappable
-  - **Countdown mode** (`showWithCountdown(context, onExpired)`): shows N→0 badge on the right; fires `onExpired` callback on main thread at zero then hides
-  - `TYPE_APPLICATION_OVERLAY`, focusable (steals window focus)
-  - `START_NOT_STICKY`
+  - Full-width dark-red banner, 48 dp icon, "FamilyRules" subtitle, "Odtwarzanie zablokowane" message
+  - **Plain mode** (`show()`): auto-dismisses after 5 s; no-op if countdown active
+  - **Countdown mode** (`showWithCountdown(context, isStillPlaying, onExpired)`): N→0 badge; checks `isStillPlaying()` each second — false → silent dismiss; zero → `onExpired()` then hide; no-op if countdown already running
+  - `TYPE_APPLICATION_OVERLAY`, focusable, `START_NOT_STICKY`
 
 - `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/ForegroundAppMonitor.kt`
-  - `checkForegroundApp()` calls `MediaSessionMonitor.onForegroundAppChanged()` on every foreground app transition
+  - `checkForegroundApp()` calls `MediaSessionMonitor.onForegroundAppChanged()` on every foreground transition
 
 - `app/src/main/AndroidManifest.xml`
   - Added `foregroundServiceType="specialUse|mediaPlayback"` to `FamilyRulesCoreService`
   - Added `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permission
   - Registered `MediaPlaybackBlockingOverlayService`
 
-- `app/src/main/res/values/strings.xml`
-  - Added `media_playback_blocked = "Media playback blocked"`
-
-- `app/src/main/res/values-pl/strings.xml`
-  - Added `media_playback_blocked = "Odtwarzanie zablokowane"`
+- `app/src/main/res/values/strings.xml` — added `media_playback_blocked`
+- `app/src/main/res/values-pl/strings.xml` — added `media_playback_blocked`
 
 ## Verification
 
 - `./gradlew compileDebugKotlin` — passes, pre-existing warnings only
-- On-device / emulator manual test:
-  - YouTube: starts playback → paused immediately via transport controls → plain overlay shown for 5 s → app remains in foreground, user can browse freely
-  - WhatsApp: starts video → countdown overlay shown (5→0) → `pressHome()` fires at zero → app minimized; restoring WhatsApp repeats the cycle, giving the user a 5-second warning each time
+- Manual test on emulator:
+  - YouTube: starts playback → paused via transport controls → plain overlay 5 s → app stays in foreground, user can browse freely
+  - WhatsApp video: countdown overlay 5→0 → `pressHome()` → app minimized
+  - WhatsApp video paused during countdown → overlay dismisses silently, no home press
+  - WhatsApp UI beeps (conversation switching) → not detected (filtered out by `CONTENT_TYPE_SONIFICATION` exclusion)
 

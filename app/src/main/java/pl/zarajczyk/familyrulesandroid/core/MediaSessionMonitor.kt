@@ -195,6 +195,17 @@ object MediaSessionMonitor {
         MediaPlaybackBlockingOverlayService.show(ctx)
     }
 
+    private fun showPlaybackBlockedOverlayWithCountdown() {
+        val ctx = appContext ?: return
+        MediaPlaybackBlockingOverlayService.showWithCountdown(
+            context = ctx,
+            isStillPlaying = {
+                getActiveAudioPlaybackPackages().any { it in blockedPlaybackPackages }
+            },
+            onExpired = { pressHome() }
+        )
+    }
+
     private fun pressHome() {
         val ctx = appContext ?: return
         Logger.i(TAG, "Pressing Home to stop blocked app playback")
@@ -238,8 +249,7 @@ object MediaSessionMonitor {
             if (audioPlayingBlocked.isNotEmpty()) {
                 Logger.i(TAG, "AudioPlayback detected blocked packages playing: $audioPlayingBlocked")
                 requestAudioFocusForBlocking()
-                showPlaybackBlockedOverlay()
-                pressHome()
+                showPlaybackBlockedOverlayWithCountdown()
             }
         } catch (e: SecurityException) {
             Logger.w(TAG, "Cannot enforce playback blocking - notification access missing", e)
