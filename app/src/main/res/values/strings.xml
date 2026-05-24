@@ -48,6 +48,9 @@
     <!-- App Blocking Overlay -->
     <string name="app_blocked_title">This app is blocked</string>
     <string name="app_blocked_description">Please close this app and return to allowed applications</string>
+
+    <!-- Media Playback Blocking Overlay -->
+    <string name="media_playback_blocked">Media playback blocked</string>
     
     <!-- Countdown Overlay -->
     <string name="countdown_title">App Blocking Countdown</string>

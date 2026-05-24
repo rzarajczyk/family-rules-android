@@ -1,7 +1,9 @@
 package pl.zarajczyk.familyrulesandroid.core
 
+import android.app.usage.UsageStatsManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -71,6 +73,10 @@ object MediaSessionMonitor {
 
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
+    private var usageStatsManager: UsageStatsManager? = null
+
+    @Volatile
+    private var coreService: FamilyRulesCoreService? = null
 
     private const val ENFORCEMENT_POLL_INTERVAL_MS = 1_000L
 
@@ -176,6 +182,21 @@ object MediaSessionMonitor {
         Logger.i(TAG, "Audio focus abandoned")
     }
 
+    private fun showPlaybackBlockedOverlay() {
+        val ctx = appContext ?: return
+        MediaPlaybackBlockingOverlayService.show(ctx)
+    }
+
+    private fun pressHome() {
+        val ctx = appContext ?: return
+        Logger.i(TAG, "Pressing Home to stop blocked app playback")
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        ctx.startActivity(homeIntent)
+    }
+
     /**
      * Pause all active media sessions belonging to [blockedPlaybackPackages] when
      * [playbackBlockingActive] is true. Called once per report tick from PeriodicReportSender
@@ -192,14 +213,25 @@ object MediaSessionMonitor {
         if (blocked.isEmpty()) return
 
         try {
+            // --- MediaSession-based enforcement ---
             val controllers = manager.getActiveSessions(component).orEmpty()
             val blockedControllers = controllers.filter { controller ->
                 controller.packageName in blocked && isPlaybackActive(controller.playbackState?.state)
             }
             for (controller in blockedControllers) {
-                Logger.i(TAG, "Pausing playback for ${controller.packageName}")
+                Logger.i(TAG, "Pausing MediaSession playback for ${controller.packageName}")
                 requestAudioFocusForBlocking()
                 controller.transportControls?.pause()
+                showPlaybackBlockedOverlay()
+            }
+
+            // --- AudioPlayback-based enforcement (catches apps without MediaSession, e.g. WhatsApp) ---
+            val audioPlayingBlocked = getActiveAudioPlaybackPackages().filter { it in blocked }
+            if (audioPlayingBlocked.isNotEmpty()) {
+                Logger.i(TAG, "AudioPlayback detected blocked packages playing: $audioPlayingBlocked")
+                requestAudioFocusForBlocking()
+                showPlaybackBlockedOverlay()
+                pressHome()
             }
         } catch (e: SecurityException) {
             Logger.w(TAG, "Cannot enforce playback blocking - notification access missing", e)
@@ -217,7 +249,7 @@ object MediaSessionMonitor {
         val manager = sessionManager ?: return emptySet()
         val component = listenerComponent ?: return emptySet()
 
-        return try {
+        val mediaSessionPackages = try {
             manager.getActiveSessions(component)
                 .orEmpty()
                 .filter { controller ->
@@ -233,12 +265,81 @@ object MediaSessionMonitor {
             Logger.w(TAG, "Failed to query media playing packages", e)
             emptySet()
         }
+
+        val audioPlaybackPackages = getActiveAudioPlaybackPackages()
+
+        val merged = mediaSessionPackages + audioPlaybackPackages
+        if (audioPlaybackPackages.isNotEmpty()) {
+            Logger.d(TAG, "AudioPlayback detected packages: $audioPlaybackPackages")
+        }
+        return merged
+    }
+
+    /**
+     * Returns packages currently playing USAGE_MEDIA audio via AudioManager.getActivePlaybackConfigurations().
+     * This catches apps (e.g. WhatsApp) that play audio without exposing a MediaSession.
+     * Safe to call regardless of which apps are installed — no package-specific checks.
+     *
+     * Uses reflection to access the hidden [AudioPlaybackConfiguration.getClientUid()] method,
+     * then resolves UIDs to package names via PackageManager. Falls back gracefully if the
+     * hidden API is unavailable.
+     */
+    /** Query the current foreground app directly via UsageStatsManager event query.
+     *  This is more reliable than [FamilyRulesCoreService.getForegroundApp] which depends
+     *  on the incremental event pipeline (which can lag or return 0 events on emulators). */
+    private fun queryCurrentForegroundApp(): String? {
+        val usm = usageStatsManager ?: return null
+        val now = System.currentTimeMillis()
+        val events = usm.queryEvents(now - 10_000L, now) ?: return null
+        var lastPackage: String? = null
+        val event = android.app.usage.UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                lastPackage = event.packageName
+            }
+        }
+        return lastPackage
+    }
+
+    private fun getActiveAudioPlaybackPackages(): Set<String> {
+        val am = audioManager ?: return emptySet()
+        return try {
+            val configs = am.activePlaybackConfigurations
+            val mediaConfigs = configs.filter { it.audioAttributes.usage == AudioAttributes.USAGE_MEDIA }
+            Logger.d(TAG, "activePlaybackConfigurations: total=${configs.size}, USAGE_MEDIA=${mediaConfigs.size}")
+            if (mediaConfigs.isEmpty()) return emptySet()
+
+            // Android anonymizes AudioPlaybackConfiguration entries from other apps (uid=-1).
+            // We cannot identify which app owns which stream directly.
+            // Correlate active USAGE_MEDIA audio with the current foreground app: if a blocked app
+            // is foregrounded while audio is playing, attribute the playback to it.
+            val foreground = queryCurrentForegroundApp()
+                ?: coreService?.getForegroundApp()
+                ?: lastKnownForegroundApp
+            Logger.d(TAG, "USAGE_MEDIA audio active, foreground=$foreground (coreService=${coreService != null}), blocked=$blockedPlaybackPackages")
+            if (foreground != null && foreground in blockedPlaybackPackages) {
+                Logger.i(TAG, "Attributing USAGE_MEDIA playback to foregrounded blocked app: $foreground")
+                return setOf(foreground)
+            }
+            emptySet()
+        } catch (e: Exception) {
+            Logger.w(TAG, "Failed to query active playback configurations", e)
+            emptySet()
+        }
     }
 
     fun install(context: Context) {
         appContext = context.applicationContext
+        if (context is FamilyRulesCoreService) {
+            coreService = context
+            Logger.i(TAG, "coreService set from install()")
+        } else {
+            Logger.w(TAG, "install() called with non-service context: ${context::class.simpleName}")
+        }
         sessionManager = context.getSystemService(MediaSessionManager::class.java)
         audioManager = context.getSystemService(AudioManager::class.java)
+        usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
         listenerComponent = ComponentName(context, FamilyRulesNotificationListenerService::class.java)
         initialized = true
         Logger.i(TAG, "Installed media session monitor")
@@ -338,6 +439,7 @@ object MediaSessionMonitor {
             try {
                 requestAudioFocusForBlocking()
                 controller.transportControls?.pause()
+                showPlaybackBlockedOverlay()
             } catch (e: Exception) {
                 Logger.w(TAG, "Failed to pause ${controller.packageName} from callback", e)
             }

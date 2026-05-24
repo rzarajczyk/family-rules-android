@@ -56,7 +56,7 @@ Focus type used: `AUDIOFOCUS_GAIN_TRANSIENT` — signals "temporary hold, give i
 
 Additionally, a gap was identified: if WhatsApp was already open when playback blocking became active, no foreground transition fired and focus was never requested (because `onForegroundAppChanged` is only called on transitions, not on the current state).
 
-### Attempt 4 — Switch to `AUDIOFOCUS_GAIN` + fix already-foregrounded gap (current)
+### Attempt 4 — Switch to `AUDIOFOCUS_GAIN` + fix already-foregrounded gap
 
 Two changes on top of Attempt 3:
 
@@ -68,13 +68,58 @@ Two changes on top of Attempt 3:
 
 Added `lastKnownForegroundApp` field to `MediaSessionMonitor`, updated on every `onForegroundAppChanged()` call. In `updatePlaybackBlocking()`, after the enforcement loop is started, focus is requested immediately if `lastKnownForegroundApp` is in the blocked list. This is guarded: if a non-blocked app is currently foregrounded, focus is not requested and no audio disruption occurs.
 
-**Outcome: pending device test.**
+**Outcome: audio focus confirmed not working on WhatsApp.** Device testing confirmed WhatsApp inline video plays through both `AUDIOFOCUS_GAIN_TRANSIENT` and `AUDIOFOCUS_GAIN`. WhatsApp also ignores media key events (Play/Pause). It only stops when the app loses window focus. `AUDIOFOCUS_GAIN` is still correct to hold for MediaSession apps, but it is insufficient for WhatsApp.
 
-Audio focus is still a voluntary protocol, so WhatsApp ignoring `AUDIOFOCUS_LOSS` entirely remains a possibility. If device testing confirms WhatsApp still plays uninterrupted, the next approach to consider is `AudioManager.adjustStreamVolume(STREAM_MUSIC, ADJUST_MUTE)` scoped to the blocked app's foreground window — this operates at the audio mixer level below app participation and cannot be bypassed by the app.
+### Attempt 5 — Dual detection + window-focus overlay (current)
+
+#### Investigation: `AudioPlaybackConfiguration`
+
+Before implementing, the Android Emulator was used to capture live logcat from WhatsApp (PID 8444) while video was playing. The logs revealed:
+
+```
+AAudioStream_requestStart(s#5) called  → state 10→3→4  (PLAYING)
+AAudioStream_requestStop(s#5) called   → state 4→9→10  (STOPPED)
+```
+
+WhatsApp uses AAudio (stream `s#5`) with:
+- `usage = 1` → `AudioAttributes.USAGE_MEDIA`
+- State `4` = actively playing; state `10` = stopped
+
+`AudioManager.getActivePlaybackConfigurations()` returns one entry per active audio stream with its `AudioAttributes`. When filtered to `USAGE_MEDIA`, it reliably detects WhatsApp video playing. When WhatsApp is not playing (e.g. only message sounds), the stream is absent. Message notification sounds use `USAGE_NOTIFICATION` (5), not `USAGE_MEDIA` (1), so the filter correctly ignores them.
+
+This allows distinguishing "WhatsApp media playing" from "WhatsApp notification sounds" without any package-specific logic.
+
+#### Implementation
+
+Two parallel detection paths, merged into a single result set:
+
+| Path | Detects | Mechanism |
+|---|---|---|
+| `MediaSessionPlayback` | Apps with `MediaSession` (YouTube, YT Music, Spotify, etc.) | `MediaSessionManager.getActiveSessions()` |
+| `AudioPlaybackDetector` | Any app playing `USAGE_MEDIA` audio, including WhatsApp | `AudioManager.getActivePlaybackConfigurations()` + UID→package resolution via `PackageManager` |
+
+`getClientUid()` on `AudioPlaybackConfiguration` is a `@hide` API (never promoted to the public SDK at any API level). It is accessed via reflection. If the method is unavailable, `getActiveAudioPlaybackPackages()` falls back to an empty set — no crash, no false positives.
+
+The merged set is used in:
+- **`getCurrentlyPlayingPackages()`** — feeds the "now playing" report sent to the server, so WhatsApp playing now appears in server-side usage data automatically.
+- **`enforcePlaybackBlocking()`** — two enforcement paths:
+  - MediaSession apps: `transportControls.pause()` + audio focus + overlay
+  - AudioPlayback-only apps (e.g. WhatsApp): audio focus + overlay (no transport control available)
+
+#### Window-focus overlay (`MediaPlaybackBlockingOverlayService`)
+
+WhatsApp inline video only pauses when it loses window focus. A new small overlay service was added to exploit this:
+
+- `TYPE_APPLICATION_OVERLAY`, focusable (does **not** set `FLAG_NOT_FOCUSABLE`) — steals window focus from the app beneath it.
+- Small top-of-screen banner ("Media playback blocked"), semi-transparent, non-intrusive.
+- Auto-dismisses after 10 seconds via `Handler.postDelayed`.
+- Idempotent: calling `show()` while already visible resets the dismiss timer rather than stacking a second overlay.
+- Tappable to dismiss early.
+- `START_NOT_STICKY` — does not restart on kill; the enforcement loop will re-show it on the next tick if blocking is still active.
+
+**Outcome: pending device test.** The mechanism is sound: stealing window focus is the one reliably observable trigger that causes WhatsApp to pause inline video. Whether the 10-second window and 1-second re-show cycle is sufficient to keep WhatsApp suppressed in practice requires on-device verification.
 
 ## Deferred Next Steps
-
-These items are intentionally deferred until after testing the current `AUDIOFOCUS_GAIN` build on-device. The immediate goal is to confirm whether WhatsApp cooperates with permanent focus loss.
 
 ### 1. Track real audio-focus loss events
 
@@ -100,20 +145,39 @@ Foreground transitions are currently reported by `ForegroundAppMonitor`, which i
 
 **Follow-up:** verify this behavior explicitly with YT Music and any other common background player before treating the implementation as final.
 
+### 5. Evaluate overlay dismiss timing
+
+If the enforcement loop fires every 1 second but the overlay auto-dismisses after 10 seconds, WhatsApp could potentially resume playing for up to ~1 second per cycle before the next enforcement tick re-shows the overlay and re-steals focus. Evaluate whether the dismiss delay should be shortened or the re-show logic should be made more aggressive.
+
 ## Files Changed
 
 - `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/MediaSessionMonitor.kt`
+  - Added `getActiveAudioPlaybackPackages()` — detects `USAGE_MEDIA` audio playback via `AudioManager.getActivePlaybackConfigurations()`; resolves UIDs to package names via reflection + `PackageManager`; safe fallback if `getClientUid()` is unavailable
+  - `getCurrentlyPlayingPackages()` — merged MediaSession + AudioPlayback results
+  - `enforcePlaybackBlocking()` — added AudioPlayback enforcement path (audio focus + overlay); MediaSession path unchanged
+  - `pauseIfBlocked()` (callback path) — now also calls `showPlaybackBlockedOverlay()`
+  - Added `showPlaybackBlockedOverlay()` helper — delegates to `MediaPlaybackBlockingOverlayService.show()`
   - Added `requestAudioFocusForBlocking()` — idempotent, acquires focus when needed
   - Added `abandonAudioFocus()` — called from `stopEnforcementLoop()` and `onForegroundAppChanged()`
   - Added `onForegroundAppChanged()` — acquires/releases audio focus based on whether the foreground app is blocked; caches package in `lastKnownForegroundApp`
-  - Wired `requestAudioFocusForBlocking()` into `enforcePlaybackBlocking()` and `pauseIfBlocked()` for MediaSession-based apps
-  - Added `audioManager`, `audioFocusRequest`, `audioFocusHeld`, `lastKnownForegroundApp` fields; `audioManager` initialized in `install()`
   - Focus type: `AUDIOFOCUS_GAIN` (permanent ownership)
   - `updatePlaybackBlocking()` immediately acquires focus if a blocked app is already foregrounded when blocking activates
+
+- `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/MediaPlaybackBlockingOverlayService.kt` *(new)*
+  - Small focusable top-of-screen overlay banner
+  - Auto-dismisses after 10 s; idempotent `show()` resets timer
+  - Steals window focus to force apps like WhatsApp to pause inline video
 
 - `app/src/main/java/pl/zarajczyk/familyrulesandroid/core/ForegroundAppMonitor.kt`
   - `checkForegroundApp()` now calls `MediaSessionMonitor.onForegroundAppChanged()` on every foreground app transition
 
+- `app/src/main/AndroidManifest.xml`
+  - Registered `MediaPlaybackBlockingOverlayService`
+
+- `app/src/main/res/values/strings.xml`
+  - Added `media_playback_blocked` string
+
 ## Verification
 
 - `./gradlew compileDebugKotlin` — passes, pre-existing warnings only
+

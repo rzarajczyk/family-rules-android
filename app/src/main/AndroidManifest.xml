@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
@@ -54,7 +55,7 @@
             android:name=".core.FamilyRulesCoreService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|mediaPlayback">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="parental_control" />
@@ -65,6 +66,11 @@
             android:enabled="true"
             android:exported="false" />
         
+        <service
+            android:name=".core.MediaPlaybackBlockingOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
         <service
             android:name=".core.CountdownOverlayService"
             android:enabled="true"
