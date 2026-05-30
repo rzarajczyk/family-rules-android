@@ -20,6 +20,22 @@ class PermissionsChecker(private val activity: Activity) {
         return flat.split(":").any { it == componentName.flattenToString() }
     }
 
+    fun isLocationPermissionGranted(): Boolean {
+        return activity.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED ||
+                activity.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+    }
+
+    fun isBackgroundLocationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            activity.checkSelfPermission(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
     fun isAllPermissionsGranted(): Boolean {
         val exactAlarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             isExactAlarmPermissionGranted()

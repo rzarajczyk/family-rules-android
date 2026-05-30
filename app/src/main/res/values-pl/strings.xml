@@ -24,6 +24,10 @@
     <string name="exact_alarms_description">Wymagane do niezawodnego działania usługi w tle (Android 12+)</string>
     <string name="battery_optimization">Optymalizacja baterii</string>
     <string name="battery_optimization_description">Zapobiega zabijaniu aplikacji przez system w celu oszczędzania baterii</string>
+    <string name="location_permission">Uprawnienie do lokalizacji</string>
+    <string name="location_permission_description">Wymagane do raportowania lokalizacji urządzenia</string>
+    <string name="background_location_permission">Uprawnienie do lokalizacji w tle</string>
+    <string name="background_location_permission_description">Wymagane do raportowania lokalizacji kiedy ekran jest wyłączony</string>
     <string name="notification_listener_permission">Dostęp do powiadomień</string>
     <string name="notification_listener_permission_description">Wymagane do zatrzymywania odtwarzania multimediów w zablokowanych aplikacjach</string>
     <string name="complete_setup">Zakończ Konfigurację</string>

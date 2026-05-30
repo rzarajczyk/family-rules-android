@@ -24,10 +24,12 @@ class PeriodicReportSender(
     private val delayDuration: Duration,
     private val screenOffDelayDuration: Duration,
     private val clientInfoDuration: Duration,
+    private val locationCheckDuration: Duration,
     private val appBlocker: AppBlocker,
     private val familyRulesClient: FamilyRulesClient,
     private val settingsManager: SettingsManager,
     private val serverCommandCoordinator: ServerCommandCoordinator,
+    private val locationTracker: LocationTracker,
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -54,6 +56,8 @@ class PeriodicReportSender(
             reportDuration: Duration,
             screenOffReportDuration: Duration,
             clientInfoDuration: Duration,
+            locationCheckDuration: Duration,
+            locationTracker: LocationTracker,
         ): PeriodicReportSender {
             val appDb = AppDb(coreService)
             val settingsManager = SettingsManager(coreService)
@@ -63,10 +67,12 @@ class PeriodicReportSender(
                 delayDuration = reportDuration,
                 screenOffDelayDuration = screenOffReportDuration,
                 clientInfoDuration = clientInfoDuration,
+                locationCheckDuration = locationCheckDuration,
                 appBlocker = appBlocker,
                 familyRulesClient = familyRulesClient,
                 settingsManager = settingsManager,
                 serverCommandCoordinator = ServerCommandCoordinator(coreService, appDb, familyRulesClient),
+                locationTracker = locationTracker,
             )
             instance.start()
             return instance
@@ -85,6 +91,10 @@ class PeriodicReportSender(
 
         scope.launch {
             runUptimeReportInfiniteLoop { isActive }
+        }
+
+        scope.launch {
+            runLocationCheckInfiniteLoop { isActive }
         }
     }
 
@@ -109,6 +119,26 @@ class PeriodicReportSender(
                 Logger.e(TAG, "Failed to send client info", e)
             }
             delay(clientInfoDuration)
+        }
+    }
+
+    private suspend fun runLocationCheckInfiniteLoop(isActive: () -> Boolean) {
+        while (isActive()) {
+            try {
+                if (!ScreenStatus.isScreenOn(coreService) && locationTracker.hasLocationPermission()) {
+                    val location = locationTracker.getCurrentLocation()
+                    if (location != null) {
+                        val (lat, lng) = location
+                        if (locationTracker.hasMoved(lat, lng)) {
+                            Logger.i(TAG, "Location changed while screen off - forcing report")
+                            reportUptime(isOnline = false)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e(TAG, "Failed to check location", e)
+            }
+            delay(locationCheckDuration)
         }
     }
 
@@ -143,17 +173,35 @@ class PeriodicReportSender(
         // Cache app info for media-playing apps so they appear in ClientInfo knownApps even if
         // they have no foreground usage time today (e.g. background audio players).
         familyRulesClient.ensureAllAppsAreCached(mediaPlayingApps)
+
+        // Get location for this report
+        val location = if (locationTracker.hasLocationPermission()) {
+            locationTracker.getLastCachedLocation() ?: locationTracker.getCurrentLocation()
+        } else {
+            null
+        }
+
+        val latitude = location?.first
+        val longitude = location?.second
+
         val uptime = Uptime(
             screenTimeMillis = coreService.getTodayScreenTime(),
             packageUsages = coreService.getTodayPackageUsage(),
             activeApps = if (foregroundApp != null) setOf(foregroundApp) else emptySet(),
             mediaPlayingApps = mediaPlayingApps,
+            latitude = latitude,
+            longitude = longitude,
         )
         try {
             // null means network failure — keep the current local state, do not unblock.
             val response = familyRulesClient.reportUptimeWithCommands(uptime, isOnline = isOnline) ?: return
             serverCommandCoordinator.onCommandsReceived(response.serverCommands)
             handleDeviceStateChange(ActualDeviceState.from(response))
+
+            // Mark location as reported after successful send
+            if (latitude != null && longitude != null) {
+                locationTracker.markReported(latitude, longitude)
+            }
         } finally {
             MediaSessionMonitor.enforcePlaybackBlocking()
         }

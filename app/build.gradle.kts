@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.retrofit.converter.moshi)
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
+    implementation(libs.play.services.location)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

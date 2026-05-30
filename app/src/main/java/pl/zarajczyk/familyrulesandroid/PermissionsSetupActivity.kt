@@ -87,6 +87,24 @@ class PermissionsSetupActivity : ComponentActivity() {
     ) {
         // Permission check will be handled in the UI
     }
+
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (!fineGranted && !coarseGranted) {
+            openAppSettings()
+        }
+    }
+
+    private val backgroundLocationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            openAppSettings()
+        }
+    }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -127,6 +145,21 @@ class PermissionsSetupActivity : ComponentActivity() {
                         onSystemAlertWindowPermissionRequest = {
                             permissionChecker.navigateToSystemAlertWindowPermissionSettings()
                         },
+                        onLocationPermissionRequest = {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        },
+                        onBackgroundLocationPermissionRequest = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                backgroundLocationPermissionLauncher.launch(
+                                    android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                                )
+                            }
+                        },
                         onSetupComplete = { 
                             finish()
                             startActivity(Intent(this@PermissionsSetupActivity, MainActivity::class.java))
@@ -159,6 +192,8 @@ fun ProtectionSetupContent(
     onNotificationListenerPermissionRequest: () -> Unit,
     onUsageStatsPermissionRequest: () -> Unit,
     onSystemAlertWindowPermissionRequest: () -> Unit,
+    onLocationPermissionRequest: () -> Unit,
+    onBackgroundLocationPermissionRequest: () -> Unit,
     onSetupComplete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -169,6 +204,8 @@ fun ProtectionSetupContent(
     var notificationListenerPermissionGranted by remember { mutableStateOf(permissionChecker.isNotificationListenerPermissionGranted()) }
     var usageStatsPermissionGranted by remember { mutableStateOf(permissionChecker.isUsageStatsPermissionGranted()) }
     var systemAlertWindowPermissionGranted by remember { mutableStateOf(permissionChecker.isSystemAlertWindowPermissionGranted()) }
+    var locationPermissionGranted by remember { mutableStateOf(permissionChecker.isLocationPermissionGranted()) }
+    var backgroundLocationPermissionGranted by remember { mutableStateOf(permissionChecker.isBackgroundLocationPermissionGranted()) }
     
     LaunchedEffect(Unit) {
         batteryOptimizationExempt = (context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
@@ -225,6 +262,12 @@ fun ProtectionSetupContent(
             }
             if (!exactAlarmsEnabled) {
                 exactAlarmsEnabled = ServiceKeepAliveAlarm.canScheduleExactAlarms(context)
+            }
+            if (!locationPermissionGranted) {
+                locationPermissionGranted = permissionChecker.isLocationPermissionGranted()
+            }
+            if (!backgroundLocationPermissionGranted) {
+                backgroundLocationPermissionGranted = permissionChecker.isBackgroundLocationPermissionGranted()
             }
         }
     }
@@ -313,6 +356,24 @@ fun ProtectionSetupContent(
             )
         }
         
+        // Location Permission
+        ProtectionCard(
+            title = stringResource(R.string.location_permission),
+            description = stringResource(R.string.location_permission_description),
+            isEnabled = locationPermissionGranted,
+            onEnableClick = onLocationPermissionRequest
+        )
+        
+        // Background Location Permission (Android 10+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ProtectionCard(
+                title = stringResource(R.string.background_location_permission),
+                description = stringResource(R.string.background_location_permission_description),
+                isEnabled = backgroundLocationPermissionGranted,
+                onEnableClick = onBackgroundLocationPermissionRequest
+            )
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
         
         // Setup Complete Button
@@ -322,6 +383,8 @@ fun ProtectionSetupContent(
             systemAlertWindowPermissionGranted && 
             deviceAdminEnabled &&
             batteryOptimizationExempt &&
+            locationPermissionGranted &&
+            backgroundLocationPermissionGranted &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || exactAlarmsEnabled)
         
         Button(
@@ -348,6 +411,8 @@ fun ProtectionSetupContent(
             if (!systemAlertWindowPermissionGranted) missingPermissions.add(stringResource(R.string.display_over_apps))
             if (!deviceAdminEnabled) missingPermissions.add(stringResource(R.string.device_admin_rights))
             if (!batteryOptimizationExempt) missingPermissions.add(stringResource(R.string.battery_optimization))
+            if (!locationPermissionGranted) missingPermissions.add(stringResource(R.string.location_permission))
+            if (!backgroundLocationPermissionGranted) missingPermissions.add(stringResource(R.string.background_location_permission))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAlarmsEnabled) missingPermissions.add(stringResource(R.string.exact_alarms))
             
             Text(

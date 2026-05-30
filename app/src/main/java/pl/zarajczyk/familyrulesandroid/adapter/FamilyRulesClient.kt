@@ -20,6 +20,8 @@ data class Uptime(
     val packageUsages: Map<String, Long>,
     val activeApps: Set<String>,
     val mediaPlayingApps: Set<String> = emptySet(),
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 data class AppDetails(
@@ -152,6 +154,8 @@ class FamilyRulesClient(
             activeApps = uptime.activeApps,
             mediaPlayingApps = uptime.mediaPlayingApps,
             isOnline = isOnline,
+            latitude = uptime.latitude,
+            longitude = uptime.longitude,
         )
 
         return withContext(Dispatchers.IO) {

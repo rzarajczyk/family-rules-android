@@ -32,6 +32,8 @@ data class ReportRequest(
     val activeApps: Set<String>,
     val mediaPlayingApps: Set<String> = emptySet(),
     val isOnline: Boolean = true,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 // Response DTOs

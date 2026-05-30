@@ -27,6 +27,10 @@
     <string name="exact_alarms_description">Required to keep the service running reliably in the background (Android 12+)</string>
     <string name="battery_optimization">Battery optimization</string>
     <string name="battery_optimization_description">Prevents system from killing the app to save battery</string>
+    <string name="location_permission">Location permission</string>
+    <string name="location_permission_description">Required to report device location for parental monitoring</string>
+    <string name="background_location_permission">Background location permission</string>
+    <string name="background_location_permission_description">Required to report location when screen is off</string>
     <string name="complete_setup">Complete Setup</string>
     <string name="enable">Enable</string>
     <string name="refresh">Refresh</string>

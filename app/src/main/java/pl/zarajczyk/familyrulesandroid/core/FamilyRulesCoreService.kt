@@ -41,6 +41,7 @@ class FamilyRulesCoreService : Service() {
 
     private lateinit var periodicReportSender: PeriodicReportSender
     private lateinit var notificationRestorer: NotificationRestorer
+    private lateinit var locationTracker: LocationTracker
 
     private val deviceStateManager = DeviceStateManager()
     
@@ -208,11 +209,15 @@ class FamilyRulesCoreService : Service() {
         val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
         registerReceiver(screenOffReceiver, filter)
 
+        locationTracker = LocationTracker(this)
+
         val appBlocker = AppBlocker(this)
         periodicReportSender = PeriodicReportSender.install(this, appBlocker,
             reportDuration = 30.seconds,
             screenOffReportDuration = 60.minutes,
-            clientInfoDuration = 10.minutes)
+            clientInfoDuration = 10.minutes,
+            locationCheckDuration = 10.minutes,
+            locationTracker = locationTracker)
         
         // Install notification restorer to prevent dismissal
         notificationRestorer = NotificationRestorer.install(this, checkInterval = 5.seconds)
