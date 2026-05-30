@@ -133,7 +133,7 @@ class FamilyRulesClient(
         }
     }
 
-    suspend fun reportUptimeWithCommands(uptime: Uptime): ReportResponseDto? {
+    suspend fun reportUptimeWithCommands(uptime: Uptime, isOnline: Boolean = true): ReportResponseDto? {
         val instanceId = settingsManager.getString("instanceId", "")
 
         // Ensure every media-playing app appears in applications even if it has no foreground usage
@@ -151,6 +151,7 @@ class FamilyRulesClient(
             applications = applications,
             activeApps = uptime.activeApps,
             mediaPlayingApps = uptime.mediaPlayingApps,
+            isOnline = isOnline,
         )
 
         return withContext(Dispatchers.IO) {

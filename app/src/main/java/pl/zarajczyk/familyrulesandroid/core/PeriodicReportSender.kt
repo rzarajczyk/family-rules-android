@@ -22,6 +22,7 @@ private const val KEY_CACHED_BLOCKED_PLAYBACK_APPS = "cachedBlockedPlaybackApps"
 class PeriodicReportSender(
     private val coreService: FamilyRulesCoreService,
     private val delayDuration: Duration,
+    private val screenOffDelayDuration: Duration,
     private val clientInfoDuration: Duration,
     private val appBlocker: AppBlocker,
     private val familyRulesClient: FamilyRulesClient,
@@ -51,6 +52,7 @@ class PeriodicReportSender(
             coreService: FamilyRulesCoreService,
             appBlocker: AppBlocker,
             reportDuration: Duration,
+            screenOffReportDuration: Duration,
             clientInfoDuration: Duration,
         ): PeriodicReportSender {
             val appDb = AppDb(coreService)
@@ -59,6 +61,7 @@ class PeriodicReportSender(
             val instance = PeriodicReportSender(
                 coreService = coreService,
                 delayDuration = reportDuration,
+                screenOffDelayDuration = screenOffReportDuration,
                 clientInfoDuration = clientInfoDuration,
                 appBlocker = appBlocker,
                 familyRulesClient = familyRulesClient,
@@ -111,19 +114,18 @@ class PeriodicReportSender(
 
     private suspend fun runUptimeReportInfiniteLoop(isActive: () -> Boolean) {
         while (isActive()) {
-            if (ScreenStatus.isScreenOn(coreService)) {
-                try {
-                    reportUptime()
-                } catch (e: Exception) {
-                    Logger.e(TAG, "Failed to send report", e)
-                }
+            val screenOn = ScreenStatus.isScreenOn(coreService)
+            try {
+                reportUptime(isOnline = screenOn)
+            } catch (e: Exception) {
+                Logger.e(TAG, "Failed to send report", e)
             }
-            delay(delayDuration)
+            delay(if (screenOn) delayDuration else screenOffDelayDuration)
         }
     }
 
     fun reportUptimeAsync() = scope.launch {
-        reportUptime()
+        reportUptime(isOnline = ScreenStatus.isScreenOn(coreService))
     }
 
     fun sendClientInfoAsync() = scope.launch {
@@ -131,7 +133,7 @@ class PeriodicReportSender(
         sendInitialClientInfoRequest()
     }
 
-    private suspend fun reportUptime() {
+    private suspend fun reportUptime(isOnline: Boolean = true) {
         val foregroundApp = coreService.getForegroundApp()
         // Refresh the active-sessions list right before querying playback state so that
         // the callback registry is always up-to-date regardless of whether the
@@ -149,7 +151,7 @@ class PeriodicReportSender(
         )
         try {
             // null means network failure — keep the current local state, do not unblock.
-            val response = familyRulesClient.reportUptimeWithCommands(uptime) ?: return
+            val response = familyRulesClient.reportUptimeWithCommands(uptime, isOnline = isOnline) ?: return
             serverCommandCoordinator.onCommandsReceived(response.serverCommands)
             handleDeviceStateChange(ActualDeviceState.from(response))
         } finally {

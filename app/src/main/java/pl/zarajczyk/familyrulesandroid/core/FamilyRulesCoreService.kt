@@ -211,6 +211,7 @@ class FamilyRulesCoreService : Service() {
         val appBlocker = AppBlocker(this)
         periodicReportSender = PeriodicReportSender.install(this, appBlocker,
             reportDuration = 30.seconds,
+            screenOffReportDuration = 60.minutes,
             clientInfoDuration = 10.minutes)
         
         // Install notification restorer to prevent dismissal

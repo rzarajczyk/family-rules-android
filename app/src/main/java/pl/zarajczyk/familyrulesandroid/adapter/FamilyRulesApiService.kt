@@ -31,6 +31,7 @@ data class ReportRequest(
     val applications: Map<String, Long>,
     val activeApps: Set<String>,
     val mediaPlayingApps: Set<String> = emptySet(),
+    val isOnline: Boolean = true,
 )
 
 // Response DTOs
