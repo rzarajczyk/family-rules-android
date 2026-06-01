@@ -83,5 +83,14 @@
     <string name="logs_clean_failed">Nie udało się wyczyścić plików logów</string>
     <string name="no_crash_logs">Brak logów</string>
     <string name="crash_logs_export_subject">Family Rules - Logi</string>
+    <string name="show_location">Pokaż lokalizację</string>
+    <string name="close">Zamknij</string>
+
+    <!-- Location Dialog -->
+    <string name="location_title">Lokalizacja urządzenia</string>
+    <string name="location_coordinates">Szer: %1$.6f, Dł: %2$.6f</string>
+    <string name="location_no_data">Brak danych o lokalizacji. Urządzenie może nie mieć uprawnień do lokalizacji lub nie raportowano jeszcze żadnej lokalizacji.</string>
+    <string name="location_last_updated">Ostatnia aktualizacja: %1$s</string>
+    <string name="location_fetching">Pobieranie lokalizacji…</string>
 </resources>
 

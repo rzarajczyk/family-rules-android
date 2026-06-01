@@ -42,11 +42,13 @@ class PermissionsChecker(private val activity: Activity) {
         } else {
             true // Not required on Android < 12
         }
-        
-        return isUsageStatsPermissionGranted() && 
+
+        return isUsageStatsPermissionGranted() &&
                isNotificationListenerPermissionGranted() &&
-               isNotificationPermissionGranted() && 
+               isNotificationPermissionGranted() &&
                isSystemAlertWindowPermissionGranted() &&
+               isLocationPermissionGranted() &&
+               isBackgroundLocationPermissionGranted() &&
                exactAlarmGranted
     }
     

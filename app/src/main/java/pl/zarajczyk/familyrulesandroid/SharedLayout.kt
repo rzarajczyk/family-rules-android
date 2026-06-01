@@ -41,6 +41,7 @@ import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.ACTIVE
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_RESTRICTED_APPS
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT
+import pl.zarajczyk.familyrulesandroid.core.FamilyRulesCoreService
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.ui.theme.FamilyRulesColors
 import pl.zarajczyk.familyrulesandroid.utils.Logger
@@ -57,12 +58,14 @@ import pl.zarajczyk.familyrulesandroid.utils.Logger
 fun SharedAppLayout(
     deviceState: DeviceState = ACTIVE,
     settingsManager: SettingsManager,
+    service: FamilyRulesCoreService? = null,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
+    var showLocationDialog by remember { mutableStateOf(false) }
     val bgColor = when (deviceState) {
         ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
         BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
@@ -143,6 +146,15 @@ fun SharedAppLayout(
                                     cleanLogs(context)
                                 }
                             )
+                            if (service != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.show_location)) },
+                                    onClick = {
+                                        showMenu = false
+                                        showLocationDialog = true
+                                    }
+                                )
+                            }
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text(settingsManager.getVersion()) },
@@ -231,6 +243,15 @@ fun SharedAppLayout(
                                 cleanLogs(context)
                             }
                         )
+                        if (service != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.show_location)) },
+                                onClick = {
+                                    showMenu = false
+                                    showLocationDialog = true
+                                }
+                            )
+                        }
                         HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text(settingsManager.getVersion()) },
@@ -241,6 +262,13 @@ fun SharedAppLayout(
                 }
             }
         }
+    }
+
+    if (showLocationDialog && service != null) {
+        LocationDialog(
+            service = service,
+            onDismiss = { showLocationDialog = false }
+        )
     }
 }
 

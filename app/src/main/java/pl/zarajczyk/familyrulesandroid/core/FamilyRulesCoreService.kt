@@ -153,6 +153,8 @@ class FamilyRulesCoreService : Service() {
 
     fun getDeviceStateFlow() = deviceStateManager.currentState
 
+    fun getLocationTracker(): LocationTracker = locationTracker
+
     fun updateDeviceState(newState: ActualDeviceState) {
         val currentState = deviceStateManager.getCurrentState()
         if (currentState != newState) {

@@ -40,6 +40,9 @@ class LocationTracker(private val context: Context) {
     @Volatile
     private var lastCachedLng: Double? = null
 
+    @Volatile
+    private var lastCachedTimestamp: Long = 0L
+
     fun hasLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
@@ -60,6 +63,7 @@ class LocationTracker(private val context: Context) {
             Logger.d(TAG, "Using last known location: ${lastKnown.first}, ${lastKnown.second}")
             lastCachedLat = lastKnown.first
             lastCachedLng = lastKnown.second
+            lastCachedTimestamp = System.currentTimeMillis()
             return lastKnown
         }
 
@@ -68,6 +72,7 @@ class LocationTracker(private val context: Context) {
             Logger.d(TAG, "Got fresh location: ${fresh.first}, ${fresh.second}")
             lastCachedLat = fresh.first
             lastCachedLng = fresh.second
+            lastCachedTimestamp = System.currentTimeMillis()
         }
         return fresh
     }
@@ -96,6 +101,8 @@ class LocationTracker(private val context: Context) {
         val lng = lastCachedLng
         return if (lat != null && lng != null) Pair(lat, lng) else null
     }
+
+    fun getLastCachedTimestamp(): Long = lastCachedTimestamp
 
     private suspend fun getLastKnownLocation(): Pair<Double, Double>? {
         return suspendCoroutine { continuation ->

@@ -222,7 +222,9 @@ fun ProtectionSetupContent(
                 systemAlertWindowPermissionGranted &&
                 deviceAdminEnabled &&
                 batteryOptimizationExempt &&
-                exactAlarmsEnabled
+                exactAlarmsEnabled &&
+                locationPermissionGranted &&
+                backgroundLocationPermissionGranted
 
             if (allEnabled) break
 

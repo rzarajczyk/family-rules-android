@@ -86,4 +86,13 @@
     <string name="logs_clean_failed">Failed to clean log files</string>
     <string name="no_crash_logs">No logs available</string>
     <string name="crash_logs_export_subject">Family Rules - Crash</string>
+    <string name="show_location">Show location</string>
+    <string name="close">Close</string>
+
+    <!-- Location Dialog -->
+    <string name="location_title">Device Location</string>
+    <string name="location_coordinates">Lat: %1$.6f, Lng: %2$.6f</string>
+    <string name="location_no_data">No location data available. The device may not have location permission or no location has been reported yet.</string>
+    <string name="location_last_updated">Last updated: %1$s</string>
+    <string name="location_fetching">Fetching location…</string>
 </resources>

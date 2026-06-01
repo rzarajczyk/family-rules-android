@@ -176,7 +176,7 @@ fun MainScreen(
         stringResource(R.string.tab_all_devices)
     )
 
-    SharedAppLayout(deviceState = deviceState, settingsManager = settingsManager) {
+    SharedAppLayout(deviceState = deviceState, settingsManager = settingsManager, service = service) {
         Column {
             TabRow(
                 selectedTabIndex = selectedTabIndex,
