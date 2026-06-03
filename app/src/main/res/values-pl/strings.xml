@@ -92,5 +92,17 @@
     <string name="location_no_data">Brak danych o lokalizacji. Urządzenie może nie mieć uprawnień do lokalizacji lub nie raportowano jeszcze żadnej lokalizacji.</string>
     <string name="location_last_updated">Ostatnia aktualizacja: %1$s</string>
     <string name="location_fetching">Pobieranie lokalizacji…</string>
+    
+    <!-- Refresh State Dialog -->
+    <string name="refresh_state">Odśwież stan</string>
+    <string name="refresh_state_title">Stan urządzenia</string>
+    <string name="refresh_state_loading">Wysyłanie raportu do serwera…</string>
+    <string name="refresh_state_result">Aktualny stan urządzenia: %1$s</string>
+    <string name="refresh_state_active">Aktywny (bez ograniczeń)</string>
+    <string name="refresh_state_blocked">Aplikacje zablokowane</string>
+    <string name="refresh_state_blocked_with_timeout">Aplikacje zablokowane (z odliczaniem)</string>
+    <string name="refresh_state_extra">Szczegóły: %1$s</string>
+    <string name="refresh_state_error">Nie udało się odświeżyć: %1$s</string>
+    <string name="refresh_state_unreachable">Nie udało się połączyć z serwerem. Wyświetlany stan urządzenia może być nieaktualny.</string>
 </resources>
 

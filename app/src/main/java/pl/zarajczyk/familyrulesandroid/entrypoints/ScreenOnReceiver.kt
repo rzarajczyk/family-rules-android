@@ -5,13 +5,13 @@ import android.content.Context
 import android.content.Intent
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 
-class ScreenOffReceiver(
-    private val onScreenOff: () -> Unit
+class ScreenOnReceiver(
+    private val onScreenOn: () -> Unit
 ) : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_SCREEN_OFF) {
-            Logger.d("ScreenOffReceiver", "Screen turned off, resetting PeriodicUsageEventsMonitor")
-            onScreenOff()
+        if (intent.action == Intent.ACTION_SCREEN_ON) {
+            Logger.d("ScreenOnReceiver", "Screen turned on, notifying report loop")
+            onScreenOn()
         }
     }
 }

@@ -95,4 +95,16 @@
     <string name="location_no_data">No location data available. The device may not have location permission or no location has been reported yet.</string>
     <string name="location_last_updated">Last updated: %1$s</string>
     <string name="location_fetching">Fetching location…</string>
+    
+    <!-- Refresh State Dialog -->
+    <string name="refresh_state">Refresh state</string>
+    <string name="refresh_state_title">Device State</string>
+    <string name="refresh_state_loading">Sending report to server…</string>
+    <string name="refresh_state_result">Current device state: %1$s</string>
+    <string name="refresh_state_active">Active (no restrictions)</string>
+    <string name="refresh_state_blocked">Apps blocked</string>
+    <string name="refresh_state_blocked_with_timeout">Apps blocked (with countdown)</string>
+    <string name="refresh_state_extra">Details: %1$s</string>
+    <string name="refresh_state_error">Failed to refresh: %1$s</string>
+    <string name="refresh_state_unreachable">Could not reach the server. The device state shown may be out of date.</string>
 </resources>

@@ -3,9 +3,13 @@ package pl.zarajczyk.familyrulesandroid.core
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import pl.zarajczyk.familyrulesandroid.adapter.ActualDeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
@@ -39,6 +43,16 @@ class PeriodicReportSender(
     // True only after appBlocker.block() has been called with a non-empty list.
     // Reset to false whenever blocking is disarmed or the service restarts.
     private var blockingArmed: Boolean = false
+
+    // Signal channel: when the screen turns on, notify the report loop to wake up
+    // from its long screen-off delay and send an immediate report.
+    private val screenOnSignal = Channel<Unit>(Channel.CONFLATED)
+
+    // Serializes report execution so that a user-triggered manual refresh and the
+    // periodic loop never run reportUptime() concurrently. Without this, the two
+    // could interleave inside handleDeviceStateChange and double-arm blocking or
+    // race on currentDeviceState / blockingArmed.
+    private val reportMutex = Mutex()
 
     // Last known-good blocked app list. Restored from SharedPreferences on startup
     // so that a restart + failed first fetch still has a fallback (Problem 7).
@@ -150,7 +164,17 @@ class PeriodicReportSender(
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send report", e)
             }
-            delay(if (screenOn) delayDuration else screenOffDelayDuration)
+            if (screenOn) {
+                delay(delayDuration)
+            } else {
+                // Wait for the full screen-off delay, but allow an early exit if the
+                // screen turns back on. Without this, a brief screen-off followed by
+                // screen-on leaves the loop sleeping for the remainder of the 60-minute
+                // delay, making the app blind to server state changes for up to an hour.
+                withTimeoutOrNull(screenOffDelayDuration) {
+                    screenOnSignal.receive()
+                }
+            }
         }
     }
 
@@ -158,12 +182,39 @@ class PeriodicReportSender(
         reportUptime(isOnline = ScreenStatus.isScreenOn(coreService))
     }
 
+    /**
+     * Forces an immediate report and returns the resulting device state, or null if the
+     * report did not reach the server (network failure). A null result lets the caller
+     * distinguish a genuine refresh from a stale, locally-cached state.
+     */
+    suspend fun reportUptimeSync(): ActualDeviceState? {
+        val reachedServer = reportUptime(isOnline = ScreenStatus.isScreenOn(coreService))
+        return if (reachedServer) currentDeviceState else null
+    }
+
+    /**
+     * Called when the screen turns on. Interrupts the long screen-off delay in the
+     * report loop so that an immediate report is sent, allowing the app to discover
+     * server-side state changes without waiting up to 60 minutes.
+     */
+    fun notifyScreenOn() {
+        screenOnSignal.trySend(Unit)
+    }
+
     fun sendClientInfoAsync() = scope.launch {
         familyRulesClient.ensureAllAppsAreCached(coreService.getTodayPackageUsage().keys)
         sendInitialClientInfoRequest()
     }
 
-    private suspend fun reportUptime(isOnline: Boolean = true) {
+    /**
+     * Sends a single uptime report and applies the resulting device state.
+     * Returns true if the server was reached, false on network failure (in which case
+     * the current local state is left untouched and blocking is not disarmed).
+     *
+     * Serialized behind [reportMutex] so a manual refresh and the periodic loop can
+     * never run this concurrently and race on currentDeviceState / blockingArmed.
+     */
+    private suspend fun reportUptime(isOnline: Boolean = true): Boolean = reportMutex.withLock {
         val foregroundApp = coreService.getForegroundApp()
         // Refresh the active-sessions list right before querying playback state so that
         // the callback registry is always up-to-date regardless of whether the
@@ -194,7 +245,8 @@ class PeriodicReportSender(
         )
         try {
             // null means network failure — keep the current local state, do not unblock.
-            val response = familyRulesClient.reportUptimeWithCommands(uptime, isOnline = isOnline) ?: return
+            val response = familyRulesClient.reportUptimeWithCommands(uptime, isOnline = isOnline)
+                ?: return@withLock false
             serverCommandCoordinator.onCommandsReceived(response.serverCommands)
             handleDeviceStateChange(ActualDeviceState.from(response))
 
@@ -202,6 +254,7 @@ class PeriodicReportSender(
             if (latitude != null && longitude != null) {
                 locationTracker.markReported(latitude, longitude)
             }
+            true
         } finally {
             MediaSessionMonitor.enforcePlaybackBlocking()
         }

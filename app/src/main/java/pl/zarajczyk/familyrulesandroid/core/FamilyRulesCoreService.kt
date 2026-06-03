@@ -22,6 +22,7 @@ import pl.zarajczyk.familyrulesandroid.adapter.ActualDeviceState
 import pl.zarajczyk.familyrulesandroid.adapter.DeviceState
 import pl.zarajczyk.familyrulesandroid.entrypoints.KeepAliveWorker
 import pl.zarajczyk.familyrulesandroid.entrypoints.ScreenOffReceiver
+import pl.zarajczyk.familyrulesandroid.entrypoints.ScreenOnReceiver
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -38,6 +39,7 @@ class FamilyRulesCoreService : Service() {
     private lateinit var systemEventLogger: SystemEventLogger
     private lateinit var mediaSessionMonitor: MediaSessionMonitor
     private lateinit var screenOffReceiver: ScreenOffReceiver
+    private lateinit var screenOnReceiver: ScreenOnReceiver
 
     private lateinit var periodicReportSender: PeriodicReportSender
     private lateinit var notificationRestorer: NotificationRestorer
@@ -171,6 +173,11 @@ class FamilyRulesCoreService : Service() {
         periodicReportSender.sendClientInfoAsync()
     }
 
+    suspend fun manualRefresh(): ActualDeviceState? {
+        Logger.i(TAG, "Manual refresh requested - sending report and processing response")
+        return periodicReportSender.reportUptimeSync()
+    }
+
     internal fun ensureNotificationVisible() {
         updateNotification()
     }
@@ -210,6 +217,15 @@ class FamilyRulesCoreService : Service() {
         }
         val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
         registerReceiver(screenOffReceiver, filter)
+
+        // Register screen on receiver to interrupt the long screen-off report delay.
+        // Without this, a brief screen-off followed by screen-on leaves the report loop
+        // sleeping for up to 60 minutes, making the app blind to server state changes.
+        screenOnReceiver = ScreenOnReceiver {
+            periodicReportSender.notifyScreenOn()
+        }
+        val screenOnFilter = IntentFilter(Intent.ACTION_SCREEN_ON)
+        registerReceiver(screenOnReceiver, screenOnFilter)
 
         locationTracker = LocationTracker(this)
 
@@ -332,6 +348,10 @@ class FamilyRulesCoreService : Service() {
         
         if (::screenOffReceiver.isInitialized) {
             unregisterReceiver(screenOffReceiver)
+        }
+
+        if (::screenOnReceiver.isInitialized) {
+            unregisterReceiver(screenOnReceiver)
         }
         
         if (::notificationRestorer.isInitialized) {

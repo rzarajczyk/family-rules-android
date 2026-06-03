@@ -723,6 +723,110 @@ fun SystemEventsDebugDialog(
     )
 }
 
+@Composable
+fun RefreshStateDialog(
+    service: FamilyRulesCoreService,
+    onDismiss: () -> Unit
+) {
+    var isLoading by remember { mutableStateOf(true) }
+    var deviceState by remember { mutableStateOf<pl.zarajczyk.familyrulesandroid.adapter.ActualDeviceState?>(null) }
+    var unreachable by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        isLoading = true
+        errorMessage = null
+        unreachable = false
+        try {
+            val result = service.manualRefresh()
+            if (result == null) {
+                unreachable = true
+            } else {
+                deviceState = result
+            }
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Unknown error"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.refresh_state_title),
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                when {
+                    isLoading -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.height(48.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = stringResource(R.string.refresh_state_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FamilyRulesColors.TEXT_COLOR
+                            )
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(
+                            text = stringResource(R.string.refresh_state_error, errorMessage!!),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Red
+                        )
+                    }
+                    unreachable -> {
+                        Text(
+                            text = stringResource(R.string.refresh_state_unreachable),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Red
+                        )
+                    }
+                    deviceState != null -> {
+                        val state = deviceState!!
+                        val stateLabel = when (state.state) {
+                            DeviceState.ACTIVE -> stringResource(R.string.refresh_state_active)
+                            DeviceState.BLOCK_RESTRICTED_APPS -> stringResource(R.string.refresh_state_blocked)
+                            DeviceState.BLOCK_RESTRICTED_APPS_WITH_TIMEOUT -> stringResource(R.string.refresh_state_blocked_with_timeout)
+                        }
+                        Text(
+                            text = stringResource(R.string.refresh_state_result, stateLabel),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = FamilyRulesColors.TEXT_COLOR
+                        )
+                        if (state.extra != null) {
+                            Text(
+                                text = stringResource(R.string.refresh_state_extra, state.extra),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = FamilyRulesColors.TEXT_COLOR,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 fun UsageStatsDisplayPreview() {

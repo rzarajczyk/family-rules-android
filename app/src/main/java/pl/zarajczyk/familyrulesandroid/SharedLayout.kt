@@ -66,6 +66,7 @@ fun SharedAppLayout(
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     var showLocationDialog by remember { mutableStateOf(false) }
+    var showRefreshStateDialog by remember { mutableStateOf(false) }
     val bgColor = when (deviceState) {
         ACTIVE -> FamilyRulesColors.NORMAL_BACKGROUND
         BLOCK_RESTRICTED_APPS -> FamilyRulesColors.BLOCKING_COLOR
@@ -152,6 +153,13 @@ fun SharedAppLayout(
                                     onClick = {
                                         showMenu = false
                                         showLocationDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.refresh_state)) },
+                                    onClick = {
+                                        showMenu = false
+                                        showRefreshStateDialog = true
                                     }
                                 )
                             }
@@ -251,6 +259,13 @@ fun SharedAppLayout(
                                     showLocationDialog = true
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.refresh_state)) },
+                                onClick = {
+                                    showMenu = false
+                                    showRefreshStateDialog = true
+                                }
+                            )
                         }
                         HorizontalDivider()
                         DropdownMenuItem(
@@ -268,6 +283,13 @@ fun SharedAppLayout(
         LocationDialog(
             service = service,
             onDismiss = { showLocationDialog = false }
+        )
+    }
+
+    if (showRefreshStateDialog && service != null) {
+        RefreshStateDialog(
+            service = service,
+            onDismiss = { showRefreshStateDialog = false }
         )
     }
 }
