@@ -22,7 +22,7 @@ data class ClientInfoRequest(
     val version: String,
     val knownApps: Map<String, AppData>,
     val availableStates: List<AvailableState>,
-    val supportedServerCommands: List<String>,
+    val capabilities: List<String>,
 )
 
 data class ReportRequest(

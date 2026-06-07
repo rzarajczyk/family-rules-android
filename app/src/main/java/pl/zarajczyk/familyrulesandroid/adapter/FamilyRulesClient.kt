@@ -34,7 +34,13 @@ class FamilyRulesClient(
     private val appDb: AppDb
 ) {
     companion object {
-        val SUPPORTED_SERVER_COMMANDS = listOf("SEND_LOGS")
+        val SUPPORTED_CAPABILITIES = listOf(
+            "LOGS_COMMAND",
+            "COMMANDS_PULL",
+            "LOCATION_REPORT",
+            "MEDIA_PLAYBACK_REPORT",
+            "MEDIA_PLAYBACK_BLOCK",
+        )
         val AVAILABLE_STATES = DeviceState.entries.map { state ->
             val stateTitle = when (state) {
                 DeviceState.ACTIVE -> "Active"
@@ -118,7 +124,7 @@ class FamilyRulesClient(
             version = version,
             knownApps = knownApps,
             availableStates = AVAILABLE_STATES,
-            supportedServerCommands = SUPPORTED_SERVER_COMMANDS,
+            capabilities = SUPPORTED_CAPABILITIES,
         )
 
         withContext(Dispatchers.IO) {
