@@ -40,6 +40,7 @@ class FamilyRulesClient(
             "LOCATION_REPORT",
             "MEDIA_PLAYBACK_REPORT",
             "MEDIA_PLAYBACK_BLOCK",
+            "RESTRICTED_APPS_BLOCK",
             "ALL_MY_DEVICES_DISPLAY",
         )
         val AVAILABLE_STATES = DeviceState.entries.map { state ->
