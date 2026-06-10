@@ -68,11 +68,25 @@ The same log **does** contain `SCREEN_NON_INTERACTIVE` when the display turns of
 2026-06-10 13:55:49.160  SCREEN_NON_INTERACTIVE (16)  android/
 ```
 
-## Additional fix
+## Additional fix (v0.95)
 
-Also close open sessions on `SCREEN_NON_INTERACTIVE`, using the same accumulate-and-close semantics as `DEVICE_SHUTDOWN`: foreground usage ends when the display turns off, even if the app never emitted `ACTIVITY_PAUSED`.
+Also close open sessions on `SCREEN_NON_INTERACTIVE`, using the same accumulate-and-close semantics as `DEVICE_SHUTDOWN`.
 
-This covers the Samsung wake-from-sleep path: a stale evening `RESUME` is closed at the last screen-off before midnight, so it does not carry into today's total.
+## v0.95 field test — still wrong (~12h)
+
+Firestore on 2026-06-10 after v0.95: `screenTime` 20055s (~5h 34m) but `com.google.android.youtube` 43379s (~12h 3m). Screen-off close was not enough.
+
+Root cause in the replay logic:
+
+1. **Missing overnight events** — `queryEvents` lookback can still contain a stale `ACTIVITY_RESUMED` from the previous evening while the matching `SCREEN_NON_INTERACTIVE` / `PAUSED` events have already been evicted from the OS buffer.
+2. **Second `RESUME` does not reset `openSince`** — when YouTube opens at 10:33, the package is already logically active from the stale session, so the fresh `RESUME` did not start a new session; totals still used the pre-midnight `openSince` clipped to today → ~12h (time since midnight).
+3. **Screen-off time counted** — stale sessions accumulated hours while the display was off because durations were not intersected with `SCREEN_INTERACTIVE` periods.
+
+## v0.96 fix
+
+- **Reset `openSince`** when a package is already active but receives `ACTIVITY_RESUMED` on or after today's midnight while `openSince` is still before midnight.
+- **Intersect every session** with `SCREEN_INTERACTIVE` intervals (same source as screen-time tracking).
+- **Drop `stillOpen` carry** when `openSince` predates today and there was no `RESUME` today — phantom carry with no foreground entry today.
 
 ## Verification
 

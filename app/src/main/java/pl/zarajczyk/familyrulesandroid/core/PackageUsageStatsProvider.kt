@@ -20,13 +20,8 @@ import java.time.temporal.ChronoUnit
  * several days of accumulated time. That produced wildly inflated numbers
  * after restart.
  *
- * Computed from the same `UsageEvents` stream that Digital Wellbeing and
- * FamilyLink internally consume; values typically match FamilyLink within a
- * few seconds, but exact parity is not guaranteed.
- *
- * To seed cross-midnight sessions correctly the query window starts 24h
- * before today's local midnight; sessions whose `RESUME` predates that point
- * will be undercounted starting at `startOfDay`.
+ * Session durations are intersected with [buildScreenOnIntervals] so stale
+ * activity bookkeeping cannot accrue time while the display is off.
  *
  * Result is cached for [CACHE_TTL_MS] to keep the binder-call cost negligible
  * even when the UI re-reads the value frequently during recomposition.
@@ -96,34 +91,25 @@ class PackageUsageStatsProvider(context: Context) {
                         )
                     )
                 }
+                UsageEvents.Event.SCREEN_INTERACTIVE,
                 DEVICE_SHUTDOWN -> {
-                    // No packageName for shutdown events; use empty string as sentinel.
                     out.add(
                         UsageEventTuple(
                             timestamp = event.timeStamp,
                             packageName = "",
                             className = "",
-                            eventType = DEVICE_SHUTDOWN,
+                            eventType = event.eventType,
                         )
                     )
                 }
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE,
                 DEVICE_STARTUP -> {
                     out.add(
                         UsageEventTuple(
                             timestamp = event.timeStamp,
                             packageName = "",
                             className = "",
-                            eventType = DEVICE_STARTUP,
-                        )
-                    )
-                }
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                    out.add(
-                        UsageEventTuple(
-                            timestamp = event.timeStamp,
-                            packageName = "",
-                            className = "",
-                            eventType = UsageEvents.Event.SCREEN_NON_INTERACTIVE,
+                            eventType = event.eventType,
                         )
                     )
                 }
@@ -135,6 +121,9 @@ class PackageUsageStatsProvider(context: Context) {
 
 private const val DEVICE_SHUTDOWN = 26 // UsageEvents.Event.DEVICE_SHUTDOWN (API 28+)
 private const val DEVICE_STARTUP = 27 // UsageEvents.Event.DEVICE_STARTUP (API 28+)
+// Sessions that were already open more than this long before midnight, with no RESUME
+// today, are treated as stale OS bookkeeping rather than continuous cross-midnight use.
+private const val MAX_CROSS_MIDNIGHT_OPEN_MS = 3L * 60L * 60L * 1_000L
 
 internal data class UsageEventTuple(
     val timestamp: Long,
@@ -148,16 +137,17 @@ internal data class UsageEventTuple(
  * currently-resumed `className` values. The package is "in foreground" iff
  * the set is non-empty; a session opens on the 0->1 transition and closes
  * on the 1->0 transition. `ACTIVITY_STOPPED` is treated as a fallback close
- * signal only when that class is still active, which preserves the preferred
- * `PAUSED` boundary while fixing streams that omit it entirely. All session
- * boundaries are clipped to
- * `[startOfDay, now]`.
+ * signal only when that class is still active. Durations are intersected with
+ * screen-on intervals so stale sessions cannot accrue overnight hours while
+ * the display is off.
  */
 internal fun computeTodayPackageUsage(
     events: List<UsageEventTuple>,
     startOfDay: Long,
     now: Long,
 ): Map<String, Long> {
+    val screenIntervals = buildScreenOnIntervals(events, startOfDay, now)
+
     val packageNames = events
         .filter {
             it.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
@@ -169,7 +159,6 @@ internal fun computeTodayPackageUsage(
 
     val byPackage = events
         .flatMap { event ->
-            // Global events are replicated into every known package stream.
             if (event.eventType.isGlobalUsageBoundary()) {
                 packageNames.map { packageName ->
                     event.copy(packageName = packageName)
@@ -193,20 +182,21 @@ internal fun computeTodayPackageUsage(
         var openSince: Long? = null
         var total = 0L
 
+        fun addSessionDuration(rangeStart: Long, rangeEnd: Long) {
+            total += overlapWithScreenOn(rangeStart, rangeEnd, screenIntervals, startOfDay, now)
+        }
+
         for (e in evs) {
             when (e.eventType) {
                 DEVICE_SHUTDOWN, UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                     val start = openSince
                     if (start != null) {
-                        val s = maxOf(start, startOfDay)
-                        if (e.timestamp > s) total += e.timestamp - s
+                        addSessionDuration(start, e.timestamp)
                         openSince = null
                     }
                     active.clear()
                 }
                 DEVICE_STARTUP -> {
-                    // Processes are gone after reboot; any surviving RESUME is stale.
-                    // Discard without accumulating — the powered-off gap is not foreground time.
                     openSince = null
                     active.clear()
                 }
@@ -216,7 +206,12 @@ internal fun computeTodayPackageUsage(
             if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 val wasEmpty = active.isEmpty()
                 active.add(e.className)
-                if (wasEmpty) openSince = e.timestamp
+                when {
+                    wasEmpty -> openSince = e.timestamp
+                    openSince != null && openSince < startOfDay && e.timestamp >= startOfDay ->
+                        // Stale pre-midnight bookkeeping; treat today's RESUME as a fresh session.
+                        openSince = e.timestamp
+                }
             } else {
                 val removed = active.remove(e.className)
                 if (!removed) {
@@ -225,8 +220,7 @@ internal fun computeTodayPackageUsage(
                 if (active.isEmpty()) {
                     val start = openSince
                     if (start != null) {
-                        val s = maxOf(start, startOfDay)
-                        if (e.timestamp > s) total += e.timestamp - s
+                        addSessionDuration(start, e.timestamp)
                         openSince = null
                     }
                 }
@@ -235,12 +229,91 @@ internal fun computeTodayPackageUsage(
 
         val stillOpen = openSince
         if (stillOpen != null) {
-            val s = maxOf(stillOpen, startOfDay)
-            if (now > s) total += now - s
+            val hasResumeToday = evs.any {
+                it.eventType == UsageEvents.Event.ACTIVITY_RESUMED && it.timestamp >= startOfDay
+            }
+            val stalePhantomCarry = stillOpen < startOfDay &&
+                !hasResumeToday &&
+                startOfDay - stillOpen > MAX_CROSS_MIDNIGHT_OPEN_MS
+            if (!stalePhantomCarry) {
+                addSessionDuration(stillOpen, now)
+            }
         }
         if (total > 0L) result[pkg] = total
     }
     return result
+}
+
+internal fun buildScreenOnIntervals(
+    events: List<UsageEventTuple>,
+    startOfDay: Long,
+    now: Long,
+): List<Pair<Long, Long>> {
+    val toggles = events
+        .filter {
+            it.eventType == UsageEvents.Event.SCREEN_INTERACTIVE ||
+                it.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE ||
+                it.eventType == DEVICE_SHUTDOWN ||
+                it.eventType == DEVICE_STARTUP
+        }
+        .sortedBy { it.timestamp }
+        .map { e ->
+            e.timestamp to (e.eventType == UsageEvents.Event.SCREEN_INTERACTIVE)
+        }
+        .fold(mutableListOf<Pair<Long, Boolean>>()) { acc, toggle ->
+            if (acc.isEmpty() || acc.last().second != toggle.second) {
+                acc.add(toggle)
+            } else {
+                acc[acc.lastIndex] = toggle
+            }
+            acc
+        }
+
+    var isOn = false
+    for ((ts, on) in toggles) {
+        if (ts >= startOfDay) break
+        isOn = on
+    }
+
+    var openAt: Long? = if (isOn) startOfDay else null
+    val intervals = mutableListOf<Pair<Long, Long>>()
+
+    for ((ts, on) in toggles) {
+        if (ts < startOfDay) continue
+        val t = minOf(ts, now)
+        if (on) {
+            if (openAt == null) openAt = t
+            isOn = true
+        } else if (isOn) {
+            openAt?.let { start ->
+                if (t > start) intervals.add(start to t)
+            }
+            openAt = null
+            isOn = false
+        }
+    }
+    if (openAt != null && now > openAt) {
+        intervals.add(openAt to now)
+    }
+    return intervals
+}
+
+internal fun overlapWithScreenOn(
+    rangeStart: Long,
+    rangeEnd: Long,
+    screenIntervals: List<Pair<Long, Long>>,
+    startOfDay: Long,
+    now: Long,
+): Long {
+    val s = maxOf(rangeStart, startOfDay)
+    val e = minOf(rangeEnd, now)
+    if (e <= s) return 0L
+    if (screenIntervals.isEmpty()) return e - s
+    return screenIntervals.sumOf { (iStart, iEnd) ->
+        val os = maxOf(iStart, s)
+        val oe = minOf(iEnd, e)
+        if (oe > os) oe - os else 0L
+    }
 }
 
 private fun Int.isGlobalUsageBoundary(): Boolean =

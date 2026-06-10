@@ -41,6 +41,9 @@ class PackageUsageStatsProviderTest {
     private fun screenOff(t: Long) =
         UsageEventTuple(t, "", "", UsageEvents.Event.SCREEN_NON_INTERACTIVE)
 
+    private fun screenOn(t: Long) =
+        UsageEventTuple(t, "", "", UsageEvents.Event.SCREEN_INTERACTIVE)
+
     private fun ts(dateTime: String): Long =
         LocalDateTime.parse(dateTime)
             .atZone(ZoneId.systemDefault())
@@ -99,7 +102,10 @@ class PackageUsageStatsProviderTest {
     fun `cross-midnight still open returns now minus startOfDay`() {
         val r = startOfDay - 2L * 60L * 60L * 1_000L
         val result = computeTodayPackageUsage(
-            listOf(resume(r, "a")),
+            listOf(
+                screenOn(r),
+                resume(r, "a"),
+            ),
             startOfDay,
             now,
         )
@@ -333,6 +339,72 @@ class PackageUsageStatsProviderTest {
         val result = computeTodayPackageUsage(events, startOfDay, now)
 
         assertEquals(mapOf("a" to 5_000L), result)
+    }
+
+    @Test
+    fun `stale pre-midnight RESUME resets on first RESUME today`() {
+        val day = startOfDay("2026-06-10")
+        val staleResume = day - 2L * 60L * 60L * 1_000L
+        val screenOnMorning = ts("2026-06-10T10:33:37")
+        val resumeToday = ts("2026-06-10T10:33:51")
+        val pauseToday = ts("2026-06-10T10:34:14")
+        val now = ts("2026-06-10T12:00:00")
+        val youtube = "com.google.android.youtube"
+        val main = "com.google.android.apps.youtube.app.watchwhile.MainActivity"
+
+        val result = computeTodayPackageUsage(
+            events = listOf(
+                resume(staleResume, youtube, main),
+                screenOn(screenOnMorning),
+                resume(resumeToday, youtube, main),
+                pause(pauseToday, youtube, main),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+
+        assertEquals(pauseToday - resumeToday, result[youtube]!!)
+    }
+
+    @Test
+    fun `stale session without RESUME today does not carry phantom hours`() {
+        val day = startOfDay("2026-06-10")
+        val staleResume = day - 4L * 60L * 60L * 1_000L
+        val now = day + 12L * 60L * 60L * 1_000L
+
+        val result = computeTodayPackageUsage(
+            events = listOf(
+                resume(staleResume, "com.google.android.youtube"),
+                screenOn(day + 60L * 60L * 1_000L),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `foreground duration ignores screen-off gaps`() {
+        val on = startOfDay + 1_000
+        val off = startOfDay + 6_000
+        val onAgain = startOfDay + 11_000
+        val pause = startOfDay + 16_000
+
+        val result = computeTodayPackageUsage(
+            events = listOf(
+                screenOn(on),
+                resume(startOfDay + 2_000, "a"),
+                screenOff(off),
+                screenOn(onAgain),
+                resume(onAgain, "a"),
+                pause(pause, "a"),
+            ),
+            startOfDay = startOfDay,
+            now = now,
+        )
+
+        assertEquals(9_000L, result["a"])
     }
 
     @Test
