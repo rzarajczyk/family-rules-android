@@ -55,9 +55,24 @@ Extended `PackageUsageStatsProviderTest` with:
 - `DEVICE_STARTUP discards stale overnight session without counting sleep as today usage` — reproduces the 2026-06-10 YouTube inflation pattern
 - `shutdown before startup still counts active usage up to shutdown` — guards the clean-reboot path
 
-## Caveat
+## Follow-up (v0.94 field test)
 
-The 2026-06-10 exported system events do not contain a `DEVICE_STARTUP (27)` line — the tablet wake at 10:33 shows `SCREEN_INTERACTIVE` and `EVENT_28` instead. `DEVICE_STARTUP` is documented for cold boot (API 28+); Samsung may omit it on wake-from-sleep. This fix applies whenever the OS does emit startup; if field testing shows the inflation persists, a follow-up using `SCREEN_NON_INTERACTIVE` as an additional close signal may be needed.
+v0.94 shipped the `DEVICE_STARTUP` fix only. On Zosia's Samsung tablet (SM-X610, Android 16) **nothing changed** — the inflation persisted.
+
+The exported system events confirm why: the morning wake at 10:33 emits `SCREEN_INTERACTIVE` and `EVENT_28`, but **no `DEVICE_STARTUP (27)`**. Samsung omits startup on wake-from-sleep; the v0.94 code path never ran.
+
+The same log **does** contain `SCREEN_NON_INTERACTIVE` when the display turns off:
+
+```text
+2026-06-10 10:36:30.678  SCREEN_NON_INTERACTIVE (16)  android/
+2026-06-10 13:55:49.160  SCREEN_NON_INTERACTIVE (16)  android/
+```
+
+## Additional fix
+
+Also close open sessions on `SCREEN_NON_INTERACTIVE`, using the same accumulate-and-close semantics as `DEVICE_SHUTDOWN`: foreground usage ends when the display turns off, even if the app never emitted `ACTIVITY_PAUSED`.
+
+This covers the Samsung wake-from-sleep path: a stale evening `RESUME` is closed at the last screen-off before midnight, so it does not carry into today's total.
 
 ## Verification
 

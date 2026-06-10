@@ -38,6 +38,9 @@ class PackageUsageStatsProviderTest {
     private fun startup(t: Long) =
         UsageEventTuple(t, "", "", DEVICE_STARTUP)
 
+    private fun screenOff(t: Long) =
+        UsageEventTuple(t, "", "", UsageEvents.Event.SCREEN_NON_INTERACTIVE)
+
     private fun ts(dateTime: String): Long =
         LocalDateTime.parse(dateTime)
             .atZone(ZoneId.systemDefault())
@@ -330,6 +333,38 @@ class PackageUsageStatsProviderTest {
         val result = computeTodayPackageUsage(events, startOfDay, now)
 
         assertEquals(mapOf("a" to 5_000L), result)
+    }
+
+    @Test
+    fun `SCREEN_NON_INTERACTIVE closes stale youtube session from previous evening`() {
+        val day = startOfDay("2026-06-10")
+        val eveningResume = day - 4L * 60L * 60L * 1_000L
+        val eveningScreenOff = day - 2L * 60L * 60L * 1_000L
+        val resumeToday = ts("2026-06-10T10:33:51")
+        val now = ts("2026-06-10T10:34:09")
+        val youtube = "com.google.android.youtube"
+        val main = "com.google.android.apps.youtube.app.watchwhile.MainActivity"
+
+        val withoutScreenOff = computeTodayPackageUsage(
+            events = listOf(
+                resume(eveningResume, youtube, main),
+                resume(resumeToday, youtube, main),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+        assertTrue(withoutScreenOff[youtube]!! >= 10L * 60L * 60L * 1_000L)
+
+        val withScreenOff = computeTodayPackageUsage(
+            events = listOf(
+                resume(eveningResume, youtube, main),
+                screenOff(eveningScreenOff),
+                resume(resumeToday, youtube, main),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+        assertEquals(now - resumeToday, withScreenOff[youtube]!!)
     }
 
     @Test

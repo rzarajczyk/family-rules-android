@@ -117,6 +117,16 @@ class PackageUsageStatsProvider(context: Context) {
                         )
                     )
                 }
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    out.add(
+                        UsageEventTuple(
+                            timestamp = event.timeStamp,
+                            packageName = "",
+                            className = "",
+                            eventType = UsageEvents.Event.SCREEN_NON_INTERACTIVE,
+                        )
+                    )
+                }
             }
         }
         return out
@@ -159,8 +169,8 @@ internal fun computeTodayPackageUsage(
 
     val byPackage = events
         .flatMap { event ->
-            // DEVICE_SHUTDOWN / DEVICE_STARTUP are global events replicated into every package stream.
-            if (event.eventType == DEVICE_SHUTDOWN || event.eventType == DEVICE_STARTUP) {
+            // Global events are replicated into every known package stream.
+            if (event.eventType.isGlobalUsageBoundary()) {
                 packageNames.map { packageName ->
                     event.copy(packageName = packageName)
                 }
@@ -172,8 +182,7 @@ internal fun computeTodayPackageUsage(
             it.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
                 it.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
                 it.eventType == UsageEvents.Event.ACTIVITY_STOPPED ||
-                it.eventType == DEVICE_SHUTDOWN ||
-                it.eventType == DEVICE_STARTUP
+                it.eventType.isGlobalUsageBoundary()
         }
         .sortedBy { it.timestamp }
         .groupBy { it.packageName }
@@ -185,24 +194,24 @@ internal fun computeTodayPackageUsage(
         var total = 0L
 
         for (e in evs) {
-            if (e.eventType == DEVICE_SHUTDOWN) {
-                val start = openSince
-                if (start != null) {
-                    val s = maxOf(start, startOfDay)
-                    if (e.timestamp > s) total += e.timestamp - s
-                    openSince = null
+            when (e.eventType) {
+                DEVICE_SHUTDOWN, UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    val start = openSince
+                    if (start != null) {
+                        val s = maxOf(start, startOfDay)
+                        if (e.timestamp > s) total += e.timestamp - s
+                        openSince = null
+                    }
+                    active.clear()
                 }
-                active.clear()
-                continue
+                DEVICE_STARTUP -> {
+                    // Processes are gone after reboot; any surviving RESUME is stale.
+                    // Discard without accumulating — the powered-off gap is not foreground time.
+                    openSince = null
+                    active.clear()
+                }
             }
-
-            if (e.eventType == DEVICE_STARTUP) {
-                // Processes are gone after reboot; any surviving RESUME is stale.
-                // Discard without accumulating — the powered-off gap is not foreground time.
-                openSince = null
-                active.clear()
-                continue
-            }
+            if (e.eventType.isGlobalUsageBoundary()) continue
 
             if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 val wasEmpty = active.isEmpty()
@@ -233,3 +242,8 @@ internal fun computeTodayPackageUsage(
     }
     return result
 }
+
+private fun Int.isGlobalUsageBoundary(): Boolean =
+    this == DEVICE_SHUTDOWN ||
+        this == DEVICE_STARTUP ||
+        this == UsageEvents.Event.SCREEN_NON_INTERACTIVE
