@@ -14,6 +14,7 @@ class PackageUsageStatsProviderTest {
 
     companion object {
         private const val DEVICE_SHUTDOWN = 26
+        private const val DEVICE_STARTUP = 27
     }
 
     private val startOfDay = 1_700_000_000_000L
@@ -33,6 +34,9 @@ class PackageUsageStatsProviderTest {
 
     private fun shutdown(t: Long) =
         UsageEventTuple(t, "", "", DEVICE_SHUTDOWN)
+
+    private fun startup(t: Long) =
+        UsageEventTuple(t, "", "", DEVICE_STARTUP)
 
     private fun ts(dateTime: String): Long =
         LocalDateTime.parse(dateTime)
@@ -326,6 +330,66 @@ class PackageUsageStatsProviderTest {
         val result = computeTodayPackageUsage(events, startOfDay, now)
 
         assertEquals(mapOf("a" to 5_000L), result)
+    }
+
+    @Test
+    fun `DEVICE_STARTUP discards stale overnight session without counting sleep as today usage`() {
+        val day = startOfDay("2026-06-10")
+        val yesterdayResume = day - 2L * 60L * 60L * 1_000L
+        val boot = ts("2026-06-10T10:33:37")
+        val resumeToday = ts("2026-06-10T10:33:51")
+        val now = ts("2026-06-10T10:34:09")
+        val youtube = "com.google.android.youtube"
+        val main = "com.google.android.apps.youtube.app.watchwhile.MainActivity"
+
+        val withoutStartup = computeTodayPackageUsage(
+            events = listOf(
+                resume(yesterdayResume, youtube, main),
+                resume(resumeToday, youtube, main),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+        val inflated = withoutStartup[youtube]!!
+        assertTrue(
+            "stale session without STARTUP should inflate to nearly time-since-midnight",
+            inflated >= 10L * 60L * 60L * 1_000L,
+        )
+
+        val withStartup = computeTodayPackageUsage(
+            events = listOf(
+                resume(yesterdayResume, youtube, main),
+                startup(boot),
+                resume(resumeToday, youtube, main),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+
+        assertEquals(now - resumeToday, withStartup[youtube]!!)
+    }
+
+    @Test
+    fun `shutdown before startup still counts active usage up to shutdown`() {
+        val day = startOfDay("2026-06-10")
+        val resumeAt = day + 10L * 60L * 1_000L
+        val shutdownAt = day + 40L * 60L * 1_000L
+        val startupAt = day + 41L * 60L * 1_000L
+        val resumeAfterBoot = day + 45L * 60L * 1_000L
+        val now = day + 50L * 60L * 1_000L
+
+        val result = computeTodayPackageUsage(
+            events = listOf(
+                resume(resumeAt, "a"),
+                shutdown(shutdownAt),
+                startup(startupAt),
+                resume(resumeAfterBoot, "a"),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+
+        assertEquals(35L * 60L * 1_000L, result["a"])
     }
 
     @Test

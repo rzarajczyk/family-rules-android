@@ -107,6 +107,16 @@ class PackageUsageStatsProvider(context: Context) {
                         )
                     )
                 }
+                DEVICE_STARTUP -> {
+                    out.add(
+                        UsageEventTuple(
+                            timestamp = event.timeStamp,
+                            packageName = "",
+                            className = "",
+                            eventType = DEVICE_STARTUP,
+                        )
+                    )
+                }
             }
         }
         return out
@@ -114,6 +124,7 @@ class PackageUsageStatsProvider(context: Context) {
 }
 
 private const val DEVICE_SHUTDOWN = 26 // UsageEvents.Event.DEVICE_SHUTDOWN (API 28+)
+private const val DEVICE_STARTUP = 27 // UsageEvents.Event.DEVICE_STARTUP (API 28+)
 
 internal data class UsageEventTuple(
     val timestamp: Long,
@@ -148,10 +159,8 @@ internal fun computeTodayPackageUsage(
 
     val byPackage = events
         .flatMap { event ->
-            // DEVICE_SHUTDOWN is a global event, but we must use it as a signal for all apps
-            if (event.eventType == DEVICE_SHUTDOWN) {
-                // Replicate the shutdown into every known package stream.
-                // className is not read by the DEVICE_SHUTDOWN branch in the loop below.
+            // DEVICE_SHUTDOWN / DEVICE_STARTUP are global events replicated into every package stream.
+            if (event.eventType == DEVICE_SHUTDOWN || event.eventType == DEVICE_STARTUP) {
                 packageNames.map { packageName ->
                     event.copy(packageName = packageName)
                 }
@@ -163,7 +172,8 @@ internal fun computeTodayPackageUsage(
             it.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
                 it.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
                 it.eventType == UsageEvents.Event.ACTIVITY_STOPPED ||
-                it.eventType == DEVICE_SHUTDOWN
+                it.eventType == DEVICE_SHUTDOWN ||
+                it.eventType == DEVICE_STARTUP
         }
         .sortedBy { it.timestamp }
         .groupBy { it.packageName }
@@ -182,6 +192,14 @@ internal fun computeTodayPackageUsage(
                     if (e.timestamp > s) total += e.timestamp - s
                     openSince = null
                 }
+                active.clear()
+                continue
+            }
+
+            if (e.eventType == DEVICE_STARTUP) {
+                // Processes are gone after reboot; any surviving RESUME is stale.
+                // Discard without accumulating — the powered-off gap is not foreground time.
+                openSince = null
                 active.clear()
                 continue
             }
