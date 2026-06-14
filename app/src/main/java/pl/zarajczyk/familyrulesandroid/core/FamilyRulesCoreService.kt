@@ -54,6 +54,8 @@ class FamilyRulesCoreService : Service() {
         const val CHANNEL_ID = "FamilyRulesChannel"
         const val NOTIFICATION_ID = 1001
         private const val TAG = "FamilyRulesCoreService"
+        const val ACTION_FORCE_REPORT = "pl.zarajczyk.familyrulesandroid.action.FORCE_REPORT"
+        const val ACTION_SYNC_PUSH_TOKEN = "pl.zarajczyk.familyrulesandroid.action.SYNC_PUSH_TOKEN"
 
         private lateinit var notificationManager: NotificationManager
         
@@ -119,6 +121,20 @@ class FamilyRulesCoreService : Service() {
 
         private fun isNotificationAlive() =
             notificationManager.activeNotifications.any { it.id == NOTIFICATION_ID }
+
+        fun requestForceReport(context: Context) {
+            val intent = Intent(context, FamilyRulesCoreService::class.java).apply {
+                action = ACTION_FORCE_REPORT
+            }
+            context.startForegroundService(intent)
+        }
+
+        fun requestPushTokenSync(context: Context) {
+            val intent = Intent(context, FamilyRulesCoreService::class.java).apply {
+                action = ACTION_SYNC_PUSH_TOKEN
+            }
+            context.startForegroundService(intent)
+        }
 
         fun bind(
             context: Context,
@@ -260,6 +276,20 @@ class FamilyRulesCoreService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_FORCE_REPORT -> {
+                if (::periodicReportSender.isInitialized) {
+                    Logger.i(TAG, "Force-report push received, sending report")
+                    periodicReportSender.reportUptimeAsync()
+                }
+            }
+            ACTION_SYNC_PUSH_TOKEN -> {
+                if (::periodicReportSender.isInitialized) {
+                    Logger.i(TAG, "Push token updated, sending client-info")
+                    periodicReportSender.sendClientInfoAsync()
+                }
+            }
+        }
         updateNotification()
         return START_STICKY
     }

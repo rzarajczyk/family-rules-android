@@ -19,3 +19,4 @@ app/build/
 app/release/
 keystores
 keystore.jks
+/app/google-services.json

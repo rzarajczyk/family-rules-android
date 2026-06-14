@@ -114,8 +114,16 @@ class PeriodicReportSender(
 
     private suspend fun sendInitialClientInfoRequest() {
         try {
-            familyRulesClient.sendClientInfoRequest()
-            serverCommandCoordinator.retryPendingWork()
+            FcmTokenRegistrar.refreshToken(settingsManager) {
+                scope.launch {
+                    try {
+                        familyRulesClient.sendClientInfoRequest()
+                        serverCommandCoordinator.retryPendingWork()
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "Failed to send initial client info after FCM token refresh: ${e.message}", e)
+                    }
+                }
+            }
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to send initial client info: ${e.message}", e)
         }

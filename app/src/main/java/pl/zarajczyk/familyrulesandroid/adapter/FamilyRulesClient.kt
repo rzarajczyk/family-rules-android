@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import pl.zarajczyk.familyrulesandroid.core.FcmTokenRegistrar
 import pl.zarajczyk.familyrulesandroid.core.SettingsManager
 import pl.zarajczyk.familyrulesandroid.database.AppDb
 import pl.zarajczyk.familyrulesandroid.utils.Logger
@@ -42,6 +43,7 @@ class FamilyRulesClient(
             "MEDIA_PLAYBACK_BLOCK",
             "RESTRICTED_APPS_BLOCK",
             "ALL_MY_DEVICES_DISPLAY",
+            "FCM_FORCE_REPORT_PUSH",
         )
         val AVAILABLE_STATES = DeviceState.entries.map { state ->
             val stateTitle = when (state) {
@@ -127,6 +129,7 @@ class FamilyRulesClient(
             knownApps = knownApps,
             availableStates = AVAILABLE_STATES,
             capabilities = SUPPORTED_CAPABILITIES,
+            pushToken = settingsManager.getString(FcmTokenRegistrar.PUSH_TOKEN_KEY),
         )
 
         withContext(Dispatchers.IO) {

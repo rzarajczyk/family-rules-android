@@ -23,6 +23,7 @@ data class ClientInfoRequest(
     val knownApps: Map<String, AppData>,
     val availableStates: List<AvailableState>,
     val capabilities: List<String>,
+    val pushToken: String? = null,
 )
 
 data class ReportRequest(
