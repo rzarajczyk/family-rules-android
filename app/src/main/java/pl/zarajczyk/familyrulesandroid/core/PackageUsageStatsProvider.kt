@@ -23,8 +23,11 @@ import java.time.temporal.ChronoUnit
  * Session durations are intersected with [buildScreenOnIntervals] so stale
  * activity bookkeeping cannot accrue time while the display is off.
  *
- * Result is cached for [CACHE_TTL_MS] to keep the binder-call cost negligible
- * even when the UI re-reads the value frequently during recomposition.
+ * Total screen time uses the same replay path via [computeTodayScreenTime]
+ * so daily totals stay consistent with per-app attribution.
+ *
+ * Results are cached for [CACHE_TTL_MS] to keep the binder-call cost negligible
+ * even when the UI re-reads values frequently during recomposition.
  */
 class PackageUsageStatsProvider(context: Context) {
 
@@ -38,7 +41,10 @@ class PackageUsageStatsProvider(context: Context) {
         context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
     @Volatile
-    private var cachedResult: Map<String, Long> = emptyMap()
+    private var cachedPackageUsage: Map<String, Long> = emptyMap()
+
+    @Volatile
+    private var cachedScreenTimeMs: Long = 0L
 
     @Volatile
     private var cachedAt: Long = 0L
@@ -48,9 +54,19 @@ class PackageUsageStatsProvider(context: Context) {
      * derived from `UsageEvents` and clipped to the local-day window.
      */
     fun getTodayPackageUsage(): Map<String, Long> {
-        val now = System.currentTimeMillis()
+        refreshIfStale()
+        return cachedPackageUsage
+    }
+
+    /** Returns total screen-on time today (ms), derived from the same event replay. */
+    fun getTodayScreenTime(): Long {
+        refreshIfStale()
+        return cachedScreenTimeMs
+    }
+
+    private fun refreshIfStale(now: Long = System.currentTimeMillis()) {
         if (now - cachedAt < CACHE_TTL_MS) {
-            return cachedResult
+            return
         }
 
         val startOfDay = Instant.ofEpochMilli(now)
@@ -59,17 +75,16 @@ class PackageUsageStatsProvider(context: Context) {
             .toInstant()
             .toEpochMilli()
 
-        val result = try {
+        try {
             val events = readEvents(startOfDay - LOOKBACK_MS, now)
-            computeTodayPackageUsage(events, startOfDay, now)
+            cachedPackageUsage = computeTodayPackageUsage(events, startOfDay, now)
+            cachedScreenTimeMs = computeTodayScreenTime(events, startOfDay, now)
         } catch (t: Throwable) {
             Logger.w(TAG, "queryEvents failed: ${t.message}", t)
-            cachedResult // serve last-known good on transient failure
+            // serve last-known good on transient failure
         }
 
-        cachedResult = result
         cachedAt = now
-        return result
     }
 
     private fun readEvents(start: Long, end: Long): List<UsageEventTuple> {
@@ -244,6 +259,12 @@ internal fun computeTodayPackageUsage(
     return result
 }
 
+internal fun computeTodayScreenTime(
+    events: List<UsageEventTuple>,
+    startOfDay: Long,
+    now: Long,
+): Long = buildScreenOnIntervals(events, startOfDay, now).sumOf { (start, end) -> end - start }
+
 internal fun buildScreenOnIntervals(
     events: List<UsageEventTuple>,
     startOfDay: Long,
@@ -270,23 +291,51 @@ internal fun buildScreenOnIntervals(
         }
 
     var isOn = false
+    var lastInteractiveBeforeDay: Long? = null
     for ((ts, on) in toggles) {
         if (ts >= startOfDay) break
+        if (on) lastInteractiveBeforeDay = ts
         isOn = on
+    }
+
+    val hasInteractiveToday = toggles.any { (ts, on) -> ts >= startOfDay && on }
+    if (isOn &&
+        !hasInteractiveToday &&
+        lastInteractiveBeforeDay != null &&
+        startOfDay - lastInteractiveBeforeDay > MAX_CROSS_MIDNIGHT_OPEN_MS
+    ) {
+        isOn = false
     }
 
     var openAt: Long? = if (isOn) startOfDay else null
     val intervals = mutableListOf<Pair<Long, Long>>()
+    var sawInteractiveToday = false
 
     for ((ts, on) in toggles) {
         if (ts < startOfDay) continue
         val t = minOf(ts, now)
         if (on) {
-            if (openAt == null) openAt = t
+            sawInteractiveToday = true
+            when {
+                openAt == null -> openAt = t
+                openAt == startOfDay &&
+                    lastInteractiveBeforeDay != null &&
+                    lastInteractiveBeforeDay < startOfDay &&
+                    t > startOfDay ->
+                    // Stale pre-midnight carry clipped to startOfDay; fresh interactive today.
+                    openAt = t
+            }
             isOn = true
         } else if (isOn) {
             openAt?.let { start ->
-                if (t > start) intervals.add(start to t)
+                val phantomMidnightCarry = start == startOfDay &&
+                    !sawInteractiveToday &&
+                    lastInteractiveBeforeDay != null &&
+                    lastInteractiveBeforeDay < startOfDay &&
+                    startOfDay - lastInteractiveBeforeDay > MAX_CROSS_MIDNIGHT_OPEN_MS
+                if (!phantomMidnightCarry && t > start) {
+                    intervals.add(start to t)
+                }
             }
             openAt = null
             isOn = false

@@ -410,6 +410,7 @@ class PackageUsageStatsProviderTest {
     @Test
     fun `SCREEN_NON_INTERACTIVE closes stale youtube session from previous evening`() {
         val day = startOfDay("2026-06-10")
+        val staleEveningResume = day - 2L * 60L * 60L * 1_000L
         val eveningResume = day - 4L * 60L * 60L * 1_000L
         val eveningScreenOff = day - 2L * 60L * 60L * 1_000L
         val resumeToday = ts("2026-06-10T10:33:51")
@@ -419,8 +420,7 @@ class PackageUsageStatsProviderTest {
 
         val withoutScreenOff = computeTodayPackageUsage(
             events = listOf(
-                resume(eveningResume, youtube, main),
-                resume(resumeToday, youtube, main),
+                resume(staleEveningResume, youtube, main),
             ),
             startOfDay = day,
             now = now,
@@ -452,7 +452,6 @@ class PackageUsageStatsProviderTest {
         val withoutStartup = computeTodayPackageUsage(
             events = listOf(
                 resume(yesterdayResume, youtube, main),
-                resume(resumeToday, youtube, main),
             ),
             startOfDay = day,
             now = now,
@@ -511,5 +510,72 @@ class PackageUsageStatsProviderTest {
         val result = computeTodayPackageUsage(events, startOfDay, now)
 
         assertEquals(mapOf("a" to 20L * 60L * 1_000L), result)
+    }
+
+    @Test
+    fun `computeTodayScreenTime sums clipped screen-on intervals`() {
+        val on = startOfDay + 1_000
+        val off = startOfDay + 6_000
+        val onAgain = startOfDay + 11_000
+        val offAgain = startOfDay + 16_000
+
+        val result = computeTodayScreenTime(
+            events = listOf(
+                screenOn(on),
+                screenOff(off),
+                screenOn(onAgain),
+                screenOff(offAgain),
+            ),
+            startOfDay = startOfDay,
+            now = now,
+        )
+
+        assertEquals(10_000L, result)
+    }
+
+    @Test
+    fun `stale pre-midnight screen-on without interactive today returns zero screen time`() {
+        val day = startOfDay("2026-06-15")
+        val staleScreenOn = day - 4L * 60L * 60L * 1_000L
+        val now = day + 4L * 60L * 1_000L
+
+        val result = computeTodayScreenTime(
+            events = listOf(screenOn(staleScreenOn)),
+            startOfDay = day,
+            now = now,
+        )
+
+        assertEquals(0L, result)
+    }
+
+    @Test
+    fun `replay june 15 shutdown does not count phantom midnight to shutdown screen time`() {
+        val day = startOfDay("2026-06-15")
+        val staleScreenOn = day - 4L * 60L * 60L * 1_000L
+        val shutdownAt = ts("2026-06-15T03:31:15.051")
+        val screenOnBoot = ts("2026-06-15T03:44:38.200")
+        val startupAt = ts("2026-06-15T03:44:38.248")
+        val screenOffBoot = ts("2026-06-15T03:44:46.986")
+        val now = ts("2026-06-15T06:50:44.101")
+
+        val inflatedWithoutFix = 3L * 60L * 60L * 1_000L + 31L * 60L * 1_000L + 23L * 1_000L
+        val result = computeTodayScreenTime(
+            events = listOf(
+                screenOn(staleScreenOn),
+                shutdown(shutdownAt),
+                screenOn(screenOnBoot),
+                startup(startupAt),
+                screenOff(screenOffBoot),
+            ),
+            startOfDay = day,
+            now = now,
+        )
+
+        assertTrue(
+            "expected brief boot flash only, not ~3h31m phantom overnight screen time",
+            result < 60_000L,
+        )
+        assertTrue(result >= screenOffBoot - screenOnBoot)
+        assertTrue(result < inflatedWithoutFix / 10)
     }
 }

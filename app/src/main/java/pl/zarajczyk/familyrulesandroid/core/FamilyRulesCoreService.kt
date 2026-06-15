@@ -33,7 +33,6 @@ class FamilyRulesCoreService : Service() {
     private val binder = LocalBinder()
 
     private lateinit var periodicUsageEventsMonitor: PeriodicUsageEventsMonitor
-    private lateinit var screenTimeCalculator: ScreenTimeCalculator
     private lateinit var packageUsageCalculator: PackageUsageCalculator
     private lateinit var packageUsageStatsProvider: PackageUsageStatsProvider
     private lateinit var systemEventLogger: SystemEventLogger
@@ -161,7 +160,7 @@ class FamilyRulesCoreService : Service() {
 
     fun getForegroundApp() = packageUsageCalculator.getForegroundApp()
 
-    fun getTodayScreenTime() = screenTimeCalculator.getTodayScreenTime()
+    fun getTodayScreenTime() = packageUsageStatsProvider.getTodayScreenTime()
 
     fun getTodayPackageUsage() = packageUsageStatsProvider.getTodayPackageUsage()
 
@@ -210,7 +209,6 @@ class FamilyRulesCoreService : Service() {
         // This is critical for parental control functionality
         ServiceKeepAliveAlarm.scheduleAlarm(this, interval = 5.minutes)
 
-        screenTimeCalculator = ScreenTimeCalculator()
         packageUsageCalculator = PackageUsageCalculator()
         packageUsageStatsProvider = PackageUsageStatsProvider(this)
         systemEventLogger = SystemEventLogger()
@@ -221,7 +219,6 @@ class FamilyRulesCoreService : Service() {
         periodicUsageEventsMonitor = PeriodicUsageEventsMonitor.install(this,
             delayDuration = 2.seconds,
             processors = listOf(
-                screenTimeCalculator,
                 packageUsageCalculator,
                 systemEventLogger,
             )
