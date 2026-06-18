@@ -72,4 +72,11 @@ interface ServerCommandDao {
 
     @Query("UPDATE server_commands SET resultUploadedAtMillis = :uploadedAtMillis, executionState = :executionState WHERE commandId = :commandId")
     suspend fun markResultUploaded(commandId: String, uploadedAtMillis: Long, executionState: String)
+
+    @Query(
+        "UPDATE server_commands SET executionState = 'RECEIVED' " +
+        "WHERE executionState = 'EXECUTING' AND commandName = 'PLAY_LOUD_SOUND' " +
+        "AND completedAtIso IS NULL AND receivedAtMillis < :cutoffMillis"
+    )
+    suspend fun resetStaleExecutingPlayLoudSound(cutoffMillis: Long)
 }

@@ -129,6 +129,12 @@ class AppDb(private val context: Context) {
         }
     }
 
+    suspend fun resetStaleExecutingPlayLoudSound(cutoffMillis: Long) {
+        withContext(Dispatchers.IO) {
+            serverCommandDao.resetStaleExecutingPlayLoudSound(cutoffMillis)
+        }
+    }
+
     suspend fun storeCommandResult(
         commandId: String,
         resultStatus: String,

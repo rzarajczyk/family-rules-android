@@ -44,6 +44,7 @@ class FamilyRulesClient(
             "RESTRICTED_APPS_BLOCK",
             "ALL_MY_DEVICES_DISPLAY",
             "FCM_FORCE_REPORT_PUSH",
+            "PLAY_LOUD_SOUND_COMMAND",
         )
         val AVAILABLE_STATES = DeviceState.entries.map { state ->
             val stateTitle = when (state) {

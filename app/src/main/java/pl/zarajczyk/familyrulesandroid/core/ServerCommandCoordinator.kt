@@ -2,7 +2,12 @@ package pl.zarajczyk.familyrulesandroid.core
 
 import android.content.Context
 import com.squareup.moshi.JsonAdapter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.zarajczyk.familyrulesandroid.adapter.CommandAckDto
 import pl.zarajczyk.familyrulesandroid.adapter.CommandResultDto
@@ -19,12 +24,16 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 
 private const val TAG = "ServerCommandCoordinator"
+private const val STALE_PLAY_LOUD_SOUND_EXECUTING_MS = 75_000L
 
 class ServerCommandCoordinator(
     private val context: Context,
     private val appDb: AppDb,
     private val familyRulesClient: FamilyRulesClient,
 ) {
+    private val commandScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var loudSoundJob: Job? = null
+    private val loudSoundPlayer = LoudSoundPlayer(context)
     private val payloadAdapter: JsonAdapter<Map<String, String>> = Moshi.Builder()
         .build()
         .adapter(Types.newParameterizedType(Map::class.java, String::class.java, String::class.java))
@@ -57,9 +66,16 @@ class ServerCommandCoordinator(
 
     suspend fun retryPendingWork() {
         appDb.cleanUpStalePayloadFiles()
+        recoverStaleExecutingPlayLoudSound()
         acknowledgePendingCommands()
         executePendingCommands()
         uploadPendingResults()
+    }
+
+    private suspend fun recoverStaleExecutingPlayLoudSound() {
+        if (loudSoundJob?.isActive == true) return
+        val cutoff = System.currentTimeMillis() - STALE_PLAY_LOUD_SOUND_EXECUTING_MS
+        appDb.resetStaleExecutingPlayLoudSound(cutoff)
     }
 
     private suspend fun acknowledgePendingCommands() {
@@ -82,19 +98,80 @@ class ServerCommandCoordinator(
     private suspend fun executePendingCommands() {
         val pending = appDb.getCommandsByExecutionState(ServerCommandExecutionState.RECEIVED)
         pending.forEach { command ->
-            appDb.markCommandExecuting(command.commandId)
-            val result = when (command.commandName) {
-                "SEND_LOGS" -> executeSendLogs(command.commandId)
-                else -> unsupportedCommand(command.commandName)
+            when (command.commandName) {
+                "PLAY_LOUD_SOUND" -> launchPlayLoudSound(command.commandId)
+                else -> executeCommandSynchronously(command)
+            }
+        }
+    }
+
+    private suspend fun executeCommandSynchronously(command: ServerCommandMeta) {
+        appDb.markCommandExecuting(command.commandId)
+        val result = when (command.commandName) {
+            "SEND_LOGS" -> executeSendLogs(command.commandId)
+            else -> unsupportedCommand(command.commandName)
+        }
+        appDb.storeCommandResult(
+            commandId = command.commandId,
+            resultStatus = result.status,
+            responseType = result.responseType,
+            responsePayloadJson = result.responsePayloadJson,
+            responsePayloadFilePath = result.responsePayloadFilePath,
+            completedAtIso = result.completedAt,
+        )
+    }
+
+    private fun launchPlayLoudSound(commandId: String) {
+        loudSoundJob?.cancel()
+        loudSoundJob = commandScope.launch {
+            appDb.markCommandExecuting(commandId)
+            val completedAt = Instant.now().toString()
+            val result = try {
+                val playResult = loudSoundPlayer.play()
+                Logger.i(TAG, "Played loud sound for command $commandId (${playResult.playedSeconds}s)")
+                CommandExecutionResult(
+                    status = "SUCCEEDED",
+                    responseType = "PLAY_LOUD_SOUND_V1",
+                    responsePayloadJson = payloadAdapter.toJson(
+                        mapOf(
+                            "playedSeconds" to playResult.playedSeconds.toString(),
+                            "alarmVolumeRaised" to playResult.alarmVolumeRaised.toString(),
+                        )
+                    ),
+                    responsePayloadFilePath = null,
+                    completedAt = completedAt,
+                )
+            } catch (e: CancellationException) {
+                loudSoundPlayer.stop()
+                Logger.i(TAG, "PLAY_LOUD_SOUND cancelled for command $commandId")
+                CommandExecutionResult(
+                    status = "FAILED",
+                    responseType = "PLAY_LOUD_SOUND_V1",
+                    responsePayloadJson = payloadAdapter.toJson(mapOf("error" to "cancelled")),
+                    responsePayloadFilePath = null,
+                    completedAt = completedAt,
+                )
+            } catch (e: Exception) {
+                Logger.e(TAG, "PLAY_LOUD_SOUND failed for command $commandId", e)
+                CommandExecutionResult(
+                    status = "FAILED",
+                    responseType = "PLAY_LOUD_SOUND_V1",
+                    responsePayloadJson = payloadAdapter.toJson(
+                        mapOf("error" to (e.message ?: "unknown"))
+                    ),
+                    responsePayloadFilePath = null,
+                    completedAt = completedAt,
+                )
             }
             appDb.storeCommandResult(
-                commandId = command.commandId,
+                commandId = commandId,
                 resultStatus = result.status,
                 responseType = result.responseType,
                 responsePayloadJson = result.responsePayloadJson,
                 responsePayloadFilePath = result.responsePayloadFilePath,
                 completedAtIso = result.completedAt,
             )
+            retryPendingWork()
         }
     }
 
