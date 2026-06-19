@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import pl.zarajczyk.familyrulesandroid.FindDeviceAlarmActivity
 import pl.zarajczyk.familyrulesandroid.adapter.CommandAckDto
 import pl.zarajczyk.familyrulesandroid.adapter.CommandResultDto
 import pl.zarajczyk.familyrulesandroid.adapter.FamilyRulesClient
@@ -24,7 +25,8 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 
 private const val TAG = "ServerCommandCoordinator"
-private const val STALE_PLAY_LOUD_SOUND_EXECUTING_MS = 75_000L
+private val STALE_PLAY_LOUD_SOUND_EXECUTING_MS =
+    (LoudSoundPlayer.PLAY_DURATION_SECONDS + 15L) * 1000L
 
 class ServerCommandCoordinator(
     private val context: Context,
@@ -123,10 +125,12 @@ class ServerCommandCoordinator(
 
     private fun launchPlayLoudSound(commandId: String) {
         loudSoundJob?.cancel()
+        FindDeviceAlarmActivity.finishIfVisible()
         loudSoundJob = commandScope.launch {
             appDb.markCommandExecuting(commandId)
             val completedAt = Instant.now().toString()
             val result = try {
+                FindDeviceAlarmActivity.show(context)
                 val playResult = loudSoundPlayer.play()
                 Logger.i(TAG, "Played loud sound for command $commandId (${playResult.playedSeconds}s)")
                 CommandExecutionResult(
@@ -136,6 +140,7 @@ class ServerCommandCoordinator(
                         mapOf(
                             "playedSeconds" to playResult.playedSeconds.toString(),
                             "alarmVolumeRaised" to playResult.alarmVolumeRaised.toString(),
+                            "dismissedEarly" to LoudSoundSession.isDismissRequested().toString(),
                         )
                     ),
                     responsePayloadFilePath = null,
@@ -162,6 +167,9 @@ class ServerCommandCoordinator(
                     responsePayloadFilePath = null,
                     completedAt = completedAt,
                 )
+            } finally {
+                FindDeviceAlarmActivity.finishIfVisible()
+                LoudSoundSession.reset()
             }
             appDb.storeCommandResult(
                 commandId = commandId,

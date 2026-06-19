@@ -57,6 +57,11 @@
     <string name="countdown_description">Aplikacje zostaną zablokowane po zakończeniu odliczania</string>
     <string name="countdown_warning">Dokończ swoje bieżące czynności</string>
     <string name="countdown_compact_message">Aplikacje zostaną zablokowane</string>
+
+    <!-- Find device alarm -->
+    <string name="find_device_alarm_title">Wyszukiwanie urządzenia</string>
+    <string name="find_device_alarm_description">Rodzic uruchomił alarm wyszukiwania. Naciśnij Odrzuć, aby wyłączyć dźwięk.</string>
+    <string name="find_device_alarm_dismiss">Odrzuć</string>
     
     <!-- Error Messages -->
     <string name="instance_already_exists">Instancja już istnieje.</string>

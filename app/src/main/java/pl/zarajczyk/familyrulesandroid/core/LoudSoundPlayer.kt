@@ -14,7 +14,6 @@ import kotlinx.coroutines.delay
 import pl.zarajczyk.familyrulesandroid.utils.Logger
 
 private const val TAG = "LoudSoundPlayer"
-private const val PLAY_DURATION_SECONDS = 60
 
 data class LoudSoundPlayResult(
     val playedSeconds: Int,
@@ -23,15 +22,21 @@ data class LoudSoundPlayResult(
 
 class LoudSoundPlayer(private val context: Context) {
 
+    companion object {
+        const val PLAY_DURATION_SECONDS = 30
+    }
+
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
 
     suspend fun play(): LoudSoundPlayResult {
         stop()
+        LoudSoundSession.reset()
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val previousAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
         val maxAlarmVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
         var volumeRaised = false
+        var playedSeconds = 0
         try {
             if (previousAlarmVolume < maxAlarmVolume) {
                 audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarmVolume, 0)
@@ -55,13 +60,18 @@ class LoudSoundPlayer(private val context: Context) {
                 start()
             }
             mediaPlayer = player
-            Logger.i(TAG, "Playing loud alarm sound for $PLAY_DURATION_SECONDS seconds")
-            delay(PLAY_DURATION_SECONDS * 1000L)
+            LoudSoundSession.stopPlayback = { stop() }
+            Logger.i(TAG, "Playing loud alarm sound for up to $PLAY_DURATION_SECONDS seconds")
+            while (playedSeconds < PLAY_DURATION_SECONDS && !LoudSoundSession.isDismissRequested()) {
+                delay(1000)
+                playedSeconds++
+            }
             return LoudSoundPlayResult(
-                playedSeconds = PLAY_DURATION_SECONDS,
+                playedSeconds = playedSeconds,
                 alarmVolumeRaised = volumeRaised,
             )
         } finally {
+            LoudSoundSession.stopPlayback = null
             stop()
             if (volumeRaised) {
                 audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousAlarmVolume, 0)

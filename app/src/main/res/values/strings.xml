@@ -61,6 +61,11 @@
     <string name="countdown_description">Apps will be blocked when the timer reaches zero</string>
     <string name="countdown_warning">Please finish your current activities</string>
     <string name="countdown_compact_message">Apps will be blocked</string>
+
+    <!-- Find device alarm -->
+    <string name="find_device_alarm_title">Finding this device</string>
+    <string name="find_device_alarm_description">A parent started the find-device alarm. Tap Dismiss to stop the sound.</string>
+    <string name="find_device_alarm_dismiss">Dismiss</string>
     
     <!-- Error Messages -->
     <string name="instance_already_exists">Instance already exists.</string>
